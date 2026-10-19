@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>blog-my · 验收清单（附录 J）</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<style>
+  .acc-wrap { max-width: 860px; margin: 0 auto; padding: 28px 22px 60px; }
+  .acc-wrap h1 { font-size: 22px; margin: 0 0 4px; }
+  .acc-sub { color: var(--text-dim, #7d87a3); font-size: 13px; margin-bottom: 18px; }
+  .acc-card { background: var(--panel, #fff); border: 1px solid var(--line, #e6e9f0); border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
+  .acc-card h2 { font-size: 15px; margin: 0 0 12px; }
+  .acc-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--line, #eef0f5); font-size: 14px; }
+  .acc-row:last-child { border-bottom: 0; }
+  .acc-box { width: 18px; height: 18px; border: 2px solid #c3c9d6; border-radius: 4px; flex: 0 0 18px; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #fff; margin-top: 1px; }
+  .acc-box.ok { background: #1a8f3c; border-color: #1a8f3c; }
+  .acc-box.no { background: #c0392b; border-color: #c0392b; }
+  .acc-box.wait { background: #fff; }
+  .acc-name { flex: 1; }
+  .acc-detail { color: var(--text-dim, #7d87a3); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .acc-stat { display: flex; align-items: center; gap: 14px; margin: 10px 0 4px; }
+  .acc-bar { flex: 1; height: 10px; background: #e9ecf3; border-radius: 6px; overflow: hidden; }
+  .acc-bar > i { display: block; height: 100%; width: 0; background: #1a8f3c; transition: width .4s; }
+  .acc-pct { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
+  .acc-btn { border: 1px solid var(--line, #d8dce6); background: #fff; border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
+  .acc-btn:hover { background: #f4f6fb; }
+  .acc-tip { font-size: 12px; color: var(--text-dim, #7d87a3); margin-top: 8px; }
+  .acc-foot { text-align: center; font-size: 12px; color: var(--text-dim, #7d87a3); margin-top: 18px; }
+  .acc-foot a { color: #4454a3; }
+</style>
+</head>
+<body>
+<div class="acc-wrap">
+  <h1>blog-my · 附录 J 验收清单</h1>
+  <div class="acc-sub">本页「实机检测」区块会在你打开页面的这一刻，对本站点真实发起请求并逐项打勾；下面另有「仓库侧证据」区块，需对照仓库核验。</div>
+
+  <div class="acc-card">
+    <h2>完成率</h2>
+    <div class="acc-stat">
+      <div class="acc-bar"><i id="bar"></i></div>
+      <div class="acc-pct"><span id="pct">—</span></div>
+    </div>
+    <div class="acc-tip" id="statText">检测中…</div>
+    <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+      <button type="button" class="acc-btn" id="rerun">重新检测</button>
+      <button type="button" class="acc-btn" id="export">导出验收结果（JSON）</button>
+    </div>
+  </div>
+
+  <div class="acc-card">
+    <h2>A · 实机检测（当场自动打勾）</h2>
+    <div id="liveList"><div class="acc-row"><span class="acc-box wait"></span><span class="acc-name">检测中…</span></div></div>
+  </div>
+
+  <div class="acc-card">
+    <h2>B · 仓库侧证据（对照仓库核验，不在浏览器内检测）</h2>
+    <div id="staticList"></div>
+  </div>
+
+  <div class="acc-foot">
+    <a href="/">← 回检查台首页</a>　·　<a href="/chat">对话页</a>　·　<a href="/hot">热搜页</a>
+  </div>
+</div>
+
+<script>
+  // A 区块：对本站点真实发起请求，逐项判定
+  var LIVE = [
+    { id: 'J-1', name: '公网首页可打开', run: function () { return check('/', 'html'); } },
+    { id: 'J-2', name: '健康检查接口 /api/health', run: function () { return check('/api/health', 'json'); } },
+    { id: 'J-3', name: '真实数据展示 /api/hot', run: function () { return check('/api/hot', 'json'); } },
+    { id: 'J-4', name: '收藏读取 /api/favorites', run: function () { return check('/api/favorites', 'json'); } },
+    { id: 'J-5', name: '模型列表 /api/models', run: function () { return check('/api/models', 'json'); } },
+    { id: 'J-6', name: '对话页 /chat 可打开', run: function () { return check('/chat', 'html'); } },
+    { id: 'J-7', name: '热搜页 /hot 可打开', run: function () { return check('/hot', 'html'); } },
+    { id: 'J-8', name: '静态资源 style.css', run: function () { return check('/static/css/style.css', 'css'); } },
+    { id: 'J-9', name: '未实现接口返回 JSON 404（Day 27 修复）', run: function () {
+        return fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+          .then(function (r) {
+            var ct = r.headers.get('content-type') || '';
+            return { ok: r.status === 404 && ct.indexOf('json') !== -1, detail: 'HTTP ' + r.status + ' / ' + ct.split(';')[0] };
+          });
+      } }
+  ];
+
+  // B 区块：仓库侧已核验项，写明证据位置（浏览器检测不了，不做假勾）
+  var STATIC = [
+    { id: 'J-10', name: '跨域响应头与 OPTIONS 预检', ok: true, detail: 'Day 20｜deploy/server.js withCORS + OPTIONS 204，脚本 day28-accept 实测 J-10/J-11 通过' },
+    { id: 'J-11', name: '收藏写入与持久化（POST）', ok: true, detail: 'Day 18｜连跑 3 遍：写入 201、刷新后仍在（day28-accept F1-5 / F2-5 / F3-5）' },
+    { id: 'J-12', name: 'PATCH / DELETE 增删改查闭环', ok: true, detail: 'Day 22｜本地同版本服务实测通过（J-15/16/17）；公网未删改共享数据' },
+    { id: 'J-13', name: '参数校验：重复 409 / 缺字段 400', ok: true, detail: 'Day 18｜day28-accept J-12 / J-13 通过' },
+    { id: 'J-14', name: '数据库表结构与种子脚本', ok: true, detail: 'Day 16｜db/schema.sql、db/seed.sql，已连本机 MySQL 建表灌种子验证' },
+    { id: 'J-15', name: '接口契约文档', ok: true, detail: 'Day 15｜docs/api-contract.md' },
+    { id: 'J-16', name: '桌面端 v1.0 构建产物', ok: true, detail: 'dist/blog-my Setup 0.1.0.exe（177MB）+ win-unpacked/blog-my.exe' },
+    { id: 'J-17', name: '回退演练手册', ok: false, detail: 'Day 26｜docs/day26/rollback-runbook.md：演练未执行（平台无回退能力），已如实标注阻塞' },
+    { id: 'J-18', name: '第三方真人试用记录', ok: false, detail: 'Day 27｜docs/day27/trial-feedback.md：未邀请到真人，走降级自测，截图需对方设备补拍' },
+    { id: 'J-19', name: '桌面端 v1.0 主程序 blog-my.exe', ok: true, detail: 'dist/win-unpacked/blog-my.exe 234.6MB，构建于 2026-10-17 14:39' },
+    { id: 'J-20', name: '桌面端打包完整（含 Go 后端与前端模板）', ok: true, detail: 'resources/ 内含 app.asar + bin/blog-my.exe + bin/cua-sidecar.exe + templates/{chat,static,user} + skills' },
+    { id: 'J-21', name: '桌面端版本号一致', ok: false, detail: 'package.json = 0.1.0，但安装包 blog-my Setup 0.1.0.exe 建于 2026-10-12，比 win-unpacked 主程序（10-17）旧 5 天，需重新打包才能一致' },
+    { id: 'J-22', name: '桌面端可启动（GUI）', ok: false, detail: '未在本次验收中确认：沙盒会话启动后进程立即退出且取不到真实桌面，无法判定是否为沙盒限制。需你在正常桌面双击 dist/win-unpacked/blog-my.exe 确认' }
+  ];
+
+  function check(p, kind) {
+    return fetch(p).then(function (r) {
+      var ct = r.headers.get('content-type') || '';
+      var ok = r.status === 200;
+      if (kind === 'json') ok = ok && ct.indexOf('json') !== -1;
+      if (kind === 'html') ok = ok && ct.indexOf('html') !== -1;
+      if (kind === 'css') ok = ok && (ct.indexOf('css') !== -1 || ct.indexOf('text/plain') !== -1);
+      return { ok: ok, detail: 'HTTP ' + r.status + ' / ' + ct.split(';')[0] };
+    }).catch(function (e) { return { ok: false, detail: '请求失败：' + e.message }; });
+  }
+
+  function row(id, name, state, detail) {
+    var box = document.createElement('span');
+    box.className = 'acc-box ' + (state === true ? 'ok' : state === false ? 'no' : 'wait');
+    box.textContent = state === true ? '✓' : state === false ? '✕' : '';
+    var n = document.createElement('span');
+    n.className = 'acc-name';
+    n.textContent = id + '　' + name;
+    if (detail) {
+      var d = document.createElement('div');
+      d.className = 'acc-detail';
+      d.textContent = detail;
+      n.appendChild(d);
+    }
+    var r = document.createElement('div');
+    r.className = 'acc-row';
+    r.appendChild(box); r.appendChild(n);
+    return r;
+  }
+
+  var lastResults = [];
+
+  function renderStatic() {
+    var list = document.getElementById('staticList');
+    list.textContent = '';
+    STATIC.forEach(function (s) { list.appendChild(row(s.id, s.name, s.ok, s.detail)); });
+  }
+
+  function updateStat(live) {
+    var all = live.concat(STATIC);
+    var pass = all.filter(function (x) { return x.ok === true; }).length;
+    var pctv = Math.round(pass / all.length * 100);
+    document.getElementById('bar').style.width = pctv + '%';
+    document.getElementById('pct').textContent = pctv + '%';
+    document.getElementById('statText').textContent =
+      '通过 ' + pass + ' / 共 ' + all.length + ' 项（实机 ' + live.filter(function (x) { return x.ok; }).length + '/' + live.length + '，仓库侧 ' + STATIC.filter(function (x) { return x.ok; }).length + '/' + STATIC.length + '）　检测时间 ' + new Date().toLocaleString('zh-CN');
+    lastResults = all;
+  }
+
+  function runLive() {
+    var list = document.getElementById('liveList');
+    list.textContent = '';
+    var items = LIVE.map(function (x) {
+      var r = row(x.id, x.name, null, '检测中…');
+      list.appendChild(r);
+      return x.run().then(function (res) {
+        list.replaceChild(row(x.id, x.name, res.ok, res.detail), r);
+        return { id: x.id, name: x.name, ok: res.ok, detail: res.detail };
+      });
+    });
+    Promise.all(items).then(function (live) {
+      updateStat(live);
+    });
+  }
+
+  function exportJSON() {
+    var payload = {
+      exported_at: new Date().toISOString(),
+      site: location.origin,
+      summary: { pass: lastResults.filter(function (x) { return x.ok; }).length, total: lastResults.length },
+      items: lastResults
+    };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'day28-acceptance-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }
+
+  document.getElementById('rerun').addEventListener('click', runLive);
+  document.getElementById('export').addEventListener('click', exportJSON);
+  renderStatic();
+  updateStat([]);
+  runLive();
+</script>
+</body>
+</html>

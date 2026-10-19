@@ -1,0 +1,246 @@
+{
+  "base": "http://127.0.0.1:8300",
+  "runTag": "20261011132050",
+  "secret": "UIVERIFY-20261011132050",
+  "mdName": "ui-verify-20261011132050.md",
+  "pngName": "ui-verify-20261011132050.png",
+  "evidence": {
+    "console": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "failedRequests": [],
+    "badResponses": [],
+    "login": {
+      "url": "http://127.0.0.1:8300/",
+      "ok": true
+    },
+    "upload": {
+      "filename": "ui-verify-20261011132050.md",
+      "note": "已入库：id=14，kind=text，切出 2 个块。",
+      "id": "14"
+    },
+    "search": {
+      "query": "UIVERIFY-20261011132050",
+      "hitCount": 2,
+      "anyContainsSecret": true,
+      "hitDocumentIds": [
+        "14",
+        "14"
+      ],
+      "containsUploadedDoc": true,
+      "topContainsSecret": true,
+      "topPreview": "前端验收专用文本，暗号词是 UIVERIFY-20261011132050。 【前端验收段落 01】这段文字由前端验收脚本生成，用来验证「粘贴/上传文本 -> 切块 -> 嵌入 -> 检索」这条链路在前端点击后确实跑通。（序号 1） 【前端验收段落 02】知识库把长文切成交叠的小块，每块单独算向量，检索时按余弦相似度取前几个。（序号 2） 【前端验收段落 03】前端只负责发请求与渲染，切块与向量化...",
+      "hitScores": [
+        "相似度 0.432",
+        "相似度 0.411"
+      ]
+    },
+    "imageUpload": {
+      "filename": "ui-verify-20261011132050.png",
+      "note": "已入库：id=15，kind=image，切出 1 个块。",
+      "seconds": 13.3
+    },
+    "ask": {
+      "model": "qwen2.5:7b",
+      "question": "本次前端验收文本里的暗号词是什么？请只依据知识库资料回答。",
+      "answer": "本次前端验收文本里的暗号词是 UIVERIFY-20261011132050。[1][2][3]",
+      "sources": 3,
+      "seconds": 4.6
+    },
+    "delete": {
+      "filename": "ui-verify-20261011132050.md",
+      "rowsBefore": 2,
+      "rowsAfter": 1,
+      "gone": true
+    },
+    "cleanupImage": {
+      "filename": "ui-verify-20261011132050.png",
+      "gone": true
+    },
+    "screenshots": [
+      "docs\\day23\\screenshots\\kb-1-view.png",
+      "docs\\day23\\screenshots\\kb-2-upload.png",
+      "docs\\day23\\screenshots\\kb-3-search.png",
+      "docs\\day23\\screenshots\\kb-4-image-upload.png",
+      "docs\\day23\\screenshots\\kb-5-ask.png",
+      "docs\\day23\\screenshots\\kb-6-delete.png",
+      "docs\\day23\\screenshots\\kb-7-cleanup.png"
+    ]
+  },
+  "checks": [
+    {
+      "level": "PASS",
+      "name": "登录后离开 /login",
+      "expect": "不在 /login",
+      "actual": "http://127.0.0.1:8300/"
+    },
+    {
+      "level": "PASS",
+      "name": "侧栏存在「知识库」导航项",
+      "expect": "存在",
+      "actual": "1 个"
+    },
+    {
+      "level": "PASS",
+      "name": "导航项文案为「知识库」",
+      "expect": "知识库",
+      "actual": "知识库"
+    },
+    {
+      "level": "PASS",
+      "name": "hash 变为 #/kb",
+      "expect": "#/kb",
+      "actual": "/kb"
+    },
+    {
+      "level": "PASS",
+      "name": "知识库视图可见",
+      "expect": "可见",
+      "actual": "true"
+    },
+    {
+      "level": "PASS",
+      "name": "对话区在知识库视图下隐藏",
+      "expect": "隐藏",
+      "actual": "false"
+    },
+    {
+      "level": "PASS",
+      "name": "统计数字已加载（不是占位 …）",
+      "expect": "数字",
+      "actual": "0"
+    },
+    {
+      "level": "PASS",
+      "name": "文件选择器已选中素材",
+      "expect": "ui-verify-20261011132050.md",
+      "actual": "ui-verify-20261011132050.md"
+    },
+    {
+      "level": "PASS",
+      "name": "上传后提示「已入库」",
+      "expect": "含 已入库",
+      "actual": "已入库：id=14，kind=text，切出 2 个块。"
+    },
+    {
+      "level": "PASS",
+      "name": "文档列表出现刚上传的文件",
+      "expect": "ui-verify-20261011132050.md",
+      "actual": "文本 ui-verify-20261011132050.md id=14 · 块 2 · 2.5 KB · text/plain; charset=utf-8 · 2026-10-11 13:20 删除"
+    },
+    {
+      "level": "PASS",
+      "name": "检索结果渲染出命中块",
+      "expect": ">= 1",
+      "actual": "2 个"
+    },
+    {
+      "level": "PASS",
+      "name": "命中的块里至少有一条包含检索词（召回证据）",
+      "expect": "含 UIVERIFY-20261011132050",
+      "actual": "有"
+    },
+    {
+      "level": "PASS",
+      "name": "命中里包含刚上传文档的块（document_id=14）",
+      "expect": "包含",
+      "actual": "14, 14"
+    },
+    {
+      "level": "PASS",
+      "name": "排在第一位的命中包含检索词（软断言：向量检索不保证词法排序）",
+      "expect": "含 UIVERIFY-20261011132050",
+      "actual": "前端验收专用文本，暗号词是 UIVERIFY-20261011132050。 【前端验收段落 01】这段文字由前端验收脚本生成，用来验证「粘贴/上传文本 -> 切块 -> 嵌入 -..."
+    },
+    {
+      "level": "PASS",
+      "name": "图片上传后提示「已入库」",
+      "expect": "含 已入库",
+      "actual": "已入库：id=15，kind=image，切出 1 个块。"
+    },
+    {
+      "level": "PASS",
+      "name": "图片上传提示 kind=image",
+      "expect": "含 kind=image",
+      "actual": "已入库：id=15，kind=image，切出 1 个块。"
+    },
+    {
+      "level": "PASS",
+      "name": "文档列表出现图片文档",
+      "expect": "ui-verify-20261011132050.png",
+      "actual": "图片 ui-verify-20261011132050.png id=15 · 块 1 · 209 B · image/png · 2026-10-11 13:21 删除 文本 ui-verify-20261011132050.md id=14 · 块 2 · 2.5 KB · text/plain; charset=utf-8 · 2026-10-11 13:20 删除"
+    },
+    {
+      "level": "PASS",
+      "name": "问答流式结束后提问按钮恢复可用",
+      "expect": "恢复可用",
+      "actual": "已恢复"
+    },
+    {
+      "level": "PASS",
+      "name": "问答渲染出 sources 出处区",
+      "expect": ">= 1",
+      "actual": "1 个"
+    },
+    {
+      "level": "PASS",
+      "name": "出处条目数 >= 1",
+      "expect": ">= 1",
+      "actual": "3 个"
+    },
+    {
+      "level": "PASS",
+      "name": "回答正文非空",
+      "expect": "非空",
+      "actual": "48 字"
+    },
+    {
+      "level": "PASS",
+      "name": "回答包含暗号词（软断言：取决于模型）",
+      "expect": "含 UIVERIFY-20261011132050",
+      "actual": "本次前端验收文本里的暗号词是 UIVERIFY-20261011132050。[1][2][3]"
+    },
+    {
+      "level": "PASS",
+      "name": "问答没有渲染错误提示",
+      "expect": "0",
+      "actual": "0 个"
+    },
+    {
+      "level": "PASS",
+      "name": "删除前列表里能找到该行",
+      "expect": "存在",
+      "actual": "存在"
+    },
+    {
+      "level": "PASS",
+      "name": "删除后列表里不再有该文档",
+      "expect": "不包含",
+      "actual": "不包含"
+    },
+    {
+      "level": "PASS",
+      "name": "清理：本次创建的图片文档已删除",
+      "expect": "不包含",
+      "actual": "不包含"
+    },
+    {
+      "level": "PASS",
+      "name": "页面加载的资源没有 4xx/5xx（/favicon.ico 除外）",
+      "expect": "0",
+      "actual": "0 条"
+    },
+    {
+      "level": "PASS",
+      "name": "页面没有 JS console 报错（favicon/静态资源 404 已在上面单独判定）",
+      "expect": "0",
+      "actual": "0 条"
+    }
+  ],
+  "summary": {
+    "pass": 28,
+    "warn": 0,
+    "fail": 0,
+    "exitCode": 0
+  }
+}

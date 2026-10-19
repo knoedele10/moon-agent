@@ -1,0 +1,48 @@
+导航重排（侧栏横排 6 页签 -> 竖排分组）验证记录
+=====================================================
+
+探针：nav-rearrange-probe.mjs
+      复用 gstack skill 里的 playwright-core 1.58.2 + 本机已缓存的 chromium-1223
+      （显式 executablePath 指 chrome-win64\chrome.exe，因为本机没装 headless_shell-1223）
+被测：http://127.0.0.1:8099（bin/blog-my.exe，模板从 templates/ 实时读盘）
+方式：真实浏览器里注册临时账号 -> 登录 -> DOM 断言 + 几何测量 + 逐页签点击 + 截图
+
+第 1 轮（重排后、修 CSS 前）：14 PASS / 2 FAIL
+  FAIL 点「助手」-> app[data-view]=assistants 且视图可见
+  FAIL 点「提示词」-> app[data-view]=prompts 且视图可见
+
+根因（预存在缺陷，不是重排引入）：
+  .view 的基础规则是 display:none，只有 .app[data-view=...] 规则能点亮它；
+  但 style.css 里只写了 models / skills / cua 三个视图的 display:block，
+  #view-assistants 与 #view-prompts 从来没有显示规则 —— 这两个页签是后加的，
+  当时只加了 DOM + 脚本（index.html 末尾的内联 init 钩子），漏了 CSS，
+  所以点它们只有顶栏标题在变、视图本体永远不显示。
+
+修复：
+  1. 补 .app[data-view="assistants"] #view-assistants 与
+     .app[data-view="prompts"] #view-prompts 的 display:block；
+  2. 对话区收起规则从「逐视图列名单」收敛成 .app:not([data-view="chat"]) 一条，
+     skill-auto 同样处理 —— data-view 取值就 6 个（chat.js 的 viewFromHash 白名单控制），
+     以后再加整页视图不必回来补名单，避免再漏。
+
+第 2 轮（修复后）：16 PASS / 0 FAIL，exit 0
+  [PASS] 页签 6 个且顺序 = 对话,技能,助手,提示词,模型,电脑操控
+  [PASS] 竖排：所有页签同 x、y 严格递增（x=10）
+  [PASS] 不挤了：每个页签行宽 243px（旧横排约 37px）
+  [PASS] 页签文案完整
+  [PASS] 两个分组标签 LIBRARY / LABS
+  [PASS] 测试版徽标改为行内（不再浮出页签外）
+  [PASS] 点「技能」/「助手」/「提示词」/「模型」/「电脑操控」/「对话」：data-view 切换且视图可见
+  [PASS] 390px：汉堡可见、侧栏移出画布、点汉堡抽屉滑入、抽屉里页签可点且切到技能
+
+截图：nav-rearrange-chat.png（对话视图全页）
+      nav-rearrange-sidebar.png（侧栏 264x800 裁切）
+      nav-rearrange-skills.png（技能视图）
+      nav-rearrange-narrow.png（390px 抽屉）
+
+清理：两轮各一个 e2e_navp_* 账号，已连同关联 user_id 行从 user 表删除，剩余 e2e 账号 0；
+      主账号 2399493728 的技能数未受影响：131。
+
+打包同步：templates/ 已同步到 dist\win-unpacked\resources\templates 与
+          E:\123\blog-my\resources\templates（index.html / style.css / skills.js 与源 SHA256 一致，
+          三份副本的显示规则字面量核对通过）。

@@ -1,0 +1,8 @@
+# Python 产物
+__pycache__/
+*.pyc
+*.pyo
+
+# 运行时日志
+logs/*.jsonl
+logs/_*.txt

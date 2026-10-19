@@ -1,0 +1,158 @@
+{{define "user/settings.html"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <!-- 主题要在首次绘制前定好，否则深色主题会先闪一帧浅色（与对话页同一份逻辑）。 -->
+    <script src="/static/js/theme-boot.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="settings-page">
+    <header class="settings-topbar">
+        <div class="brand-row">
+            <span class="logo" aria-hidden="true">M</span>
+            <span class="brand-text">
+                <span class="brand-name">多模型工作台</span>
+                <span class="brand-mid">SETTINGS<i>//</i>KEYS</span>
+            </span>
+        </div>
+        <span class="username" title="{{.Username}}">{{.Username}}</span>
+        <a class="btn btn-ghost" href="/">返回对话</a>
+        <a class="btn btn-ghost" href="/logout">退出</a>
+    </header>
+
+    <main class="settings-body">
+        <!-- 锚点导航保持页面简单，同时让 API、目录和助手偏好一眼可达。 -->
+        <nav class="settings-nav" aria-label="设置导航">
+            <p class="settings-nav-label">设置</p>
+            <a class="settings-nav-item" href="#sec-key-form"><span>01</span>连接模型</a>
+            <a class="settings-nav-item" href="#sec-keys"><span>02</span>已保存密钥</a>
+            <a class="settings-nav-item" href="#sec-roots"><span>03</span>模式目录</a>
+            <a class="settings-nav-item" href="#sec-soul"><span>04</span>助手偏好</a>
+            <a class="settings-nav-item settings-nav-back" href="/">返回对话</a>
+        </nav>
+        <div class="settings-content">
+            <header class="page-heading settings-hero">
+                <div>
+                    <p class="page-tag">MODEL CONNECTIONS</p>
+                    <h1>模型连接与偏好</h1>
+                    <p>管理模型服务、工作目录和助手行为。密钥仅保存在你的服务端数据库中。</p>
+                </div>
+                <div class="settings-hero-badges" aria-label="连接特性">
+                    <span>加密保存</span>
+                    <span>多厂商切换</span>
+                </div>
+            </header>
+
+            <section class="card settings-feature-card" id="sec-key-form">
+                <div class="settings-card-heading">
+                    <span class="settings-card-icon" aria-hidden="true">⌁</span>
+                    <div>
+                        <p class="card-tag">API CONNECTION</p>
+                        <h2>连接模型服务</h2>
+                        <p class="card-sub">选择服务商并粘贴 API Key。同一厂商再次保存会安全覆盖旧 Key。</p>
+                    </div>
+                </div>
+                <form class="key-form" id="key-form" autocomplete="off">
+                    <div class="field">
+                        <label for="endpoint">模型厂商</label>
+                        <select class="select" id="endpoint" required>
+                            <option value="">加载中…</option>
+                        </select>
+                    </div>
+                    <div class="field key-secret-field">
+                        <label for="api-key">API Key</label>
+                        <div class="secret-input-wrap">
+                            <input class="input" type="password" id="api-key" placeholder="粘贴 API Key" autocomplete="new-password" spellcheck="false" required>
+                            <button type="button" class="secret-toggle" id="key-visibility" aria-label="显示 API Key" aria-pressed="false">显示</button>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn key-save-btn" id="key-submit">保存连接</button>
+                </form>
+                <p class="provider-note" id="provider-note">选择厂商后，这里会显示对应的连接说明。</p>
+                <div class="settings-callout" role="note">
+                    <span aria-hidden="true">i</span>
+                    <p><b>工具调用会多请求一次模型。</b>工具执行后，模型还要读取结果并组织回复；服务商繁忙时可能返回 503。应用现在会对没有产生任何输出的临时错误自动重试一次。</p>
+                </div>
+            </section>
+
+            <section class="card" id="sec-keys">
+                <div class="settings-card-heading compact">
+                    <span class="settings-card-icon" aria-hidden="true">✓</span>
+                    <div>
+                        <p class="card-tag">SAVED CONNECTIONS</p>
+                        <h2>已保存密钥 <span class="key-count" id="key-count">0</span></h2>
+                        <p class="card-sub">这里只显示脱敏后的 Key，浏览器不会拿到完整密钥。</p>
+                    </div>
+                </div>
+                <div class="key-list" id="key-list">
+                    <div class="list-hint">加载中…</div>
+                </div>
+            </section>
+
+        <!-- 模式专属工作区：代码模式 / 学习模式各自的默认目录。
+             留空就回落成通用工作区（在对话页左下角选的那个）。 -->
+        <section class="card" id="sec-roots">
+            <div class="settings-card-heading">
+                <span class="settings-card-icon" aria-hidden="true">⌂</span>
+                <div>
+                    <p class="card-tag">WORKSPACE</p>
+                    <h2>模式专属目录</h2>
+                    <p class="card-sub">为代码协作和学习陪伴固定默认目录；留空时使用对话页选择的通用工作区。</p>
+                </div>
+            </div>
+            <div class="settings-field-grid">
+                <div class="field">
+                    <label for="code-root">代码协作目录</label>
+                    <input class="input" id="code-root" placeholder="例如 D:\code\my-project" spellcheck="false">
+                </div>
+                <div class="field">
+                    <label for="learn-root">学习陪伴目录</label>
+                    <input class="input" id="learn-root" placeholder="例如 D:\notes" spellcheck="false">
+                </div>
+            </div>
+            <button type="button" class="btn" id="roots-save">保存目录</button>
+            <p class="kb-note" id="roots-note" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="card" id="sec-soul">
+            <div class="settings-card-heading">
+                <span class="settings-card-icon" aria-hidden="true">✦</span>
+                <div>
+                    <p class="card-tag">ASSISTANT PREFERENCES</p>
+                    <h2>灵魂：人格、说话方式、做事方式</h2>
+                    <p class="card-sub">这些偏好会加入每轮对话，帮助助手保持一致的表达和工作习惯。</p>
+                </div>
+            </div>
+            <div class="settings-field-grid">
+                <div class="field">
+                    <label for="soul-personality">人格</label>
+                    <textarea class="input" id="soul-personality" rows="5" placeholder="例如：温和、有主见、诚实；发现问题时提出不同意见。"></textarea>
+                </div>
+                <div class="field">
+                    <label for="soul-voice">说话方式</label>
+                    <textarea class="input" id="soul-voice" rows="5" placeholder="例如：直接、少客套；先给结论再给理由。"></textarea>
+                </div>
+                <div class="field">
+                    <label for="soul-work">做事方式</label>
+                    <textarea class="input" id="soul-work" rows="5" placeholder="例如：改文件前先检查现状；完成后给出验证结果。"></textarea>
+                </div>
+            </div>
+            <div class="field" style="margin-top:16px">
+                <label for="soul-growth">玛丽的自我成长记录</label>
+                <textarea class="input" id="soul-growth" rows="3" readonly placeholder="她会在有充分互动依据时，主动调整可变特质；调整会显示在这里。"></textarea>
+            </div>
+            <button type="button" class="btn" id="soul-save">保存偏好</button>
+            <p class="kb-note" id="soul-note" role="status" aria-live="polite"></p>
+        </section>
+        </div>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="/static/js/settings.js"></script>
+</body>
+</html>
+{{end}}

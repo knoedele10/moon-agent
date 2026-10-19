@@ -1,0 +1,18 @@
+{
+  "seq": 1,
+  "mode": "empty",
+  "at": "2026-10-11T08:12:56.898Z",
+  "url": "/v1/chat/completions",
+  "auth_seen": true,
+  "model": "deepseek-flash",
+  "messages": [
+    {
+      "role": "user",
+      "content": "hi"
+    }
+  ],
+  "message_content_types": [
+    "string"
+  ],
+  "reply_content_len": 0
+}

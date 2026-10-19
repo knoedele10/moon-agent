@@ -1,0 +1,344 @@
+=== 集成层回归基线（task-18，verifier） ===
+采样时间：2026-10-11（Asia/Shanghai）
+环境：Python 3.13.13 / Node v24.16.0
+
+【口径变更 · 2026-10-11 19:3x · 84 -> 87（同样不是回归）】
+  task-25 为「type 走剪贴板主路径」新增 3 条自检（ASCII 也走剪贴板、剪贴板不可用退化、target/submit 路径），
+  总数 84 -> 87。**当前锚点见文末 [6]：87 通过 / 0 失败**；84 及以前都是历史值。
+  （sidecar 产物的自检同为 87/0，见 [6]。）
+
+【口径变更 · 2026-10-11 16:25 · 83 -> 84（同样不是回归）】
+  cua-py 完成 task-21 时为「事件流 UTF-8 往返」又新增 1 个自检项，总数 83 -> 84。
+  **当前锚点见文末 [5]：84 通过 / 0 失败**；81 / 83 都是历史值。cua/tests/run_tests.py 仍 91/0。
+
+【口径变更 · 2026-10-11 16:05 · 这不是回归，是设计变更】
+  下面 [1] 记录的 81/0 是「契约 §3.1 落地之前」的历史值，只作历史对照。
+  cua-py 为 §3.1 新增 2 个自检项（空 content → E_MODEL_EMPTY；max_tokens 分档 cloud=4096 / local=1024），
+  总数因此由 81 变为 83。**当前锚点是文末 [4]：83 通过 / 0 失败。**
+  判断「有没有被改坏」一律对齐 [4]；81 不再是锚点，不要再按 81 报 FAIL。
+  （2026-10-11 15:55 曾出现 79/2 的过渡态：协议文档还没有 E_MODEL_EMPTY、自检的总数断言还是 20，
+   两处随后由 Lead / cua-py 修好，16:05 复测回到 0 失败。）
+
+--- [1] python -X utf8 -m cua.main --selfcheck ---
+=== CUA 离线自检（协议 cua/1，cua 0.1.0）===
+工作目录：E:\blog-my
+Python：3.13.13 (tags/v3.13.13:01104ce, Apr  7 2026, 19:25:48) [MSC v.1944 64 bit (AMD64)]
+模式：无显示器 / 不动真实鼠标 / 不截图（MockScreenshot + DryRunDevice）
+建议对照命令：python -m cua.main --selfcheck
+
+
+== 1 环境与依赖 ==
+  [PASS] Python >= 3.10  -> 3.13.13
+  [PASS] pyautogui / Pillow / numpy 可用且 FAILSAFE=True  -> pyautogui=0.9.54 FAILSAFE=True Pillow=12.2.0 numpy=2.2.0
+  [PASS] jsonschema 可选依赖状态  -> jsonschema=4.23.0（仅用于交叉校验，不是硬依赖）
+  [PASS] 冻结契约 action.schema.json 存在  -> E:\blog-my\docs\cua\action.schema.json
+      · 真实鼠标/键盘全程未被调用（设备为 DryRunDevice / RecordingDevice）
+      · 网络未被调用（无 API 探针；模型为 MockClient）
+
+== 2 契约一致性 ==
+  [PASS] 动作类型与 schema 一致  -> 9 种动作与 schema oneOf 逐项一致
+  [PASS] 错误码表与协议文档逐条对齐  -> 20 个错误码全部出现在冻结契约第 5 节
+  [PASS] 系统提示词与 02-agent-prompt.md 对齐  -> 系统提示词逐字取自 02-agent-prompt.md 第 1 节 text 代码块（6097 字）
+  [PASS] 错误码总数为 20  -> 20
+  [PASS] 错误策略表（可重试/上限/分类）  -> 重试上限与分类逐条核对通过（E_MODEL_HTTP 单独按状态码判定）
+  [PASS] E_MODEL_HTTP 5xx 可重试
+  [PASS] E_MODEL_HTTP 4xx 不可重试
+  [PASS] E_STALL 属于重规划而非重试
+  [PASS] E_LOOP 属于重规划而非重试
+
+== 3 Step 提取（协议 2.1 宽进） ==
+  [PASS] 全文直解  -> 全文直解
+  [PASS] 剥代码围栏  -> 剥代码围栏（含前后说明文字）
+  [PASS] 平衡括号扫描  -> 第一个平衡对象扫描
+  [PASS] 字符串内花括号/转义  -> 正确跳过字符串内的花括号与转义
+  [PASS] 反斜杠/引号转义  -> 反斜杠与引号转义
+  [PASS] 提取失败报 E_BAD_JSON  -> 空/无 JSON/未闭合 -> E_BAD_JSON
+
+== 4 Schema 校验（协议第 2、3 节） ==
+  [PASS] 9 种动作合法样例全部通过  -> 9 种动作全部通过校验
+  [PASS] 未知字段忽略  -> 未知字段被忽略（向前兼容），并记录到 meta：['future_field']
+  [PASS] 小数坐标宽容取整  -> 640.4 -> 640，210.6 -> 211，meta.coord_rounded=True
+  [PASS] 非法样例错误码映射  -> 16 条非法样例全部按预期报错
+  [PASS] 与 jsonschema 交叉校验  -> 自研校验子集与 jsonschema Draft2020-12 判定一致（25 个样例）
+  [PASS] 终态字段裁定（2026-10-11）  -> action=null 恒 E_SCHEMA；缺 final E_SCHEMA；done/final 不一致 E_SCHEMA；done+任意动作合法
+
+== 5 坐标换算（协议 1.1） ==
+  [PASS] 协议第 4 节换算样例  -> image(640,210) + scale=0.7667 -> screen(835,274)，与协议第 4 节样例一致
+  [PASS] 局部帧 origin/scale 换算与逆换算  -> 局部帧 origin=(100,50) scale=2.0：(10,20) -> (105,60) 且可逆
+  [PASS] round_half_up 确定性  -> round_half_up 对 .5 一律向上（int(floor(x+0.5))）
+  [PASS] 局部截图区域换算  -> image 空间 region -> 屏幕矩形 (105, 60, 50, 30)
+
+== 6 越界拒绝（绝不 clamp，协议 1.1 / 8.2） ==
+  [PASS] 越界拒绝 x=width  -> 拒绝 x=width：坐标 x=1472 超出图像宽度 1472
+  [PASS] 越界拒绝 x=-1  -> 拒绝 x=-1：坐标 x=-1 超出图像宽度 1472
+  [PASS] 越界拒绝 y=height  -> 拒绝 y=height：坐标 y=828 超出图像高度 828
+  [PASS] 越界拒绝 y=-1  -> 拒绝 y=-1：坐标 y=-1 超出图像高度 828
+  [PASS] 越界错误消息回显实际值与图像尺寸  -> 坐标 x=1600 超出图像宽度 1472
+  [PASS] 越界时不产生设备操作  -> 越界点击未产生任何设备操作（绝不 clamp）
+  [PASS] 局部截图区域越界由执行器拒绝  -> 越界区域由执行器自己拒绝（未触达 provider）；贴边合法区域（x+width==image.width）放行
+
+== 7 执行器（9 种动作 / 安全不变量） ==
+  [PASS] 9 种动作逐个执行  -> 9 种动作均可执行并产生预期设备操作
+  [PASS] ActionResult 结构  -> ActionResult 字段与协议第 4 节一致
+  [PASS] 修饰键成对释放  -> 修饰键 key_down/key_up 成对且执行后无残留
+  [PASS] 异常路径释放修饰键  -> FAILSAFE -> E_EXECUTOR_FAILSAFE，且 ctrl 已释放
+  [PASS] 拖拽异常仍抬起鼠标  -> 拖拽中途异常也会 mouse_up
+  [PASS] 键名白名单与危险组合键  -> 白名单外与危险组合键被拦截；allowlist 打开后放行
+  [PASS] type 输入路径  -> ASCII/中文/clear_first/submit/target 路径均正确
+  [PASS] scroll 方向与单位映射  -> dy 正负映射与 page 放大均正确（page=5 行）
+  [PASS] 每步 sleep >= 150ms（实测计时）  -> 实测单步耗时 150ms（>=150ms）
+  [PASS] FAILSAFE 常开且不可配置  -> FAILSAFE=True 且不是配置项
+  [PASS] screenshot 局部放大与坐标空间切换  -> region -> origin=(100, 100) scale=2.000（= zoom 2.0 × 基准 scale 0.767，协议公式一致）
+
+== 8 错误对象与重试策略 ==
+  [PASS] CuaError.to_dict  -> to_dict 字段与协议第 4 节失败样例一致
+  [PASS] RetryTracker 决策  -> E_BAD_JSON 2 次 / E_OUT_OF_BOUNDS 1 次 / E_STALL,E_LOOP 直接重规划
+  [PASS] E_SCHEMA 重试上限为 2
+  [PASS] 反馈文本要求只输出一个 JSON
+
+== 9 弹窗与卡死检测（协议第 7 节） ==
+  [PASS] 模态框样张判为疑似弹窗  -> bbox=(557, 378, 1363, 702) 面积比=0.126 填充率=1.00 信号=['bbox_rule', 'center_block', 'background_darkened', 'modal_like']
+  [PASS] 同帧反例  -> 同帧：无变化、非弹窗
+  [PASS] 微小变化反例  -> 极小变化反例：bbox 面积比 0.000000
+  [PASS] 整屏变化反例  -> 整屏突变反例：面积比 1.000
+  [PASS] 破坏性词表  -> 中英文命中：['删除'] / ['delete']；安全文案不误伤；destructive_guard=['删除']
+  [PASS] StallDetector  -> 连续 N 步无变化才触发；有变化即清零
+  [PASS] LoopDetector  -> 同一（动作，画面哈希）第 3 次触发 E_LOOP；画面变化即分离
+  [PASS] 弹窗裁剪区域裁剪  -> 弹窗裁剪提示会被裁进当前帧：{'x': 84, 'y': 84, 'width': 16, 'height': 16}
+
+== 10 API-first 路由（协议第 6 节） ==
+  [PASS] 默认落到 GUI 兜底  -> 无任何 API 探针 -> L3（L0~L2 均无可用能力（已探测 0 个探针），按协议第 6 节落到 GUI 视觉操控兜底）
+  [PASS] L0 命中即停  -> L0 可用即停：探测到 GitHub API
+  [PASS] 跳过不可用级别  -> L0 不可用 -> L1；两次探测结果都落记录
+  [PASS] 关闭兜底的行为  -> 关闭 GUI 兜底且无 API -> E_NEED_HUMAN
+
+== 11 端到端（mock 模型 + 合成屏幕 + dry-run） ==
+  [PASS] 正常任务闭环  -> 3 步成功；坏 JSON 回喂 1 次；640.4/210.6 -> screen(835,275)
+  [PASS] 越界回喂后恢复  -> 越界 -> 回喂当前 image 尺寸 -> 修正成功（未 clamp）
+  [PASS] E_STALL 强制重规划  -> 冻结画面：9 步后强制重规划 2 次 -> 终止 E_STALL
+  [PASS] E_LOOP 中断策略  -> 同一（动作，画面哈希）第 3 次触发 -> 重规划 2 次 -> E_LOOP（5 步）
+  [PASS] 步数预算  -> 步数预算 40 -> 2（自检用）时优雅退出
+  [PASS] 墙钟预算  -> 墙钟预算与步数预算双重约束（注入时钟：10s 预算）
+  [PASS] risk=high 护栏  -> risk=high 默认需护栏放行，未放行即 E_NEED_HUMAN
+  [PASS] 弹窗破坏性按钮硬约束  -> 疑似弹窗 + 破坏性按钮 -> 不点击，直接 E_NEED_HUMAN
+  [PASS] 弹窗 esc 升级转人工  -> 弹窗持续 -> 按 2 次 esc -> 仍无效转人工
+  [PASS] 模型超时路径  -> E_MODEL_TIMEOUT 退避重试 2 次 -> E_NEED_HUMAN
+  [PASS] need_human 收尾  -> 模型自报 need_human：正确地交还控制权
+  [PASS] 手动取消路径 E_CANCEL  -> loop.cancel() -> E_CANCEL（第 1 步后停手并释放按键）
+  [PASS] dry-run 空转验证  -> 全程 DryRunDevice：15 条模拟操作，真实 pyautogui 未被调用
+
+== 12 已知边界与待验证项（只登记，不改契约） ==
+      · 2026-10-11 裁定：action 恒为必填动作对象（不可为 null），final.status/summary 是终态唯一权威来源。
+      · E_ARG_RANGE 与 E_SCHEMA 的边界：action 内 minimum/maximum 越界 -> E_ARG_RANGE，其余结构不符 -> E_SCHEMA。
+      · 弹窗判定使用两级阈值（弱>8 计 change_ratio，强>45 定形状），否则整屏压暗会把 bbox 撑满。
+      · 多显示器虚拟桌面合并坐标系未实测（pyautogui 只报主屏几何）——待验证。
+      · 弹窗按钮文字识别依赖模型给出的文本字段，未接入 OCR —— 待验证。
+      · 本地 VLM 真实端到端（Ollama qwen2.5vl:7b）未在本自检中跑过 —— 待验证。
+
+== 13 预算分档（2026-10-11 裁定） ==
+  [PASS] 分档取值  -> cloud=云端 API 后端：40 步 / 300s / 截图长边 1472；local=本地 VLM 后端：40 步 / 1800s / 截图长边 1280（本地单步 9~78s）
+  [PASS] 默认值与分档应用  -> Config() 默认 cloud(40/300/1472)；local -> 40/1800/1280
+  [PASS] auto 判定与显式覆盖优先级  -> auto 按 base_url 判定；显式 --max-seconds/--max-steps 覆盖分档
+  [PASS] local 档在闭环中生效  -> local 档在完整闭环中生效（合成屏 1920 -> 送模型宽 1280，墙钟 1800s）
+  [PASS] 终态动作仍被执行  -> done=true 配 click：动作执行后按 final 收尾
+
+== 结论 ==
+  通过 81 项，失败 0 项
+  自检完成时间：2026-10-11 15:33:34
+  说明：本自检全程使用 MockScreenshot + DryRunDevice/RecordingDevice，
+        不截图、不移动鼠标、不按键；真实 pyautogui 仅被导入用于断言 FAILSAFE=True。
+SELFCHECK_EXIT=0
+
+--- [2] python -X utf8 cua/tests/run_tests.py ---
+python : ...........................................................................................
+所在位置 行:12 字符: 1
++ python -X utf8 cua/tests/run_tests.py 2>&1 | Out-File -Encoding utf8  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (.................................:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+----------------------------------------------------------------------
+Ran 91 tests in 6.347s
+
+OK
+
+==== CAPABILITY_TABLE (task-7 verifier) ====
+repo=E:\blog-my
+cua_package_present=True
+extract_json       RESOLVED  <cap extract_json @cua.action_parser.extract_json>
+step_validate      RESOLVED  <cap step_validator @cua.action_parser.validate_step_dict>
+image_to_screen    RESOLVED  <cap image_to_screen @cua.screenshot.image_to_screen>
+screen_to_image    RESOLVED  <cap screen_to_image @cua.screenshot.screen_to_image>
+bounds_check       RESOLVED  <cap bounds_check @cua.screenshot.check_image_bounds>
+key_whitelist      RESOLVED  <cap key_whitelist_container @cua.executor.KEY_WHITELIST>
+error_policy       RESOLVED  <ct_adapter.PolicyView object at 0x00000200192D02F0>
+destructive_words  RESOLVED  <cap is_destructive_fn @cua.executor.destructive_hits>
+click_guard        RESOLVED  <cap click_guard @cua.executor.destructive_guard>
+execute_action     RESOLVED  <cap executor_instance @cua.executor.Executor.execute>
+dry_run_executor   RESOLVED  <cap dry_run_instance @cua.executor.Executor.execute（dry_run=True）>
+==== END CAPABILITY_TABLE ====
+
+==== DRY-RUN 取证范围 ====
+已取证: CLI --help 暴露 --dry-run/--mock（子进程，假件已装）
+已取证: 执行入口 cua.executor.Executor.execute（dry_run=True） 在开关打开时不产生键鼠调用
+待验证: 主循环级（真实模型 + 截图的端到端 dry-run）需要实现提供截图/模型注入点
+==== END ====
+
+---- 汇总 ----
+模块: ct_test_00_capability, ct_test_01_json, ct_test_02_schema, ct_test_03_coords, ct_test_04_bounds, ct_test_05_keys, ct_test_06_errors, ct_test_07_destructive, ct_test_08_modifier_release, ct_test_09_dryrun_mock
+用例: run=91 failures=0 errors=0 skipped=0
+SUITE_EXIT=0
+
+--- [3] python -X utf8 cua/tests/ct_negative_control.py ---
+==== 负向对照（注入契约违规，套件必须变红）====
+变异                             目标模块                           结果
+extract_json_always_ok         ct_test_01_json                已抓住
+schema_accepts_all             ct_test_02_schema              已抓住
+bounds_never_rejects           ct_test_04_bounds              已抓住
+key_whitelist_widened          ct_test_05_keys                已抓住
+destructive_words_disabled     ct_test_07_destructive         已抓住
+click_guard_always_passes      ct_test_07_destructive         已抓住
+dry_run_sends_input            ct_test_09_dryrun_mock         已抓住
+never_releases_modifiers       ct_test_08_modifier_release    已抓住
+all_errors_retryable           ct_test_06_errors              已抓住
+everything_replans             ct_test_06_errors              已抓住
+failsafe_disabled              ct_test_08_modifier_release    已抓住
+
+结果：11/11 变异全部被抓住（套件对已列判据有区分能力）
+NEG_EXIT=0
+
+
+--- [4] 复测 · 新锚点（2026-10-11 16:05，契约 §3.1 落地之后）---
+$ python -X utf8 -m cua.main --selfcheck
+  通过 83 项，失败 0 项        <- 新锚点（旧口径 81，见文首「口径变更」；过渡态 79/2 已消失）
+  SELFCHECK_EXIT=0
+  原始输出：docs/verify/tmp/selfcheck-83.log
+
+$ python -X utf8 cua/tests/run_tests.py
+  用例: run=91 failures=0 errors=0 skipped=0
+  SUITE_EXIT=0
+
+$ python -X utf8 cua/tests/ct_negative_control.py
+  结果：11/11 变异全部被抓住（套件对已列判据有区分能力）
+  NEG_EXIT=0
+
+$ python -X utf8 cua/tests/it_model_empty.py   （verifier 新增：契约 §3.1 独立判据，含变异自检）
+  正向 11 条判据 FAIL 0（空/全空白/缺 content/无 choices/数组全空白 -> 一律 E_MODEL_EMPTY；
+  代理带回 E_MODEL_EMPTY 字样 -> E_MODEL_EMPTY；普通上游错误 -> E_MODEL_HTTP）
+  变异自检 2 条全部被抓住（"空当正常返回"的坏实现让 5 条判据变红）
+  IT_EMPTY_EXIT=0   原始输出：docs/verify/tmp/model-empty-01.log
+
+$ go build ./...   -> BUILD_EXIT=0
+$ go test ./...    -> 采样时刻为红（FAIL: TestCuaLLMProxyEmptyContentIsError，用不存在的模型名 empty-model
+                      在校验阶段就返回「未知模型」，走不到空 content 分支）。属于契约 §3.1 的 Go 侧缺口，
+                      不作为本文件口径锚点，逐轮状态记在 docs/verify/integration-independent.md。
+
+【采样环境说明 / 端口纪律（2026-10-11 16:05 教训）】
+  8300 是约定端口但不是排他资源：16:04 我起自己的实例时端口已被 bin/blog-my.exe 占用，
+  我的进程 bind 失败退出，而探测实际打在了那个实例上。事后按运行特征核对：该实例上的 run 为
+  model=deepseek-flash、5 步、16:04:16→16:04:18（2.0 秒），与我 --mock 实例的 5 步 2.0 秒完全一致，
+  真实云端多模态 5 步不可能 2 秒（且 mock 帧是 640x360 合成图），故可判定那几次也是 mock 语义。
+  今后纪律：起实例前先探 8300；被占用则不启动、改用其它端口（如 APP_PORT=8317）并在报告里写清端口，
+  绝不默认"能连通就是我的实例"。自有实例一律带 CUA_EXTRA_ARGS=--mock 起；需要走真实模型链路时，
+  改为 CUA_LLM_UPSTREAM 指向本地桩（Stub 抓包留证），绝不放行到外网。
+
+
+--- [5] 复测 · 当前锚点（2026-10-11 16:2x，task-21 之后）---
+$ python -X utf8 -m cua.main --selfcheck
+  通过 84 项，失败 0 项        <- 当前锚点（历史 81 -> 83 -> 84，两次都是新增自检项，不是回归）
+  SELFCHECK_EXIT=0
+
+$ python -X utf8 cua/tests/run_tests.py             -> 用例: run=91 failures=0 errors=0 skipped=0
+$ python -X utf8 cua/tests/ct_negative_control.py   -> 11/11 变异全部被抓住
+$ python -X utf8 cua/tests/it_model_empty.py        -> §3.1 判据 11 条全过 + 变异自检 2 条被抓
+
+§7 门禁（同一时刻）：
+  go build ./...            -> 0
+  go vet ./...              -> 0
+  go test -count=1 ./...    -> 0（ok blog-my/rag / ok blog-my/web）
+  gofmt -l .                -> 空（干净）
+
+task-18 的完整判定与证据见 docs/verify/integration-independent.md；
+编码专项（C14）见 docs/verify/c14-encoding-record.md。
+
+
+--- [6] 复测 · 新锚点（2026-10-11 19:3x，task-19~26 之后 · task-28 终验）---
+$ python -X utf8 -m cua.main --selfcheck
+  通过 87 项，失败 0 项        <- 当前锚点（历史 81 -> 83 -> 84 -> 87，三次都是新增自检项，不是回归）
+  SELFCHECK_EXIT=0
+
+$ cmd /c "bin\cua-sidecar.exe --selfcheck > out.log 2>&1"   # 必须用 cmd /c 抓原始字节：
+  通过 87 项，失败 0 项        # sidecar 的 stdout 是 UTF-8，PowerShell 的 > 会按 GBK 误解码成乱码
+  SIDECAR_SELFCHECK_EXIT=0
+
+$ python -X utf8 cua/tests/run_tests.py             -> 91/0（未变）
+
+§7 门禁（同一时刻）：
+  go build ./...            -> 0
+  go vet ./...              -> 0
+  go test -count=1 ./...    -> 0（ok blog-my/rag / ok blog-my/web）
+  gofmt -l .                -> 空（干净）
+
+端口纪律（本轮实践）：一律 APP_PORT=0 由系统分配（实测 3119/3666/4223/9588/1370…），不抢固定端口；
+  但**端口要从 stderr 的 READY 行读**——这条同时是 task-23 的缺陷本身，见下。
+
+task-28 的完整判定与证据见 docs/verify/final-verification.md：
+  8 个任务里 7 PASS、**task-23 FAIL**（后端在打包布局下能起、health 200，但 electron/main.js 只在 stdout 找 READY，
+  而 main.go 用 log.Printf 把 READY 写到 stderr → 壳永远解析不出后端 URL）。
+  max_tokens 下限 16384 与剪贴板主路径/退化均已用自建桩与自建假设备独立验过（各带对照）。
+
+--- [7] task-31 复验（task-30 修复 electron/ready.js）---
+  task-28 报的 FAIL（main.go 把 READY 打到 stderr、electron/main.js 只扫 stdout）已修，独立复验通过：
+    - 两个方向都能解析；穷举 47 个切分点：换行前不 settle、结果无残缺 URL
+    - 突变对照：不接 stderr -> 我的探针 FAIL=3（他们的套件则**挂起**，建议给用例加超时）；
+      回到按 chunk 匹配 -> 他们的套件 fail 1、我的探针 FAIL=1（都抓到）
+    - 真实打包应用：`[electron] loading http://127.0.0.1:1606` + `loadURL resolved` + `window shown 1282x802`，
+      该地址 /api/health=200；另有「真实后端两条流 -> 真实 ready.js」85ms 解析成功（READY 只在 stderr）
+  未覆盖：`dist\blog-my Setup 0.1.0.exe`(19:30:44) 早于修复(ready.js 19:48:16) -> **安装包未重出**。
+  详见 docs/verify/task-31-reverify.md。
+  环境坑（复现用）：本会话 ELECTRON_RUN_AS_NODE=1 会被继承，直接启动打包 exe 会当 node 跑（日志全空），需先清掉。
+--- [8] task-35 探针适配「测试版警告」模态弹窗（verifier 自证）---
+  官方探针 docs/verify/frontend-probe.mjs：正常页面 **PASS=21 FAIL=0（exit 0）**，F3c 由红转绿；
+  负向对照 --strip-dialog（只在响应拦截里删掉 <dialog>）：F3-modal-open/close/reenter 全红、其他页签仍绿，PASS=18 FAIL=3。
+  新增断言：open/role=dialog/aria-modal/aria-labelledby + CDP AX 树 accessible name=「测试版，别当真」；关掉后 open=false 且焦点回页签；
+  其他 4 个页签各切一次 dialog.open 恒 false。F3b 从「数按钮」改成断言 5 个固定控件 id。详见 docs/verify/task-35-modal-probe.md。
+
+--- [9] task-43 独立验收：AI 自主工具调用 + 记忆系统（后端与安全部分；前端 ⏳）---
+  门禁：build=0 vet=0 gofmt -l .=0 go test -count=1 ./... 全 ok。CUA 冻结路径 git 改动 **0 行** + TestCua ok。
+  沙箱红线（我自造对抗用例）：junction 逃逸（write/read/深层/edit/read_image）、链接链、.. 多种写法、前缀兄弟目录、
+    根外绝对路径与 \\?\ 长路径、目录、冒号/ADS —— 全部拒绝且根外无副作用；链接指向根内**必须放行**（正控）。
+  负向对照：把 resolveLinks 换回第一版 EvalSymlinks 写法（变异体在模块外 + go test -overlay，能编译）→ 我的 junction 用例转红
+    （逃逸成功：write esc/pwn.txt 没被拒）；sandbox.go sha256 前后一致 8DA15D86...C31E8 = 原始文件没被动过。
+  观察/版本/原子/并发：mtime 单独变化也必须 STALE；陈旧优先于字面量匹配；被拒读不得记 absent；三态流转；
+    createIfAbsent 输给外部抢先创建；无 tmp 残留；并发 edit 恰好 1 成功 + 1 STALE；MaxToolCalls/MaxIterations 边界补齐。
+  向后兼容（真路由 web.Setup + 真 MySQL + 自签会话 cookie）：tools 缺省 → 只有 delta…done；A/B 反证 tools=true 时出现 tool_call/tool_result。
+  记忆：memory_search/memory_write 可用；真 Ollama 入库后端到端注入（录音 streamer 抓到 system prompt 含 <memory> 与本轮暗号）；
+    另起进程的降级对照（端点不可达）→ system prompt 无 <memory> 且 SSE 仍以 done 收尾。
+  Lead 修的 agent.SetStreamer 生产缺口：独立复验通过 —— 真二进制 tools=true → done；去掉安装行的变异二进制复现「未安装模型调用实现」（真机 A/B）。
+  发现：① 实现方 web/agent_http_it_test.go 的查询**未按会话过滤**，在共享真库上会取到别人的 tool_trace 行，
+    导致 AGENT_IT=1 时 TestChatHTTPToolsEndToEnd FAIL（用例不隔离，非产品回归）；② web/web.go 曾带 BOM（已修，gofmt=0）；
+    ③ web.kb() 进程级缓存嵌入端点（进程内切端点做降级对照无效）；④ 冒号/ADS 形态的 IO 错误文本泄漏绝对路径（低危，失败关闭）。
+  未覆盖：前端 §9.8（task-41 进行中，待补）、真云端模型工具调用、真符号链接（本机无权限，已独立确认）、TOCTOU/硬链接、Electron 壳。
+  详见 docs/verify/agent-independent.md；门禁原始日志 docs/verify/tmp/task43-gates.log。
+--- [10] task-43 §9.8 前端验收（verifier 自写探针；task-43 收尾）---
+  探针是自写的 docs/verify/agent-ui-probe.mjs（不复用 cua-ui 那份）；node --check = 0。
+  结构+交互层 PASS=28 FAIL=0 SKIP=1；真 deepseek-chat 层 PASS=36 FAIL=0 SKIP=0。
+  6 条要求全过：三页签(chat/models/cua)且 #view-keys/#view-kb 计数 0；#keys-open 在 .topbar 内、弹层开关正常、
+    关闭后焦点回按钮、#/keys 路由仍可达；#memory-panel 默认折叠、只在对话视图可见、面板内 CRUD 真能跑；
+    工具卡片 运行中(MutationObserver 记录 is-running)/完成 is-ok/失败 is-error + <details> 折叠 + 长结果内部滚动
+    (overflowY=auto, maxHeight=240px, scrollHeight 7143 > clientHeight 238)；CUA 页签/测试版角标/警告弹窗(role+aria-modal+
+    aria-labelledby)/焦点回页签/#view-cua 卡片数 0；390px 三视图 scrollWidth==clientWidth==390、零 pageerror。
+  真模型复现（我自造暗号 UI-VERIFY-7731，隔离目录 %TEMP%\agent-verify\ui-root）：deepseek-chat 自主 read+write，
+    盘上真出现 copy.md；要求它读 C:/Windows/win.ini 被沙箱拒绝并渲染成失败卡片（UI 层再验一次 §9.6）。
+  负向对照 3 组（运行时拦截，不改仓库文件）：N1 抽掉 #keys-open -> B-keys-topbar FAIL；
+    N2 改 #memory-panel id -> 两条记忆断言 FAIL；N3 把 chat.js 的 onTool(event, tool) 换成 void 0 -> 6 条卡片断言全 FAIL
+    (PASS=29 FAIL=6)，而 B-real-model-wrote 仍 PASS（卡片断言绑渲染那行，磁盘断言独立）。
+  /favicon.ico 404 归因：git grep -i favicon HEAD 只有 docs/day23 历史记录（「后端本就没有该路由」），
+    按 msg.location().url 精确排除；除它之外 badResponses/failedReqs/pageerror 全 0。
+  差点误判为缺陷的 3 处（已查清，均非产品缺陷）：390px 点页签超时＝既有 off-canvas 侧栏(HEAD 就有 ≤820px
+    translateX(-101%))，需先点汉堡 #sidebar-toggle；删除未生效＝kb.js window.confirm 被 Playwright 默认 dismiss；
+    is-running 抓不到＝fs 工具毫秒级返回，改用 MutationObserver。
+  F1 复验：实现方把 web/agent_http_it_test.go 改成按 conversation_id 过滤后，AGENT_IT=1 go test ./web/ -run TestChatHTTP = 3/3 PASS。
+  收尾：测试服务已按 PID 收掉（无 blog-my-ui 残留）；验收期知识库文档清理后剩余 0；docs 下 .go 文件数 0；
+    build/vet=0、gofmt -l .=0、go test ./... 无 FAIL。未覆盖：Electron 壳内、视觉人工核对（本会话无图像输入，
+    截图留在 docs/verify/tmp/ui-390-*.png）、除 390/1440 外的断点、完整无障碍审计、CUA 真实运行（纪律禁止）。

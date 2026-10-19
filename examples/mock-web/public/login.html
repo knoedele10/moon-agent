@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="auth-page">
+    <div class="auth-card">
+        <div class="auth-brand">
+            <span class="logo">✦</span>
+            <span>多模型对话</span>
+        </div>
+        <h1>登录</h1>
+        <p class="auth-sub">登录后即可开始与多个大模型对话。</p>
+
+        <form action="/login" method="post" autocomplete="off">
+            <div class="field">
+                <label for="username">用户名</label>
+                <input class="input" type="text" id="username" name="username" placeholder="请输入用户名" required autofocus>
+            </div>
+            <div class="field">
+                <label for="password">密码</label>
+                <input class="input" type="password" id="password" name="password" placeholder="请输入密码" required>
+            </div>
+            <button type="submit" class="btn btn-block">登录</button>
+        </form>
+
+        <div class="auth-footer">
+            还没有账号？<a href="/register">立即注册</a>
+        </div>
+    </div>
+</body>
+</html>

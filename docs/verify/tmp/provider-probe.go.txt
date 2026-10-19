@@ -1,0 +1,85 @@
+//go:build ignore
+
+// 契约 §3.4 独立复验（verifier）：Content 与 MultiContent 并存会让 go-openai 的 MarshalJSON 直接报错，
+// 进而表现为 502。这里直接调用 llm 包的导出面：
+//
+//	P1/P2 本地 ollama 后端（RAG 依赖它）——文本路径必须照旧可用，图片路径必须不报错；
+//	P3    openai 后端指向本地桩——多模态请求必须真的发出去并拿到回复（桩侧再看 body 形态）。
+package main
+
+import (
+	"context"
+	"encoding/base64"
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
+	"blog-my/llm"
+)
+
+// 一张真实可解码的 1x1 JPEG（手写字节会被服务端判为非法图片，必须用真图）。
+const jpegB64 = "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q=="
+
+func trunc(s string) string {
+	s = strings.TrimSpace(strings.ReplaceAll(s, "\n", " "))
+	r := []rune(s)
+	if len(r) > 70 {
+		return string(r[:70]) + "..."
+	}
+	return s
+}
+
+func main() {
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
+	defer cancel()
+	jpeg, derr := base64.StdEncoding.DecodeString(jpegB64)
+	if derr != nil {
+		fmt.Println("FATAL 测试图解码失败: " + derr.Error())
+		return
+	}
+	fmt.Printf("# 测试图 %d 字节，magic=%x%x%x\n", len(jpeg), jpeg[0], jpeg[1], jpeg[2])
+
+	reg := llm.NewRegistry()
+	reg.SetEndpoints([]llm.Endpoint{{ID: "ollama-local", Label: "本地", Backend: "ollama",
+		BaseURL: "http://127.0.0.1:11434", Models: []string{"qwen2.5vl:7b"}}})
+
+	out, err := reg.Generate(ctx, "qwen2.5vl:7b", "", llm.ChatRequest{Model: "qwen2.5vl:7b",
+		Messages: []llm.Message{{Role: "user", Content: "只回复两个字：收到"}}, MaxTokens: 24})
+	if err != nil {
+		fmt.Println("P1-ollama-text  FAIL " + trunc(err.Error()))
+	} else if strings.TrimSpace(out) == "" {
+		fmt.Println("P1-ollama-text  FAIL 回复为空")
+	} else {
+		fmt.Printf("P1-ollama-text  PASS 回复=%q\n", trunc(out))
+	}
+
+	out2, err2 := reg.Generate(ctx, "qwen2.5vl:7b", "", llm.ChatRequest{Model: "qwen2.5vl:7b",
+		Messages:  []llm.Message{{Role: "user", Content: "这张图是什么颜色？一句话", Images: []llm.Image{{MIME: "image/jpeg", Data: jpeg}}}},
+		MaxTokens: 40})
+	if err2 != nil {
+		fmt.Println("P2-ollama-image FAIL " + trunc(err2.Error()))
+	} else if strings.TrimSpace(out2) == "" {
+		fmt.Println("P2-ollama-image FAIL 回复为空")
+	} else {
+		fmt.Printf("P2-ollama-image PASS 回复=%q\n", trunc(out2))
+	}
+
+	stub := os.Getenv("STUB_URL")
+	if stub == "" {
+		fmt.Println("P3-openai-multi SKIP 未给 STUB_URL")
+		return
+	}
+	reg2 := llm.NewRegistry()
+	reg2.Register("openai", llm.NewOpenAIBackend) // 裸 Registry 只默认带 ollama/mock，openai 要显式注册
+	reg2.SetEndpoints([]llm.Endpoint{{ID: "stub", Label: "桩", Backend: "openai",
+		BaseURL: stub, Models: []string{"stub-model"}}})
+	out3, err3 := reg2.Generate(ctx, "stub-model", "test-key", llm.ChatRequest{Model: "stub-model",
+		Messages:  []llm.Message{{Role: "user", Content: "看图并回答", Images: []llm.Image{{MIME: "image/jpeg", Data: jpeg}}}},
+		MaxTokens: 40})
+	if err3 != nil {
+		fmt.Println("P3-openai-multi FAIL " + trunc(err3.Error()))
+	} else {
+		fmt.Printf("P3-openai-multi PASS 桩回复=%q\n", trunc(out3))
+	}
+}

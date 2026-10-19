@@ -1,0 +1,15 @@
+﻿==== 负向对照（注入契约违规，套件必须变红）====
+变异                             目标模块                           结果
+extract_json_always_ok         ct_test_01_json                已抓住
+schema_accepts_all             ct_test_02_schema              已抓住
+bounds_never_rejects           ct_test_04_bounds              已抓住
+key_whitelist_widened          ct_test_05_keys                已抓住
+destructive_words_disabled     ct_test_07_destructive         已抓住
+click_guard_always_passes      ct_test_07_destructive         已抓住
+dry_run_sends_input            ct_test_09_dryrun_mock         已抓住
+never_releases_modifiers       ct_test_08_modifier_release    已抓住
+all_errors_retryable           ct_test_06_errors              已抓住
+everything_replans             ct_test_06_errors              已抓住
+failsafe_disabled              ct_test_08_modifier_release    已抓住
+
+结果：11/11 变异全部被抓住（套件对已列判据有区分能力）

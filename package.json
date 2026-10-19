@@ -1,0 +1,72 @@
+{
+  "name": "blog-my-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "多模型聊天客户端 (Electron 壳 + Go/Gin 后端)",
+  "main": "electron/main.js",
+  "scripts": {
+    "build:go": "node scripts/build-go.js",
+    "build": "npm run build:go",
+    "build:cua-sidecar": "python -m PyInstaller --noconfirm --distpath bin --workpath build/cua-sidecar packaging/cua.spec",
+    "test:electron": "node --test --test-isolation=none electron/*.test.js",
+    "dev": "npm run build:go && node scripts/dev.js",
+    "start": "node scripts/dev.js",
+    "dist:dir": "npm run build:go && electron-builder --dir --config.electronDist=node_modules/electron/dist",
+    "dist": "npm run build:go && electron-builder --config.electronDist=node_modules/electron/dist",
+    "test": "npm run test:tooling && npm run test:electron && npm run test:go && npm run test:ui",
+    "test:tooling": "node --test --test-isolation=none scripts/lib/*.test.cjs",
+    "test:go": "node scripts/go.cjs test",
+    "test:ui": "node scripts/test-ui.cjs",
+    "test:ui:taskcard": "node scripts/test-ui.cjs --taskcard",
+    "check:go": "node scripts/go.cjs vet",
+    "check": "npm run test:tooling && npm run check:go"
+  },
+  "devDependencies": {
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "jsdom": "^29.1.1"
+  },
+  "build": {
+    "npmRebuild": true,
+    "beforeBuild": "scripts/lib/build-policy.cjs",
+    "afterPack": "scripts/after-pack.js",
+    "appId": "com.blogmy.desktop",
+    "productName": "blog-my",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "!electron/**/*.test.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "bin",
+        "to": "bin",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "templates",
+        "to": "templates",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

@@ -1,0 +1,6 @@
+[
+  "我先看一眼界面。\n```json\n{\"protocol\":\"cua/1\",\"thought\":\"点击搜索框\",\"action\":{\"type\":\"click\",\"x\":640.4,\"y\":210.6},\"risk\":\"low\",\"done\":false}\n```",
+  "抱歉，我需要再想想。",
+  "{\"protocol\":\"cua/1\",\"thought\":\"输入关键词并回车\",\"action\":{\"type\":\"type\",\"text\":\"hello cua\",\"clear_first\":true,\"submit\":true},\"risk\":\"low\",\"done\":false}",
+  "{\"protocol\":\"cua/1\",\"thought\":\"任务完成\",\"action\":{\"type\":\"done\",\"status\":\"success\",\"summary\":\"演示脚本跑通\"},\"risk\":\"low\",\"done\":true,\"final\":{\"status\":\"success\",\"summary\":\"演示脚本跑通\"}}"
+]

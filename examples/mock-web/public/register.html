@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注册</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="auth-page">
+    <div class="auth-card">
+        <div class="auth-brand">
+            <span class="logo">✦</span>
+            <span>多模型对话</span>
+        </div>
+        <h1>注册</h1>
+        <p class="auth-sub">创建一个账号，开始使用多模型对话。</p>
+
+        <form action="/register" method="post" autocomplete="off">
+            <div class="field">
+                <label for="username">用户名</label>
+                <input class="input" type="text" id="username" name="username" placeholder="设置用户名" required autofocus>
+            </div>
+            <div class="field">
+                <label for="password">密码</label>
+                <input class="input" type="password" id="password" name="password" placeholder="设置密码" required>
+            </div>
+            <button type="submit" class="btn btn-block">注册</button>
+        </form>
+
+        <div class="auth-footer">
+            已有账号？<a href="/login">去登录</a>
+        </div>
+    </div>
+</body>
+</html>

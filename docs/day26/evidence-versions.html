@@ -1,0 +1,32 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+body{margin:0;background:#f5f6f7;color:#1f1f1f;font-family:"Microsoft YaHei",sans-serif;padding:24px 32px}
+h1{font-size:20px;margin:0 0 4px} .sub{color:#5f6368;font-size:13px;margin:0 0 18px}
+table{border-collapse:collapse;width:100%;font-size:14px;background:#fff}
+td,th{border:1px solid #dadce0;padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#e8eaed} code{background:#f1f3f4;padding:1px 5px;border-radius:4px;font-family:Consolas,monospace}
+pre{background:#202124;color:#e8eaed;padding:12px;border-radius:8px;font-size:13px;white-space:pre-wrap}
+.warn{background:#fff3cd;border:1px solid #ffe69c;border-radius:8px;padding:10px 14px;font-size:13.5px;margin:14px 0}
+h2{font-size:16px;margin:20px 0 8px}
+</style></head><body>
+<h1>Day 26 证据：部署 / 提交记录</h1>
+<p class="sub">生成时间 2026/10/15 21:40:59　目标站点 https://blog-my-check-10974.app.workbuddy.host/</p>
+<div class="warn">托管平台（workbuddy 发布）无版本历史查询与回退入口，平台侧不存在"上一稳定版本"。以下用 Git 提交记录与线上实测代替平台部署记录。</div>
+<h2>1. deploy/ 目录 Git 历史（真实输出 git log --oneline -- deploy）</h2>
+<table><tr><th>提交 SHA</th><th>说明</th></tr>
+<tr><td>9a12e5c</td><td>Day 22｜补齐 PATCH / DELETE，增删改查四类操作闭环</td></tr>
+<tr><td>e978b60</td><td>Day 20｜检查台首页上线：配好跨域，公网展示真实数据 ← 当前线上（判定依据：allow-methods 无 PATCH/DELETE）</td></tr>
+<tr><td>d9b194c</td><td>Day 18｜POST /api/favorites 收藏写入，重复与缺字段被拒</td></tr>
+<tr><td>d912cb0</td><td>Day 17｜补充热搜展示页 /hot</td></tr>
+<tr><td>79710ab</td><td>Day 17｜GET /api/hot 与 /api/favorites 读接口，真实热搜入库</td></tr>
+<tr><td>a090652</td><td>Day 15｜部署 /api/health 与前端 mock 版到公网，产出接口契约</td></tr>
+</table>
+<h2>2. 站点创建时间（平台应用标记文件）</h2>
+<p>创建时间：<code>2026/10/8 22:56:48</code>（2026-10-08T14:56:48.962Z）</p>
+<h2>3. 线上接口实时快照（2026/10/15 21:40:59 抓取）</h2>
+<pre>GET /api/health →
+{"status":"ok","service":"blog-my","version":"mock-1","time":"2026-10-15T13:41:03.037Z","uptime":242}
+
+GET /api/favorites → 9 条收藏</pre>
+<h2>4. 线上版本判定</h2>
+<p>OPTIONS /api/favorites 的 <code>access-control-allow-methods: GET,POST,OPTIONS</code>（不含 PATCH/DELETE）→ 线上代码为 <code>e978b60</code>（Day 20），不含 Day 22 的 <code>9a12e5c</code>。</p>
+</body></html>

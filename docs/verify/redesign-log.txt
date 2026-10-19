@@ -1,0 +1,19 @@
+测试用户: e2eredesign1791971600963
+
+[PASS] 准备：从页面里解析出 15 个脚本，按真实顺序注入
+[PASS] A. 顶部四模式分段控件：4 个按钮（data-kind=[chat,work,code,learn]），#kind-select 默认值="work"
+[PASS] B. 点「代码」→ 下拉同步为 code、选中态唯一、草稿键写入（#kind-select="code"，代码按钮 is-active=true/aria-pressed="true"，其它按钮仍选中=false/false，draft="code"）
+[PASS] C. 反向同步：#kind-select 改成 learn 后 sync() → 「学习」按钮跟随（学习按钮 is-active=true，其它按钮仍选中=false）
+[PASS] D. 主题切换：两次点击在 azure/graphite 间往返并写入 localStorage（初始="azure" → 第一次="graphite"(存储="graphite") → 第二次="azure"(存储="azure")）
+[PASS] E. 「当前任务」卡片：首屏常驻「暂无任务 / 0/0」，update() 后各字段按契约渲染（首屏 hidden=false/count="0/0 已完成"/current="暂无任务"，update 后 hidden=false，count="2/4 已完成"，进度条="50%"，类型="代码"，当前任务="整理今天的笔记"，执行中可见=true，回忆="本轮回忆：3 条"/hidden=false）
+[PASS] F. 卡片收起/展开：点击往返（第一次点击后 is-collapsed=true/aria-expanded="false"，第二次点击后 is-collapsed=false/aria-expanded="true"）
+[PASS] G. 空状态：加载时 .app 带 is-empty，发出第一条消息后去掉（初始=true，发送后=false，#empty-state 存在=true）
+  [debug] 模型回复 111 字："你好！我是 blog-my 的助手，可以帮你读写工作区里的文件、查资料、算数、处"
+[PASS] H. 参数按钮落在输入框工具条内（按钮存在=true，实际父节点=composer-toolbar，工具条存在=true）
+[PASS] I. 胶囊下拉：点按钮开浮层、点选项写回 select 并收起（按钮存在=true，浮层=true，选项数=3，点「自主执行」后 #mode-select="auto"，浮层收起=true，按钮 aria-expanded="false"）
+Not implemented: HTMLFormElement's requestSubmit() method
+[PASS] J. 页内对话框：prompt 能拿到输入，取消返回 null（确定返回="D:\\new-workspace"，取消返回=null）
+[PASS] K. chat.js 里没有 window.prompt（Electron 不支持它）（命中=0 处）
+
+结果: 12 通过 / 0 失败
+测试用户: e2eredesign1791971600963（记得清理）

@@ -1,0 +1,4 @@
+# CUA 运行日志（运行时产物，不入库）
+*.jsonl
+*.txt
+_smoke.py

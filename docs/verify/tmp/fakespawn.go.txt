@@ -1,0 +1,30 @@
+// 假 CUA 子进程：自己再起一个"孙进程"，用来独立复验 stop 是否收掉整棵进程树。
+// 记录两个 pid 到文件，然后各自睡 600s；只有"整棵树"被 kill 才会双双消失。
+package main
+
+import (
+    "os"
+    "os/exec"
+    "strconv"
+    "time"
+)
+
+func write(env, fallback string) {
+    p := os.Getenv(env)
+    if p == "" { p = fallback }
+    _ = os.WriteFile(p, []byte(strconv.Itoa(os.Getpid())), 0644)
+}
+
+func main() {
+    if len(os.Args) > 1 && os.Args[1] == "--grandchild" {
+        write("GC_PIDFILE", "gc.pid")
+        time.Sleep(600 * time.Second)
+        return
+    }
+    write("DIRECT_PIDFILE", "direct.pid")
+    c := exec.Command(os.Args[0], "--grandchild")
+    if err := c.Start(); err != nil {
+        _ = os.WriteFile(os.Getenv("GC_PIDFILE")+".err", []byte(err.Error()), 0644)
+    }
+    time.Sleep(600 * time.Second)
+}

@@ -1,0 +1,32 @@
+{
+  "seq": 1,
+  "mode": "normal",
+  "at": "2026-10-11T08:12:22.473Z",
+  "url": "/v1/chat/completions",
+  "auth_seen": true,
+  "model": "deepseek-flash",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "这是什么图"
+        },
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+          }
+        }
+      ]
+    }
+  ],
+  "message_content_types": [
+    [
+      "text",
+      "image_url"
+    ]
+  ],
+  "reply_content_len": 25
+}

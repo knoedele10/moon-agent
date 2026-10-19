@@ -1,0 +1,10 @@
+# cua 运行依赖（全部为本机既有依赖，未引入新包）
+# 实测环境：Python 3.13.13 / Windows 11
+pyautogui>=0.9.54
+Pillow>=10.0
+numpy>=1.26
+openai>=1.0
+httpx>=0.27
+pyperclip>=1.8        # type 动作主路径：所有非空文本写剪贴板再 Ctrl+V（task-25）；缺失/写后读不回时退化为逐字符 write
+# 可选：仅用于自检里的交叉校验，不是硬依赖
+# jsonschema>=4.18

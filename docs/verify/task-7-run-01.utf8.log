@@ -1,0 +1,945 @@
+python : test_capability_table (ct_test_00_capability.SafetyNet.test_capability_table) ... ok
+所在位置 行:1 字符: 195
++ ... | Out-Null; python cua/tests/run_tests.py -v > docs/verify/task-7-run ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (test_capability...y_table) ... ok:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+test_fake_defaults_are_deterministic (ct_test_00_capability.SafetyNet.test_fake_defaults_are_deterministic) ... ok
+test_fake_pyautogui_installed (ct_test_00_capability.SafetyNet.test_fake_pyautogui_installed) ... ok
+test_prose_brace_before_json (ct_test_01_json.AmbiguousJsonExtraction.test_prose_brace_before_json) ... ERROR
+test_toplevel_array (ct_test_01_json.AmbiguousJsonExtraction.test_toplevel_array) ... ERROR
+test_invalid_inputs_report_bad_json (ct_test_01_json.ImplJsonExtraction.test_invalid_inputs_report_bad_json) ... 
+  test_invalid_inputs_report_bad_json (ct_test_01_json.ImplJsonExtraction.test_invalid_inputs_report_bad_json) (case='n
+o_json_at_all') ... ERROR
+  test_invalid_inputs_report_bad_json (ct_test_01_json.ImplJsonExtraction.test_invalid_inputs_report_bad_json) (case='u
+nbalanced_object') ... ERROR
+  test_invalid_inputs_report_bad_json (ct_test_01_json.ImplJsonExtraction.test_invalid_inputs_report_bad_json) (case='t
+railing_comma') ... ERROR
+  test_invalid_inputs_report_bad_json (ct_test_01_json.ImplJsonExtraction.test_invalid_inputs_report_bad_json) (case='e
+mpty_text') ... ERROR
+  test_invalid_inputs_report_bad_json (ct_test_01_json.ImplJsonExtraction.test_invalid_inputs_report_bad_json) (case='f
+ence_then_garbage') ... ERROR
+test_string_content_not_truncated_by_inner_brace (ct_test_01_json.ImplJsonExtraction.test_string_content_not_truncated_
+by_inner_brace) ... ERROR
+test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) ... 
+  test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='pure_json') ... ERROR
+  test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='fenced_json') ... ERR
+OR
+  test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='fenced_plain') ... ER
+ROR
+  test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='prose_wrapped') ... E
+RROR
+  test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='fenced_with_prose_aro
+und') ... ERROR
+  test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='braces_inside_string'
+) ... ERROR
+  test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='escaped_quotes') ... 
+ERROR
+  test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='nested_json_inside_st
+ring') ... ERROR
+  test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='escaped_backslash') .
+.. ERROR
+test_bad_input_reports_bad_json (ct_test_01_json.OracleJsonExtraction.test_bad_input_reports_bad_json) ... 
+  test_bad_input_reports_bad_json (ct_test_01_json.OracleJsonExtraction.test_bad_input_reports_bad_json) (case='fence_t
+hen_garbage') ... FAIL
+test_balance_scanner_handles_escapes (ct_test_01_json.OracleJsonExtraction.test_balance_scanner_handles_escapes) ... ok
+test_balance_scanner_ignores_braces_in_strings (ct_test_01_json.OracleJsonExtraction.test_balance_scanner_ignores_brace
+s_in_strings) ... ok
+test_fence_strip (ct_test_01_json.OracleJsonExtraction.test_fence_strip) ... FAIL
+test_pure_and_wrapped (ct_test_01_json.OracleJsonExtraction.test_pure_and_wrapped) ... ok
+test_ambiguous_cases_land_in_allowed_set (ct_test_02_schema.AmbiguousSchema.test_ambiguous_cases_land_in_allowed_set) .
+.. 
+  test_ambiguous_cases_land_in_allowed_set (ct_test_02_schema.AmbiguousSchema.test_ambiguous_cases_land_in_allowed_set)
+ (case='dy_float') ... FAIL
+test_impl_choice_is_recorded (ct_test_02_schema.ConflictMdVsSchema.test_impl_choice_is_recorded) ... ERROR
+test_oracle_follows_schema (ct_test_02_schema.ConflictMdVsSchema.test_oracle_follows_schema) ... ERROR
+test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.ImplSchema.test_invalid_steps_rejected_with_expected_
+code) ... 
+  test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.ImplSchema.test_invalid_steps_rejected_with_expecte
+d_code) (case='key_f13') ... FAIL
+  test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.ImplSchema.test_invalid_steps_rejected_with_expecte
+d_code) (case='key_escape') ... FAIL
+  test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.ImplSchema.test_invalid_steps_rejected_with_expecte
+d_code) (case='key_return') ... FAIL
+  test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.ImplSchema.test_invalid_steps_rejected_with_expecte
+d_code) (case='key_meta') ... FAIL
+  test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.ImplSchema.test_invalid_steps_rejected_with_expecte
+d_code) (case='key_trailing_space') ... FAIL
+  test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.ImplSchema.test_invalid_steps_rejected_with_expecte
+d_code) (case='key_unknown_word') ... FAIL
+test_lenient_float_coords_accepted (ct_test_02_schema.ImplSchema.test_lenient_float_coords_accepted) ... ok
+test_valid_steps_pass (ct_test_02_schema.ImplSchema.test_valid_steps_pass) ... ok
+test_error_table_covers_all_documented_codes (ct_test_02_schema.OracleSchema.test_error_table_covers_all_documented_cod
+es) ... ok
+test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.OracleSchema.test_invalid_steps_rejected_with_expecte
+d_code) ... ok
+test_lenient_float_coords_accepted_but_schema_invalid (ct_test_02_schema.OracleSchema.test_lenient_float_coords_accepte
+d_but_schema_invalid) ... FAIL
+test_schema_crosscheck (ct_test_02_schema.OracleSchema.test_schema_crosscheck)
+ÿ���Ƿ� fixture �ġ��Ƿ�Υ�� frozen schema����Ԥ��һ�£���������������������򣬹����⣩�� ... ok
+test_schema_module_available (ct_test_02_schema.OracleSchema.test_schema_module_available) ... ok
+test_valid_steps_pass (ct_test_02_schema.OracleSchema.test_valid_steps_pass) ... ok
+test_half_boundary_lands_in_allowed_set (ct_test_03_coords.AmbiguousHalfRounding.test_half_boundary_lands_in_allowed_se
+t) ... 
+  test_half_boundary_lands_in_allowed_set (ct_test_03_coords.AmbiguousHalfRounding.test_half_boundary_lands_in_allowed_
+set) (case='half_0_5') ... FAIL
+  test_half_boundary_lands_in_allowed_set (ct_test_03_coords.AmbiguousHalfRounding.test_half_boundary_lands_in_allowed_
+set) (case='half_2_5') ... FAIL
+test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) ... 
+  test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='full_screen_doc_example') ... FAIL
+  test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='identity') ... FAIL
+  test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='downscale_2x') ... FAIL
+  test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='region_upscale_2x') ... FAIL
+  test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='region_scale_075') ... FAIL
+  test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='negative_origin_left_monitor') ... FA
+IL
+  test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='float_round_down') ... FAIL
+  test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='float_round_up') ... FAIL
+  test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='bottom_right_pixel') ... FAIL
+test_monotonic_geometry_sanity (ct_test_03_coords.ImplCoords.test_monotonic_geometry_sanity)
+ͬһ origin/scale �£�ͼ������Խ����Ļ������벻������ x/y �ߵ����� ... FAIL
+test_round_trip (ct_test_03_coords.ImplCoords.test_round_trip) ... 
+  test_round_trip (ct_test_03_coords.ImplCoords.test_round_trip) (case='full_screen_doc_example') ... FAIL
+  test_round_trip (ct_test_03_coords.ImplCoords.test_round_trip) (case='region_upscale_2x') ... FAIL
+  test_round_trip (ct_test_03_coords.ImplCoords.test_round_trip) (case='identity') ... FAIL
+  test_round_trip (ct_test_03_coords.ImplCoords.test_round_trip) (case='bottom_right_pixel') ... FAIL
+test_half_up_is_documented_reading (ct_test_03_coords.OracleCoords.test_half_up_is_documented_reading) ... ok
+test_image_to_screen (ct_test_03_coords.OracleCoords.test_image_to_screen) ... ok
+test_round_trip (ct_test_03_coords.OracleCoords.test_round_trip) ... ok
+test_in_range_points_are_not_rejected (ct_test_04_bounds.ImplBoundsRejection.test_in_range_points_are_not_rejected) ...
+ 
+  test_in_range_points_are_not_rejected (ct_test_04_bounds.ImplBoundsRejection.test_in_range_points_are_not_rejected) (
+case='origin') ... FAIL
+  test_in_range_points_are_not_rejected (ct_test_04_bounds.ImplBoundsRejection.test_in_range_points_are_not_rejected) (
+case='typical') ... FAIL
+  test_in_range_points_are_not_rejected (ct_test_04_bounds.ImplBoundsRejection.test_in_range_points_are_not_rejected) (
+case='bottom_right') ... FAIL
+test_oob_reports_e_out_of_bounds_code (ct_test_04_bounds.ImplBoundsRejection.test_oob_reports_e_out_of_bounds_code)
+������һ����Լ��ڰ�Խ���ϱ�Ϊ E_OUT_OF_BOUNDS����4/��5 �Ĵ������棩�� ... FAIL
+test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejected) .
+.. ok
+setUpClass (ct_test_04_bounds.ImplBoundsThroughValidator) ... skipped '����㣺ģ���Ѵ��ڣ�cua.action_parser�����Ҳ��� Step У�
+飨�� image ��Խ���飩 ����ڣ���Լ ��10 ֻ����ģ������δ���ắ������'
+setUpClass (ct_test_04_bounds.ImplDedicatedBoundsChecker) ... skipped '����㣺ģ���Ѵ��ڣ�cua.observation, cua.screenshot���
+��Ҳ��� Խ���ж�����1.1/��8.2�� ����ڣ���Լ ��10 ֻ����ģ������δ���ắ������'
+test_in_range_accepted (ct_test_04_bounds.OracleBounds.test_in_range_accepted) ... ok
+test_no_clamping (ct_test_04_bounds.OracleBounds.test_no_clamping)
+�ܾ����Ǿܾ������÷��� clamp ��� (W-1, H-1)�� ... ok
+test_out_of_bounds_rejected (ct_test_04_bounds.OracleBounds.test_out_of_bounds_rejected) ... ok
+test_casing_choice_is_recorded (ct_test_05_keys.AmbiguousKeyCasing.test_casing_choice_is_recorded) ... ok
+test_allowed_keys_pass (ct_test_05_keys.ImplKeyWhitelist.test_allowed_keys_pass) ... ok
+test_illegal_keys_rejected (ct_test_05_keys.ImplKeyWhitelist.test_illegal_keys_rejected) ... ok
+test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) ... 
+  test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='f13') ..
+. FAIL
+  test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='F0') ...
+ FAIL
+  test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='escape')
+ ... FAIL
+  test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='return')
+ ... FAIL
+  test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='meta') .
+.. FAIL
+  test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='del') ..
+. FAIL
+  test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='control'
+) ... FAIL
+  test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='windows'
+) ... FAIL
+  test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='enter ')
+ ... FAIL
+  test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key=' enter')
+ ... FAIL
+  test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='ctrl+c')
+ ... FAIL
+  test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='') ... F
+AIL
+  test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='��') ...
+ FAIL
+  test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='clear') 
+... FAIL
+test_legal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_legal_keys_in_step) ... ok
+test_hotkey_step_with_illegal_key (ct_test_05_keys.OracleKeyWhitelist.test_hotkey_step_with_illegal_key) ... ok
+test_hotkey_step_with_legal_keys (ct_test_05_keys.OracleKeyWhitelist.test_hotkey_step_with_legal_keys) ... ok
+test_whitelist_size_and_members (ct_test_05_keys.OracleKeyWhitelist.test_whitelist_size_and_members) ... ok
+test_max_retries_when_exposed (ct_test_06_errors.ImplErrorMaxRetries.test_max_retries_when_exposed) ... skipped 'ʵ��δ��
+¶�������޼�������Ϊ����֤����5 �ġ���� N �Ρ�δ���Ϊ���ݣ�'
+test_must_replan_flags (ct_test_06_errors.ImplErrorReplan.test_must_replan_flags) ... skipped 'ʵ��δ��¶�������ع滮����ǣ���
+��ֻʵ���˿������ԣ�����Ϊ����֤'
+test_retryable_counterexample_is_retryable (ct_test_06_errors.ImplErrorRetryability.test_retryable_counterexample_is_re
+tryable) ... ok
+test_retryable_flags_for_all_documented_codes (ct_test_06_errors.ImplErrorRetryability.test_retryable_flags_for_all_doc
+umented_codes) ... ok
+test_stall_and_loop_are_not_retryable (ct_test_06_errors.ImplErrorRetryability.test_stall_and_loop_are_not_retryable) .
+.. ok
+test_4xx_not_retryable_5xx_retryable (ct_test_06_errors.ImplModelHttpContext.test_4xx_not_retryable_5xx_retryable) ... 
+ok
+test_max_retries (ct_test_06_errors.OracleErrorPolicy.test_max_retries) ... ok
+test_model_http_is_context_dependent (ct_test_06_errors.OracleErrorPolicy.test_model_http_is_context_dependent) ... ok
+test_must_replan_is_exactly_stall_and_loop (ct_test_06_errors.OracleErrorPolicy.test_must_replan_is_exactly_stall_and_l
+oop) ... ok
+test_retryable_sets (ct_test_06_errors.OracleErrorPolicy.test_retryable_sets) ... ok
+test_table_is_frozen_size (ct_test_06_errors.OracleErrorPolicy.test_table_is_frozen_size) ... ok
+test_guard_entry_presence_is_reported (ct_test_07_destructive.DestructiveGuardWithoutDedicatedEntry.test_guard_entry_pr
+esence_is_reported) ... skipped '���������ƻ��Դʱ��ж���δ����������������ڣ������м����������һӲԼ����ʵ����غ󸴺�'
+setUpClass (ct_test_07_destructive.ImplDestructivePopupGuard) ... skipped '����㣺ģ���Ѵ��ڣ�cua.executor�����Ҳ��� �����ƻ��
+԰�ť��������7 ӲԼ���� ����ڣ���Լ ��10 ֻ����ģ������δ���ắ������'
+test_hits (ct_test_07_destructive.ImplDestructiveWords.test_hits) ... ok
+test_safe_texts_are_not_hits (ct_test_07_destructive.ImplDestructiveWords.test_safe_texts_are_not_hits) ... ok
+test_destructive_hits_detail (ct_test_07_destructive.OracleDestructiveWords.test_destructive_hits_detail) ... ok
+test_hits (ct_test_07_destructive.OracleDestructiveWords.test_hits) ... ok
+test_safe_texts_are_not_hits (ct_test_07_destructive.OracleDestructiveWords.test_safe_texts_are_not_hits) ... ok
+test_word_table_matches_doc (ct_test_07_destructive.OracleDestructiveWords.test_word_table_matches_doc) ... ok
+test_failsafe_is_true_after_import (ct_test_08_modifier_release.FailsafeInvariant.test_failsafe_is_true_after_import) .
+.. ok
+test_no_source_disables_failsafe (ct_test_08_modifier_release.FailsafeInvariant.test_no_source_disables_failsafe) ... F
+AIL
+test_modifier_key_released_when_execution_fails (ct_test_08_modifier_release.ModifierReleaseOnFailure.test_modifier_key
+_released_when_execution_fails) ... skipped "ִ��·��δ�����κ���ʵ������ã�failed code=E_SCHEMA exc=CuaError(E_SCHEMA, '�޿�ִ
+�ж�����action Ϊ null ��ȱʧ��') @cua.executor.Executor.execute����������оݲ�����"
+test_modifier_release_on_failsafe_exception (ct_test_08_modifier_release.ModifierReleaseOnFailure.test_modifier_release
+_on_failsafe_exception) ... skipped 'hotkey ·����ʹ�� keyDown/keyUp���������� []�����������·��ȡ֤'
+test_no_residual_keys_at_rest (ct_test_08_modifier_release.ModifierReleaseOnFailure.test_no_residual_keys_at_rest) ... 
+skipped 'ִ��·��δ����������ã��޷�ȡ֤'
+setUpClass (ct_test_09_dryrun_mock.CliDryRunFlags) ... skipped "cua.main �в����ڻ���ʧ�ܣ�probe �˳��� 3����['CLI_PROBE_IMP
+ORT_ERROR: No module named cua.main']"
+test_scope_note (ct_test_09_dryrun_mock.DryRunEvidenceScope.test_scope_note) ... ok
+test_click_under_dry_run (ct_test_09_dryrun_mock.DryRunMakesNoInputCalls.test_click_under_dry_run) ... ok
+test_hotkey_under_dry_run (ct_test_09_dryrun_mock.DryRunMakesNoInputCalls.test_hotkey_under_dry_run) ... ok
+test_type_under_dry_run (ct_test_09_dryrun_mock.DryRunMakesNoInputCalls.test_type_under_dry_run) ... ok
+test_backend_scan (ct_test_09_dryrun_mock.NoUninterceptableInputBackend.test_backend_scan) ... skipped "ʵ��ʹ���˼�¼ʽ�ټ��
+���ס�������� [('cua\\\\screenshot.py:61', 'user32'), ('cua\\\\tests\\\\ct_test_09_dryrun_mock.py:6', 'win32api'), ('cua
+\\\\tests\\\\ct_test_09_dryrun_mock.py:6', 'SendInput'), ('cua\\\\tests\\\\ct_test_09_dryrun_mock.py:15', 'win32api'), 
+('cua\\\\tests\\\\ct_test_09_dryrun_mock.py:15', 'SendInput'), ('cua\\\\tests\\\\ct_test_09_dryrun_mock.py:15', 'user32
+'), ('cua\\\\tests\\\\ct_test_09_dryrun_mock.py:15', 'Xlib'), ('cua\\\\tests\\\\ct_test_09_dryrun_mock.py:15', 'pydirec
+tinput')]��������ʵ���롹�оݲ����������˹����� dry-run ��Ϊ"
+
+======================================================================
+ERROR: test_prose_brace_before_json (ct_test_01_json.AmbiguousJsonExtraction.test_prose_brace_before_json)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 138, in test_prose_brace_before_json
+    res = cap(text)
+  File "E:\blog-my\cua\tests\ct_adapter.py", line 691, in __call__
+    return self.fn(*args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^
+  File "E:\blog-my\cua\action_parser.py", line 117, in extract_json
+    raise CuaError(
+    ...<4 lines>...
+    )
+cua.errors.CuaError: E_BAD_JSON: ģ������޷������� JSON���ѳ��ԣ�ȫ��ֱ�� / ������Χ�� / ƽ������ɨ�裩
+
+======================================================================
+ERROR: test_toplevel_array (ct_test_01_json.AmbiguousJsonExtraction.test_toplevel_array)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 147, in test_toplevel_array
+    if res.ok:
+       ^^^^^^
+AttributeError: 'ExtractResult' object has no attribute 'ok'
+
+======================================================================
+ERROR: test_invalid_inputs_report_bad_json (ct_test_01_json.ImplJsonExtraction.test_invalid_inputs_report_bad_json) (ca
+se='no_json_at_all')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 112, in test_invalid_inputs_report_bad_json
+    res = self.cap(text)
+  File "E:\blog-my\cua\tests\ct_adapter.py", line 691, in __call__
+    return self.fn(*args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^
+  File "E:\blog-my\cua\action_parser.py", line 117, in extract_json
+    raise CuaError(
+    ...<4 lines>...
+    )
+cua.errors.CuaError: E_BAD_JSON: ģ������޷������� JSON���ѳ��ԣ�ȫ��ֱ�� / ������Χ�� / ƽ������ɨ�裩
+
+======================================================================
+ERROR: test_invalid_inputs_report_bad_json (ct_test_01_json.ImplJsonExtraction.test_invalid_inputs_report_bad_json) (ca
+se='unbalanced_object')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 112, in test_invalid_inputs_report_bad_json
+    res = self.cap(text)
+  File "E:\blog-my\cua\tests\ct_adapter.py", line 691, in __call__
+    return self.fn(*args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^
+  File "E:\blog-my\cua\action_parser.py", line 117, in extract_json
+    raise CuaError(
+    ...<4 lines>...
+    )
+cua.errors.CuaError: E_BAD_JSON: ģ������޷������� JSON���ѳ��ԣ�ȫ��ֱ�� / ������Χ�� / ƽ������ɨ�裩
+
+======================================================================
+ERROR: test_invalid_inputs_report_bad_json (ct_test_01_json.ImplJsonExtraction.test_invalid_inputs_report_bad_json) (ca
+se='trailing_comma')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 112, in test_invalid_inputs_report_bad_json
+    res = self.cap(text)
+  File "E:\blog-my\cua\tests\ct_adapter.py", line 691, in __call__
+    return self.fn(*args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^
+  File "E:\blog-my\cua\action_parser.py", line 117, in extract_json
+    raise CuaError(
+    ...<4 lines>...
+    )
+cua.errors.CuaError: E_BAD_JSON: ģ������޷������� JSON���ѳ��ԣ�ȫ��ֱ�� / ������Χ�� / ƽ������ɨ�裩
+
+======================================================================
+ERROR: test_invalid_inputs_report_bad_json (ct_test_01_json.ImplJsonExtraction.test_invalid_inputs_report_bad_json) (ca
+se='empty_text')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 112, in test_invalid_inputs_report_bad_json
+    res = self.cap(text)
+  File "E:\blog-my\cua\tests\ct_adapter.py", line 691, in __call__
+    return self.fn(*args, **kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^
+  File "E:\blog-my\cua\action_parser.py", line 98, in extract_json
+    raise CuaError(E_BAD_JSON, "ģ�����Ϊ��", hint="��ֻ���һ�� JSON ����")
+cua.errors.CuaError: E_BAD_JSON: ģ�����Ϊ��
+
+======================================================================
+ERROR: test_invalid_inputs_report_bad_json (ct_test_01_json.ImplJsonExtraction.test_invalid_inputs_report_bad_json) (ca
+se='fence_then_garbage')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 113, in test_invalid_inputs_report_bad_json
+    if res.ok:
+       ^^^^^^
+AttributeError: 'ExtractResult' object has no attribute 'ok'
+
+======================================================================
+ERROR: test_string_content_not_truncated_by_inner_brace (ct_test_01_json.ImplJsonExtraction.test_string_content_not_tru
+ncated_by_inner_brace)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 120, in test_string_content_not_truncated_by_inner_brace
+    self.assertTrue(res.ok, res.describe())
+                    ^^^^^^
+AttributeError: 'ExtractResult' object has no attribute 'ok'
+
+======================================================================
+ERROR: test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='pure_json')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 104, in test_valid_inputs_extract
+    self.assertTrue(res.ok, "Ӧ����ȡ JSON��ʵ��ʧ�ܣ�%s" % res.describe())
+                    ^^^^^^
+AttributeError: 'ExtractResult' object has no attribute 'ok'
+
+======================================================================
+ERROR: test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='fenced_json')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 104, in test_valid_inputs_extract
+    self.assertTrue(res.ok, "Ӧ����ȡ JSON��ʵ��ʧ�ܣ�%s" % res.describe())
+                    ^^^^^^
+AttributeError: 'ExtractResult' object has no attribute 'ok'
+
+======================================================================
+ERROR: test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='fenced_plain')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 104, in test_valid_inputs_extract
+    self.assertTrue(res.ok, "Ӧ����ȡ JSON��ʵ��ʧ�ܣ�%s" % res.describe())
+                    ^^^^^^
+AttributeError: 'ExtractResult' object has no attribute 'ok'
+
+======================================================================
+ERROR: test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='prose_wrapped')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 104, in test_valid_inputs_extract
+    self.assertTrue(res.ok, "Ӧ����ȡ JSON��ʵ��ʧ�ܣ�%s" % res.describe())
+                    ^^^^^^
+AttributeError: 'ExtractResult' object has no attribute 'ok'
+
+======================================================================
+ERROR: test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='fenced_with_pros
+e_around')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 104, in test_valid_inputs_extract
+    self.assertTrue(res.ok, "Ӧ����ȡ JSON��ʵ��ʧ�ܣ�%s" % res.describe())
+                    ^^^^^^
+AttributeError: 'ExtractResult' object has no attribute 'ok'
+
+======================================================================
+ERROR: test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='braces_inside_st
+ring')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 104, in test_valid_inputs_extract
+    self.assertTrue(res.ok, "Ӧ����ȡ JSON��ʵ��ʧ�ܣ�%s" % res.describe())
+                    ^^^^^^
+AttributeError: 'ExtractResult' object has no attribute 'ok'
+
+======================================================================
+ERROR: test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='escaped_quotes')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 104, in test_valid_inputs_extract
+    self.assertTrue(res.ok, "Ӧ����ȡ JSON��ʵ��ʧ�ܣ�%s" % res.describe())
+                    ^^^^^^
+AttributeError: 'ExtractResult' object has no attribute 'ok'
+
+======================================================================
+ERROR: test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='nested_json_insi
+de_string')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 104, in test_valid_inputs_extract
+    self.assertTrue(res.ok, "Ӧ����ȡ JSON��ʵ��ʧ�ܣ�%s" % res.describe())
+                    ^^^^^^
+AttributeError: 'ExtractResult' object has no attribute 'ok'
+
+======================================================================
+ERROR: test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) (case='escaped_backslas
+h')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 104, in test_valid_inputs_extract
+    self.assertTrue(res.ok, "Ӧ����ȡ JSON��ʵ��ʧ�ܣ�%s" % res.describe())
+                    ^^^^^^
+AttributeError: 'ExtractResult' object has no attribute 'ok'
+
+======================================================================
+ERROR: test_impl_choice_is_recorded (ct_test_02_schema.ConflictMdVsSchema.test_impl_choice_is_recorded)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_02_schema.py", line 204, in setUp
+    self.step = mk({"type": "click", "x": 1, "y": 2}, done=True, action=None,
+                ~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                   final={"status": "success", "summary": "�����"})
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: mk() got multiple values for argument 'action'
+
+======================================================================
+ERROR: test_oracle_follows_schema (ct_test_02_schema.ConflictMdVsSchema.test_oracle_follows_schema)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_02_schema.py", line 204, in setUp
+    self.step = mk({"type": "click", "x": 1, "y": 2}, done=True, action=None,
+                ~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                   final={"status": "success", "summary": "�����"})
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: mk() got multiple values for argument 'action'
+
+======================================================================
+FAIL: test_bad_input_reports_bad_json (ct_test_01_json.OracleJsonExtraction.test_bad_input_reports_bad_json) (case='fen
+ce_then_garbage')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 77, in test_bad_input_reports_bad_json
+    with self.assertRaises(O.ContractError) as ctx:
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+AssertionError: ContractError not raised
+
+======================================================================
+FAIL: test_fence_strip (ct_test_01_json.OracleJsonExtraction.test_fence_strip)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 90, in test_fence_strip
+    self.assertEqual(O.strip_code_fence(fenced(PURE, "json")), PURE)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '{"pr[59 chars]{"type": "wait", "ms": 500, "reason": "�ȼ���"}, "done": false}\n' != '{"pr[59 chars]{"ty
+pe": "wait", "ms": 500, "reason": "�ȼ���"}, "done": false}'
+  {"protocol": "cua/1", "thought": "������ַ�����ڽ��㣬ֱ��������ַ", "action": {"type": "wait", "ms": 500, "reason": "�ȼ���
+"}, "done": false}
+- 
+
+
+======================================================================
+FAIL: test_ambiguous_cases_land_in_allowed_set (ct_test_02_schema.AmbiguousSchema.test_ambiguous_cases_land_in_allowed_
+set) (case='dy_float')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_02_schema.py", line 194, in test_ambiguous_cases_land_in_allowed_set
+    self.assertIn(oracle_code, allowed, "�ο�ʵ�ֵĹ���Խ���������")
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: None not found in {'E_ARG_RANGE', 'E_SCHEMA'} : �ο�ʵ�ֵĹ���Խ���������
+
+======================================================================
+FAIL: test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.ImplSchema.test_invalid_steps_rejected_with_exp
+ected_code) (case='key_f13')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_02_schema.py", line 178, in test_invalid_steps_rejected_with_expected_code
+    self.assertNotEqual(got, "OK", "�Ƿ� Step �����ܣ�%s" % case["name"])
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ� Step �����ܣ�key_f13
+
+======================================================================
+FAIL: test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.ImplSchema.test_invalid_steps_rejected_with_exp
+ected_code) (case='key_escape')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_02_schema.py", line 178, in test_invalid_steps_rejected_with_expected_code
+    self.assertNotEqual(got, "OK", "�Ƿ� Step �����ܣ�%s" % case["name"])
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ� Step �����ܣ�key_escape
+
+======================================================================
+FAIL: test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.ImplSchema.test_invalid_steps_rejected_with_exp
+ected_code) (case='key_return')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_02_schema.py", line 178, in test_invalid_steps_rejected_with_expected_code
+    self.assertNotEqual(got, "OK", "�Ƿ� Step �����ܣ�%s" % case["name"])
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ� Step �����ܣ�key_return
+
+======================================================================
+FAIL: test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.ImplSchema.test_invalid_steps_rejected_with_exp
+ected_code) (case='key_meta')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_02_schema.py", line 178, in test_invalid_steps_rejected_with_expected_code
+    self.assertNotEqual(got, "OK", "�Ƿ� Step �����ܣ�%s" % case["name"])
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ� Step �����ܣ�key_meta
+
+======================================================================
+FAIL: test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.ImplSchema.test_invalid_steps_rejected_with_exp
+ected_code) (case='key_trailing_space')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_02_schema.py", line 178, in test_invalid_steps_rejected_with_expected_code
+    self.assertNotEqual(got, "OK", "�Ƿ� Step �����ܣ�%s" % case["name"])
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ� Step �����ܣ�key_trailing_space
+
+======================================================================
+FAIL: test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.ImplSchema.test_invalid_steps_rejected_with_exp
+ected_code) (case='key_unknown_word')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_02_schema.py", line 178, in test_invalid_steps_rejected_with_expected_code
+    self.assertNotEqual(got, "OK", "�Ƿ� Step �����ܣ�%s" % case["name"])
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ� Step �����ܣ�key_unknown_word
+
+======================================================================
+FAIL: test_lenient_float_coords_accepted_but_schema_invalid (ct_test_02_schema.OracleSchema.test_lenient_float_coords_a
+ccepted_but_schema_invalid)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_02_schema.py", line 150, in test_lenient_float_coords_accepted_but_schema_invalid
+    self.assertFalse(O.schema_valid(s), "schema Ҫ�� integer���˴����� md/schema �Ĳ����")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : schema Ҫ�� integer���˴����� md/schema �Ĳ����
+
+======================================================================
+FAIL: test_half_boundary_lands_in_allowed_set (ct_test_03_coords.AmbiguousHalfRounding.test_half_boundary_lands_in_allo
+wed_set) (case='half_0_5')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_03_coords.py", line 123, in test_half_boundary_lands_in_allowed_set
+    self.assertTrue(res.ok, res.describe())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : failed code=None exc=AttributeError("'float' object has no attribute 'origin'") @cu
+a.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_half_boundary_lands_in_allowed_set (ct_test_03_coords.AmbiguousHalfRounding.test_half_boundary_lands_in_allo
+wed_set) (case='half_2_5')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_03_coords.py", line 123, in test_half_boundary_lands_in_allowed_set
+    self.assertTrue(res.ok, res.describe())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : failed code=None exc=AttributeError("'float' object has no attribute 'origin'") @cu
+a.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='full_screen_doc_example')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_03_coords.py", line 73, in test_image_to_screen
+    self.assertTrue(res.ok, "����ʧ�ܣ�%s" % res.describe())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : ����ʧ�ܣ�failed code=None exc=AttributeError("'float' object has no attribute 'origi
+n'") @cua.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='identity')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_03_coords.py", line 73, in test_image_to_screen
+    self.assertTrue(res.ok, "����ʧ�ܣ�%s" % res.describe())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : ����ʧ�ܣ�failed code=None exc=AttributeError("'float' object has no attribute 'origi
+n'") @cua.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='downscale_2x')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_03_coords.py", line 73, in test_image_to_screen
+    self.assertTrue(res.ok, "����ʧ�ܣ�%s" % res.describe())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : ����ʧ�ܣ�failed code=None exc=AttributeError("'float' object has no attribute 'origi
+n'") @cua.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='region_upscale_2x')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_03_coords.py", line 73, in test_image_to_screen
+    self.assertTrue(res.ok, "����ʧ�ܣ�%s" % res.describe())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : ����ʧ�ܣ�failed code=None exc=AttributeError("'float' object has no attribute 'origi
+n'") @cua.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='region_scale_075')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_03_coords.py", line 73, in test_image_to_screen
+    self.assertTrue(res.ok, "����ʧ�ܣ�%s" % res.describe())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : ����ʧ�ܣ�failed code=None exc=AttributeError("'float' object has no attribute 'origi
+n'") @cua.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='negative_origin_left_monitor')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_03_coords.py", line 73, in test_image_to_screen
+    self.assertTrue(res.ok, "����ʧ�ܣ�%s" % res.describe())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : ����ʧ�ܣ�failed code=None exc=AttributeError("'float' object has no attribute 'origi
+n'") @cua.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='float_round_down')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_03_coords.py", line 73, in test_image_to_screen
+    self.assertTrue(res.ok, "����ʧ�ܣ�%s" % res.describe())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : ����ʧ�ܣ�failed code=None exc=AttributeError("'float' object has no attribute 'origi
+n'") @cua.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='float_round_up')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_03_coords.py", line 73, in test_image_to_screen
+    self.assertTrue(res.ok, "����ʧ�ܣ�%s" % res.describe())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : ����ʧ�ܣ�failed code=None exc=AttributeError("'float' object has no attribute 'origi
+n'") @cua.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) (case='bottom_right_pixel')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_03_coords.py", line 73, in test_image_to_screen
+    self.assertTrue(res.ok, "����ʧ�ܣ�%s" % res.describe())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : ����ʧ�ܣ�failed code=None exc=AttributeError("'float' object has no attribute 'origi
+n'") @cua.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_monotonic_geometry_sanity (ct_test_03_coords.ImplCoords.test_monotonic_geometry_sanity)
+ͬһ origin/scale �£�ͼ������Խ����Ļ������벻������ x/y �ߵ�����
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_03_coords.py", line 99, in test_monotonic_geometry_sanity
+    self.assertTrue(res.ok, res.describe())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : failed code=None exc=AttributeError("'float' object has no attribute 'origin'") @cu
+a.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_round_trip (ct_test_03_coords.ImplCoords.test_round_trip) (case='full_screen_doc_example')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_03_coords.py", line 85, in test_round_trip
+    self.assertTrue(fwd.ok, fwd.describe())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : failed code=None exc=AttributeError("'float' object has no attribute 'origin'") @cu
+a.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_round_trip (ct_test_03_coords.ImplCoords.test_round_trip) (case='region_upscale_2x')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_03_coords.py", line 85, in test_round_trip
+    self.assertTrue(fwd.ok, fwd.describe())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : failed code=None exc=AttributeError("'float' object has no attribute 'origin'") @cu
+a.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_round_trip (ct_test_03_coords.ImplCoords.test_round_trip) (case='identity')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_03_coords.py", line 85, in test_round_trip
+    self.assertTrue(fwd.ok, fwd.describe())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : failed code=None exc=AttributeError("'float' object has no attribute 'origin'") @cu
+a.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_round_trip (ct_test_03_coords.ImplCoords.test_round_trip) (case='bottom_right_pixel')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_03_coords.py", line 85, in test_round_trip
+    self.assertTrue(fwd.ok, fwd.describe())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : failed code=None exc=AttributeError("'float' object has no attribute 'origin'") @cu
+a.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_in_range_points_are_not_rejected (ct_test_04_bounds.ImplBoundsRejection.test_in_range_points_are_not_rejecte
+d) (case='origin')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 72, in test_in_range_points_are_not_rejected
+    self.assertFalse(A.rejected(res),
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+                     "�Ϸ����걻�ܾ���(%s,%s) -> %s" % (x, y, res.describe()))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : �Ϸ����걻�ܾ���(0,0) -> failed code=None exc=AttributeError("'float' object has no att
+ribute 'origin'") @cua.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_in_range_points_are_not_rejected (ct_test_04_bounds.ImplBoundsRejection.test_in_range_points_are_not_rejecte
+d) (case='typical')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 72, in test_in_range_points_are_not_rejected
+    self.assertFalse(A.rejected(res),
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+                     "�Ϸ����걻�ܾ���(%s,%s) -> %s" % (x, y, res.describe()))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : �Ϸ����걻�ܾ���(736,414) -> failed code=None exc=AttributeError("'float' object has no
+ attribute 'origin'") @cua.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_in_range_points_are_not_rejected (ct_test_04_bounds.ImplBoundsRejection.test_in_range_points_are_not_rejecte
+d) (case='bottom_right')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 72, in test_in_range_points_are_not_rejected
+    self.assertFalse(A.rejected(res),
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+                     "�Ϸ����걻�ܾ���(%s,%s) -> %s" % (x, y, res.describe()))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : �Ϸ����걻�ܾ���(1471,827) -> failed code=None exc=AttributeError("'float' object has n
+o attribute 'origin'") @cua.screenshot.image_to_screen
+
+======================================================================
+FAIL: test_oob_reports_e_out_of_bounds_code (ct_test_04_bounds.ImplBoundsRejection.test_oob_reports_e_out_of_bounds_cod
+e)
+������һ����Լ��ڰ�Խ���ϱ�Ϊ E_OUT_OF_BOUNDS����4/��5 �Ĵ������棩��
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 98, in test_oob_reports_e_out_of_bounds_code
+    self.assertIn("E_OUT_OF_BOUNDS", codes,
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+                  "Խ��ܾ�δ�� E_OUT_OF_BOUNDS �ϱ����۲쵽�����/�����룺%r" % (seen,))
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'E_OUT_OF_BOUNDS' not found in [] : Խ��ܾ�δ�� E_OUT_OF_BOUNDS �ϱ����۲쵽�����/�����룺[('image_to_screen', N
+one)]
+
+======================================================================
+FAIL: test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='f13'
+)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_05_keys.py", line 92, in test_illegal_keys_in_step
+    self.assertNotEqual(got, "OK", "�Ƿ��� %r �� Step ������" % k)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ��� 'f13' �� Step ������
+
+======================================================================
+FAIL: test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='F0')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_05_keys.py", line 92, in test_illegal_keys_in_step
+    self.assertNotEqual(got, "OK", "�Ƿ��� %r �� Step ������" % k)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ��� 'F0' �� Step ������
+
+======================================================================
+FAIL: test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='esca
+pe')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_05_keys.py", line 92, in test_illegal_keys_in_step
+    self.assertNotEqual(got, "OK", "�Ƿ��� %r �� Step ������" % k)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ��� 'escape' �� Step ������
+
+======================================================================
+FAIL: test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='retu
+rn')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_05_keys.py", line 92, in test_illegal_keys_in_step
+    self.assertNotEqual(got, "OK", "�Ƿ��� %r �� Step ������" % k)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ��� 'return' �� Step ������
+
+======================================================================
+FAIL: test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='meta
+')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_05_keys.py", line 92, in test_illegal_keys_in_step
+    self.assertNotEqual(got, "OK", "�Ƿ��� %r �� Step ������" % k)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ��� 'meta' �� Step ������
+
+======================================================================
+FAIL: test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='del'
+)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_05_keys.py", line 92, in test_illegal_keys_in_step
+    self.assertNotEqual(got, "OK", "�Ƿ��� %r �� Step ������" % k)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ��� 'del' �� Step ������
+
+======================================================================
+FAIL: test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='cont
+rol')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_05_keys.py", line 92, in test_illegal_keys_in_step
+    self.assertNotEqual(got, "OK", "�Ƿ��� %r �� Step ������" % k)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ��� 'control' �� Step ������
+
+======================================================================
+FAIL: test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='wind
+ows')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_05_keys.py", line 92, in test_illegal_keys_in_step
+    self.assertNotEqual(got, "OK", "�Ƿ��� %r �� Step ������" % k)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ��� 'windows' �� Step ������
+
+======================================================================
+FAIL: test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='ente
+r ')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_05_keys.py", line 92, in test_illegal_keys_in_step
+    self.assertNotEqual(got, "OK", "�Ƿ��� %r �� Step ������" % k)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ��� 'enter ' �� Step ������
+
+======================================================================
+FAIL: test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key=' ent
+er')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_05_keys.py", line 92, in test_illegal_keys_in_step
+    self.assertNotEqual(got, "OK", "�Ƿ��� %r �� Step ������" % k)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ��� ' enter' �� Step ������
+
+======================================================================
+FAIL: test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='ctrl
++c')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_05_keys.py", line 92, in test_illegal_keys_in_step
+    self.assertNotEqual(got, "OK", "�Ƿ��� %r �� Step ������" % k)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ��� 'ctrl+c' �� Step ������
+
+======================================================================
+FAIL: test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_05_keys.py", line 92, in test_illegal_keys_in_step
+    self.assertNotEqual(got, "OK", "�Ƿ��� %r �� Step ������" % k)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ��� '' �� Step ������
+
+======================================================================
+FAIL: test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='��')
+----------------------------------------------------------------------
+
+==== CAPABILITY_TABLE (task-7 verifier) ====
+repo=E:\blog-my
+cua_package_present=True
+extract_json       RESOLVED  <cap extract_json @cua.action_parser.extract_json>
+step_validate      RESOLVED  <cap step_validator @cua.action_parser.validate_step_dict>
+image_to_screen    RESOLVED  <cap image_to_screen @cua.screenshot.image_to_screen>
+screen_to_image    RESOLVED  <cap screen_to_image @cua.screenshot.screen_to_image>
+bounds_check       MISSING   ����㣺ģ���Ѵ��ڣ�cua.observation, cua.screenshot�����Ҳ��� Խ���ж�����1.1/��8.2�� ����ڣ���Լ ��10 ֻ����ģ������δ���ắ������
+key_whitelist      RESOLVED  <cap key_whitelist_container @cua.executor.KEY_WHITELIST>
+error_policy       RESOLVED  <ct_adapter.PolicyView object at 0x000001731DC7FA10>
+destructive_words  RESOLVED  <cap destructive_words_container @cua.config.DESTRUCTIVE_WORDS>
+click_guard        MISSING   ����㣺ģ���Ѵ��ڣ�cua.executor�����Ҳ��� �����ƻ��԰�ť��������7 ӲԼ���� ����ڣ���Լ ��10 ֻ����ģ������δ���ắ������
+execute_action     RESOLVED  <cap executor_instance @cua.executor.Executor.execute>
+dry_run_executor   RESOLVED  <cap dry_run_instance @cua.executor.Executor.execute(dry_run=True)>
+==== END CAPABILITY_TABLE ====
+
+==== DRY-RUN ȡ֤��Χ ====
+��ȡ֤: CLI --help ��¶ --dry-run/--mock���ӽ��̣��ټ���װ��
+��ȡ֤: ִ����� cua.executor.Executor.execute(dry_run=True) �ڿ��ش�ʱ�������������
+����֤: ��ѭ��������ʵģ�� + ��ͼ�Ķ˵��� dry-run����Ҫʵ���ṩ��ͼ/ģ��ע���
+==== END ====
+
+---- ���� ----
+ģ��: ct_test_00_capability, ct_test_01_json, ct_test_02_schema, ct_test_03_coords, ct_test_04_bounds, ct_test_05_keys, ct_test_06_errors, ct_test_07_destructive, ct_test_08_modifier_release, ct_test_09_dryrun_mock
+����: run=74 failures=45 errors=19 skipped=11
+����ԭ��ǰ 20 ������
+  - ImplBoundsThroughValidator) :: ����㣺ģ���Ѵ��ڣ�cua.action_parser�����Ҳ��� Step У�飨�� image ��Խ���飩 ����ڣ���Լ ��10 ֻ����ģ������δ���ắ������
+  - ImplDedicatedBoundsChecker) :: ����㣺ģ���Ѵ��ڣ�cua.observation, cua.screenshot�����Ҳ��� Խ���ж�����1.1/��8.2�� ����ڣ���Լ ��10 ֻ����ģ������δ���ắ������
+  - test_max_retries_when_exposed :: ʵ��δ��¶�������޼�������Ϊ����֤����5 �ġ���� N �Ρ�δ���Ϊ���ݣ�
+  - test_must_replan_flags :: ʵ��δ��¶�������ع滮����ǣ�����ֻʵ���˿������ԣ�����Ϊ����֤
+  - test_guard_entry_presence_is_reported :: ���������ƻ��Դʱ��ж���δ����������������ڣ������м����������һӲԼ����ʵ����غ󸴺�
+  - ImplDestructivePopupGuard) :: ����㣺ģ���Ѵ��ڣ�cua.executor�����Ҳ��� �����ƻ��԰�ť��������7 ӲԼ���� ����ڣ���Լ ��10 ֻ����ģ������δ���ắ������
+  - test_modifier_key_released_when_execution_fails :: ִ��·��δ�����κ���ʵ������ã�failed code=E_SCHEMA exc=CuaError(E_SCHEMA, '�޿�ִ�ж�����action Ϊ null ��ȱʧ��') @cua.executor.Executor.execute����������оݲ�����
+  - test_modifier_release_on_failsafe_exception :: hotkey ·����ʹ�� keyDown/keyUp���������� []�����������·��ȡ֤
+  - test_no_residual_keys_at_rest :: ִ��·��δ����������ã��޷�ȡ֤
+  - CliDryRunFlags) :: cua.main �в����ڻ���ʧ�ܣ�probe �˳��� 3����['CLI_PROBE_IMPORT_ERROR: No module named cua.main']
+  - test_backend_scan :: ʵ��ʹ���˼�¼ʽ�ټ�����ס�������� [('cua\\screenshot.py:61', 'user32'), ('cua\\tests\\ct_test_09_dryrun_mock.py:6', 'win32api'), ('cua\\tests\\ct_test_09_dryrun_mock.py:6', 'SendInput'), ('cua\\tests\\ct_test_09_dryrun_mock.py:15', 'win32api'), ('cua\\tests\\ct_test_09_dryrun_mock.py:15', 'SendInput'), ('cua\\tests\\ct_test_09_dryrun_mock.py:15', 'user32'), ('cua\\tests\\ct_test_09_dryrun_mock.py:15', 'Xlib'), ('cua\\tests\\ct_test_09_dryrun_mock.py:15', 'pydirectinput')]��������ʵ���롹�оݲ����������˹����� dry-run ��Ϊ
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_05_keys.py", line 92, in test_illegal_keys_in_step
+    self.assertNotEqual(got, "OK", "�Ƿ��� %r �� Step ������" % k)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ��� '��' �� Step ������
+
+======================================================================
+FAIL: test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) (key='clea
+r')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_05_keys.py", line 92, in test_illegal_keys_in_step
+    self.assertNotEqual(got, "OK", "�Ƿ��� %r �� Step ������" % k)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OK' == 'OK' : �Ƿ��� 'clear' �� Step ������
+
+======================================================================
+FAIL: test_no_source_disables_failsafe (ct_test_08_modifier_release.FailsafeInvariant.test_no_source_disables_failsafe)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_08_modifier_release.py", line 24, in test_no_source_disables_failsafe
+    self.assertEqual(hits, [], "ʵ��Դ������� FAILSAFE = False��Υ�� ��8.1��%r" % (hits,))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: [('cua\\tests\\ct_test_08_modifier_release.py:24', 'FAILSAFE = False')] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+('cua\\tests\\ct_test_08_modifier_release.py:24', 'FAILSAFE = False')
+
+- [('cua\\tests\\ct_test_08_modifier_release.py:24', 'FAILSAFE = False')]
++ [] : ʵ��Դ������� FAILSAFE = False��Υ�� ��8.1��[('cua\\tests\\ct_test_08_modifier_release.py:24', 'FAILSAFE = False')]
+
+----------------------------------------------------------------------
+Ran 74 tests in 0.292s
+
+FAILED (failures=45, errors=19, skipped=11)

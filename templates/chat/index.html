@@ -1,0 +1,636 @@
+{{define "chat/index.html"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <!-- 主题必须在首次绘制前定好，否则选了深色主题的用户每次打开都会先闪一帧浅色。
+         所以这里用阻塞式脚本而不是 defer：它只读一次 localStorage，开销可以忽略。 -->
+    <script src="/static/js/theme-boot.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="chat-page">
+    <!-- is-empty 是首屏的初始状态：新会话、还没有消息。CSS 靠它把「招呼 + 输入框」当成一组居中。
+         任何一条消息进来 / 打开旧会话时，chat.js 的 setEmptyState() 会摘掉它。 -->
+    <div class="app is-empty" data-view="chat">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-head">
+                <div class="brand-row">
+                    <span class="logo" aria-hidden="true">M</span>
+                    <span class="brand-text">
+                        <span class="brand-name">多模型工作台</span>
+                        <span class="brand-mid">AI<i>//</i>WORKSPACE</span>
+                    </span>
+                </div>
+                <button type="button" class="btn btn-block new-chat-btn" id="new-chat"><span aria-hidden="true">+</span> 新建对话</button>
+            </div>
+            <!-- 重排：页签从横排改竖排分组。6 个页签横排在 264px 侧栏里早已互相挤压
+                 （.view-tab 的 flex-basis:auto 只是缓兵之计，「电脑操控」带角标仍然挤），
+                 竖排后每个页签独占一行，顺序按使用频率：对话是主工作区，
+                 LIBRARY 是沉淀下来的可复用资产，LABS 是实验功能压底。
+                 .view-tab 类名与 data-view 都保持不变，chat.js 的 showView / 路由一行不用改。
+                 图标用 lucide 的路径数据内联成 SVG——项目没有构建步骤，引不了图标库；
+                 aria-hidden 放在 svg 上，可读名字仍由旁边的文字节点提供。 -->
+            <nav class="view-nav" aria-label="功能导航">
+                <a class="view-tab active" href="#/chat" data-view="chat" aria-current="page">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    <span>对话</span>
+                </a>
+                <div class="nav-group">
+                    <div class="nav-group-tag" aria-hidden="true">LIBRARY</div>
+                    <a class="view-tab" href="#/skills" data-view="skills">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.9 15.5A2 2 0 0 0 8.5 14.1l-6.1-1.6a.5.5 0 0 1 0-1l6.1-1.6A2 2 0 0 0 9.9 8.5l1.6-6.1a.5.5 0 0 1 1 0l1.6 6.1a2 2 0 0 0 1.4 1.4l6.1 1.6a.5.5 0 0 1 0 1l-6.1 1.6a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0z"></path></svg>
+                        <span>技能</span>
+                    </a>
+                    <a class="view-tab" href="#/assistants" data-view="assistants">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                        <span>助手</span>
+                    </a>
+                    <a class="view-tab" href="#/prompts" data-view="prompts">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                        <span>提示词</span>
+                    </a>
+                    <a class="view-tab" href="#/models" data-view="models">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="16" height="16" x="4" y="4" rx="2"></rect><rect width="6" height="6" x="9" y="9" rx="1"></rect><path d="M15 2v2"></path><path d="M15 20v2"></path><path d="M2 15h2"></path><path d="M2 9h2"></path><path d="M20 15h2"></path><path d="M20 9h2"></path><path d="M9 2v2"></path><path d="M9 20v2"></path></svg>
+                        <span>模型</span>
+                    </a>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-group-tag" aria-hidden="true">LABS</div>
+                    <a class="view-tab" href="#/cua" data-view="cua" aria-label="电脑操控（测试版）">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line></svg>
+                        <span>电脑操控</span>
+                        <span class="view-tab-beta" title="测试版：功能仍在打磨，接口与交互可能变化">测试版</span>
+                    </a>
+                </div>
+            </nav>
+            <div class="conv-filter">
+                <input type="search" id="conv-filter" class="input" placeholder="筛选会话标题…" aria-label="筛选会话" autocomplete="off">
+            </div>
+            <nav class="conv-list" id="conv-list" aria-label="会话列表">
+                <div class="list-hint">加载中…</div>
+            </nav>
+            <!-- 侧栏底部：账号 + 设置 / 退出。参考图把账号块放在左下角，
+                 顺带把这两个入口从顶栏挪下来，顶栏腾给标题、模式与模型。 -->
+            <div class="sidebar-foot">
+                <span class="sidebar-avatar" aria-hidden="true">月</span>
+                <span class="sidebar-user" title="{{.Username}}">{{.Username}}</span>
+                <a class="icon-btn" href="/settings" title="设置" aria-label="设置">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                </a>
+                <a class="icon-btn" href="/logout" title="退出" aria-label="退出">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" x2="9" y1="12" y2="12"></line></svg>
+                </a>
+            </div>
+        </aside>
+
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+        <main class="main">
+            <!-- 背景装饰：参考图里那几条很淡的弧线与星点。纯装饰，关掉点击穿透。
+                 用 CSS 画而不是引图片：项目没有构建步骤，也不想为几根线增加资源请求。 -->
+            <div class="main-decor" aria-hidden="true">
+                <span class="decor-arc decor-arc-a"></span>
+                <span class="decor-arc decor-arc-b"></span>
+                <span class="decor-spark decor-spark-a"></span>
+                <span class="decor-spark decor-spark-b"></span>
+                <span class="decor-spark decor-spark-c"></span>
+            </div>
+            <header class="topbar">
+                <button type="button" class="hamburger" id="sidebar-toggle" aria-label="切换侧栏" aria-controls="sidebar" aria-expanded="false">&#9776;</button>
+                <div class="topbar-title" id="topbar-title">新对话</div>
+                <!-- 四模式分段控件（参考图顶部那颗胶囊）。真状态仍然存在 #kind-select 里：
+                     chat.js 读的是它，所以后端协议、按会话记忆、发送逻辑一行都不用改；
+                     这里只是同一份状态的另一个视图，双向同步写在 kind.js。
+                     顺序按使用频率排（聊天/工作/代码/学习），默认高亮「工作」，与 #kind-select 的默认值一致。 -->
+                <div class="kind-switch" id="kind-switch" role="group" aria-label="会话模式">
+                    <button type="button" class="kind-switch-btn" data-kind="chat" aria-label="聊天" title="聊天" aria-pressed="false">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"></path></svg>
+                        <span>聊天</span>
+                    </button>
+                    <button type="button" class="kind-switch-btn" data-kind="work" aria-label="工作" title="工作" aria-pressed="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="7" rx="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+                        <span>工作</span>
+                    </button>
+                    <button type="button" class="kind-switch-btn" data-kind="code" aria-label="代码" title="代码" aria-pressed="false">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                        <span>代码</span>
+                    </button>
+                    <button type="button" class="kind-switch-btn" data-kind="learn" aria-label="学习" title="学习" aria-pressed="false">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg>
+                        <span>学习</span>
+                    </button>
+                </div>
+                <div class="topbar-actions">
+                    <div class="model-wrap">
+                        <select class="select" id="model-select" aria-label="选择模型">
+                            <option value="">加载模型…</option>
+                        </select>
+                    </div>
+                    <!-- 深浅主题开关：两枚图标叠着放，由 [data-theme] 决定显示哪一枚，JS 不用换图标。 -->
+                    <button type="button" class="icon-btn theme-toggle" id="theme-toggle" title="切换深浅主题" aria-label="切换深浅主题">
+                        <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
+                        <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
+                    </button>
+                    <!-- 契约 §7：密钥入口移到右上角；#/keys 路由仍可达（chat.js 的 handleRoute 特判），点开是弹层。
+                         设置 / 退出 已挪到侧栏左下角，顶栏只留与「当前会话」直接相关的东西。 -->
+                    <button type="button" class="btn btn-ghost" id="keys-open" aria-haspopup="dialog" aria-expanded="false" aria-controls="keys-dialog">密钥</button>
+                </div>
+            </header>
+
+            <!-- 右上角浮动的「当前任务」卡片（参考图那一块）。
+                 内容完全由 static/js/taskcard.js 渲染（window.TASKCARD）；
+                 这里只留一个空容器，数据来自真实会话状态，不是写死的装饰。 -->
+            <aside class="task-card" id="task-card" hidden aria-label="当前任务"></aside>
+
+            <!-- 契约 §7：记忆（原「知识库」）并入对话视图，定位为 AI 的记忆系统。
+                 内部元素 id 与原来完全一致，所以 kb.js 一行都不用改；折叠 + 内部滚动，展开不会把对话区挤没。 -->
+            <details class="memory-panel" id="memory-panel">
+                <summary class="memory-summary">
+                    <span class="memory-tag" aria-hidden="true">MEMORY</span>
+                    <span class="memory-title">记忆</span>
+                    <span class="memory-sub">AI 的记忆系统：上传的资料、检索与问答都在这里</span>
+                    <span class="memory-count" id="memory-count"></span>
+                </summary>
+                <div class="memory-body">
+                    <div class="kb-stats" id="kb-stats">
+                        <span class="kb-stat"><b id="kb-stat-docs">—</b> 个文档</span>
+                        <span class="kb-stat"><b id="kb-stat-chunks">—</b> 个检索块</span>
+                        <span class="kb-stat kb-stat-note" id="kb-stat-note"></span>
+                    </div>
+
+                    <div class="kb-grid">
+                        <section class="kb-card">
+                            <h3>上传文件</h3>
+                            <p class="kb-card-sub">支持 .txt / .md / .log 与 .png / .jpg / .jpeg / .webp / .gif。图片会先由本地视觉模型转成「描述 + OCR」再入库，视机器性能可能需要几十秒。</p>
+                            <form id="kb-upload-form" class="kb-form">
+                                <input type="file" id="kb-file" class="kb-file" aria-label="选择要入库的文件"
+                                       accept=".txt,.md,.markdown,.log,.png,.jpg,.jpeg,.webp,.gif">
+                                <button type="submit" class="btn" id="kb-upload-btn">上传入库</button>
+                            </form>
+                            <p class="kb-note" id="kb-upload-note" role="status" aria-live="polite"></p>
+                        </section>
+
+                        <section class="kb-card">
+                            <h3>粘贴文本</h3>
+                            <p class="kb-card-sub">适合直接入库一段摘录；标题留空时取正文首行。</p>
+                            <form id="kb-text-form" class="kb-form">
+                                <div class="field">
+                                    <label for="kb-text-title">标题</label>
+                                    <input type="text" class="input" id="kb-text-title" maxlength="255" placeholder="可留空">
+                                </div>
+                                <div class="field">
+                                    <label for="kb-text-body">正文</label>
+                                    <textarea class="input kb-textarea" id="kb-text-body" rows="5" placeholder="粘贴要入库的文本…"></textarea>
+                                </div>
+                                <button type="submit" class="btn" id="kb-text-btn">入库文本</button>
+                            </form>
+                            <p class="kb-note" id="kb-text-note" role="status" aria-live="polite"></p>
+                        </section>
+                    </div>
+
+                    <section class="kb-card">
+                        <h3>工作区</h3>
+                        <p class="kb-card-sub">AI 的文件工具可在这里列出的多个活动目录中操作。每行填写一个绝对路径；第一行是主目录。</p>
+                        <form id="ws-form" class="kb-inline">
+                            <textarea class="input" id="ws-path" rows="3" placeholder="D:\\my-workspace&#10;D:\\notes" aria-label="工作区目录列表" autocomplete="off"></textarea>
+                            <button type="submit" class="btn" id="ws-save">保存</button>
+                        </form>
+                        <p class="kb-note" id="ws-note" role="status" aria-live="polite"></p>
+                    </section>
+
+                    <section class="kb-card">
+                        <h3>检索</h3>
+                        <p class="kb-card-sub">把问题嵌入成向量后在全部块里做余弦相似度排序，返回最相似的几个块（不做重排）。</p>
+                        <form id="kb-search-form" class="kb-inline">
+                            <input type="search" class="input" id="kb-search-input" placeholder="输入关键词或一句话…" aria-label="检索关键词">
+                            <button type="submit" class="btn btn-outline" id="kb-search-btn">检索</button>
+                        </form>
+                        <div class="kb-result" id="kb-search-result"></div>
+                    </section>
+
+                    <section class="kb-card">
+                        <h3>基于知识库问答</h3>
+                        <p class="kb-card-sub">先检索，再把命中的原文交给所选模型生成回答；回答以 SSE 流式返回，上方列出出处。</p>
+                        <form id="kb-ask-form" class="kb-inline">
+                            <input type="search" class="input" id="kb-ask-input" placeholder="向知识库提问…" aria-label="知识库问题">
+                            <button type="submit" class="btn" id="kb-ask-btn">提问</button>
+                        </form>
+                        <p class="kb-note" id="kb-ask-model"></p>
+                        <div class="kb-result" id="kb-ask-result"></div>
+                    </section>
+
+                    <section class="kb-card">
+                        <h3>文档列表</h3>
+                        <p class="kb-card-sub">列表只取元信息，不回读图片与向量；删除会连同该文档的全部检索块一起删掉。</p>
+                        <div class="list-panel" id="kb-doc-list">
+                            <div class="list-hint">加载中…</div>
+                        </div>
+                        <p class="kb-note" id="kb-list-note" role="status" aria-live="polite"></p>
+                    </section>
+                </div>
+            </details>
+
+            <!-- 本轮自动选中的技能：chat.js 收到 SSE 的 skills 事件后转给 skills.js 渲染。
+                 没有命中时隐藏，不占对话区高度；source=hybrid 说明大模型重排不可用。 -->
+            <div class="skill-auto" id="skill-auto" role="status" aria-live="polite" hidden></div>
+
+            <section class="messages" id="messages">
+                <!-- 首屏空状态：月牙标记 + 招呼 + 一句随模式变化的话。
+                     副文案由 kind.js 按当前会话模式写进 #hero-sub，不靠改 DOM 结构。
+                     名字写的是「小月」——用户给助手起的名字；要改就改这一行。 -->
+                <div class="empty-state" id="empty-state">
+                    <div class="hero-mark" aria-hidden="true">
+                        <svg class="hero-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
+                        <span class="hero-spark hero-spark-a"></span>
+                        <span class="hero-spark hero-spark-b"></span>
+                    </div>
+                    <p class="empty-tag">YOUR THINKING SPACE</p>
+                    <h2>让<em class="hero-name">小月</em>来帮你把今天的事做完</h2>
+                    <p class="empty-sub" id="hero-sub">选一个模型，从一句话、一个想法，或者一份要处理的文件开始。</p>
+                </div>
+                <div class="thread" id="thread"></div>
+            </section>
+
+            <div class="composer">
+                <form class="composer-inner" id="composer" autocomplete="off">
+                    <textarea id="input" rows="1" aria-label="输入消息" placeholder="把要做的事说给小月听，Enter 发送，Shift+Enter 换行"></textarea>
+                    <!-- 输入框内的工具条：左边决定「这次会话怎么跑」，右边是参数与发送。
+                         原来四个控件和 textarea 挤在一行，窗口一窄就互相抢宽度，所以拆成两行。 -->
+                    <div class="composer-toolbar">
+                        <!-- 工作区可同时启用多个目录；普通相对路径默认落在主工作区。 -->
+                        <button type="button" class="composer-chip composer-ws-btn" id="ws-pick" title="管理 AI 可访问的多个工作目录">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path></svg>
+                            <span class="composer-ws-label">工作区</span>
+                        </button>
+                        <!-- Agent 自主档位。三档：只列计划 / 风险操作先问 / 自主执行。 -->
+                        <select class="composer-chip" id="mode-select" title="Agent 自主档位">
+                            <option value="plan">只列计划</option>
+                            <option value="confirm">风险操作先问</option>
+                            <option value="auto">自主执行</option>
+                        </select>
+                        <!-- 当前助手：选具体助手时，它的灵魂/模型/档位/工作区会覆盖全局设置；
+                             「不使用助手」= 全部走设置页里的全局配置。选项由 chat.js 从 /api/assistants 填。 -->
+                        <select class="composer-chip" id="assistant-select" title="选择助手（每个助手有自己的说话方式、模型、档位与工作区）">
+                            <option value="">不使用助手</option>
+                        </select>
+                        <!-- 会话模式的真状态。控件已经搬到顶栏的 #kind-switch（参考图顶部那颗胶囊），
+                             这里留一个隐藏 select：chat.js 读的是它，后端协议与按会话记忆因此一行都不用改。
+                             双向同步在 static/js/kind.js。 -->
+                        <select class="composer-kind-select" id="kind-select" hidden title="会话模式：日常聊天 / 辅助工作 / 代码协作 / 学习陪伴">
+                            <option value="chat">日常聊天</option>
+                            <option value="work">辅助工作</option>
+                            <option value="code">代码协作</option>
+                            <option value="learn">学习陪伴</option>
+                        </select>
+                        <span class="composer-spacer" aria-hidden="true"></span>
+                        <button type="submit" class="send-btn" id="send-btn" aria-label="发送">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+                    </div>
+                </form>
+                <div class="composer-meta">
+                    <span class="composer-ws-path" id="ws-current" title=""></span>
+                    <span class="composer-hint">内容由 AI 生成，请注意甄别。</span>
+                </div>
+            </div>
+
+            <!-- 重排：下面的视图区块顺序对齐侧栏导航（对话的元素在最前，
+                 然后 技能 / 助手 / 提示词 / 模型 / 电脑操控），弹层统一挪到 body 尾部。 -->
+
+            <!-- 技能：本地 SKILL.md 的搜索 / 启停 / 编辑入口。
+                 列表、弹层都只渲染后端真的返回的字段；导入结果里的失败项默认展开。 -->
+            <section class="view" id="view-skills" aria-label="技能管理">
+                <div class="view-body">
+                    <header class="view-head">
+                        <p class="view-tag">WORKSPACE<i>//</i>SKILLS</p>
+                        <h2>技能</h2>
+                        <p class="view-sub">技能是一段可复用的任务说明。对话时后端会自动挑出最相关的几条交给模型；这里可以搜索、启停、编辑，或从本地文件夹批量导入 SKILL.md。</p>
+                    </header>
+
+                    <div class="skill-toolbar">
+                        <input type="search" class="input" id="skill-search" placeholder="搜索技能名或简介…" aria-label="搜索技能" autocomplete="off">
+                        <button type="button" class="btn btn-outline" id="skill-import-open" aria-haspopup="dialog" aria-controls="skill-import-dialog">从文件夹导入</button>
+                        <button type="button" class="btn" id="skill-new-open" aria-haspopup="dialog" aria-controls="skill-dialog">新建技能</button>
+                    </div>
+
+                    <div class="list-panel" id="skill-list">
+                        <div class="list-hint">加载中…</div>
+                    </div>
+                    <p class="kb-note" id="skill-list-note" role="status" aria-live="polite"></p>
+                </div>
+            </section>
+
+            <!-- 自定义助手：一个助手 = 一套「人格 + 默认模型 + 档位 + 工作区」。
+                 留空的字段一律表示「跟随全局设置」，所以改全局时没覆盖过的助手会跟着变。
+                 列表与表单由 static/js/assistants.js 渲染（它暴露 window.ASSISTANTS.init）。 -->
+            <section class="view" id="view-assistants" aria-label="自定义助手">
+                <div class="view-body">
+                    <header class="view-head">
+                        <p class="view-tag">WORKSPACE<i>//</i>ASSISTANTS</p>
+                        <h2>助手</h2>
+                        <p class="view-sub">每个助手有自己的说话方式、做事方式、默认模型与工作区。留空的字段跟随全局设置走，所以改全局时没覆盖过的助手会一起变。</p>
+                    </header>
+                    <form id="assistant-form" autocomplete="off"></form>
+                    <div id="assistant-list">
+                        <div class="list-hint">加载中…</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 提示词库：常用指令存成模板，在对话页一键填进输入框。
+                 列表与表单由 static/js/prompts.js 渲染（它暴露 window.PROMPTS.init）。 -->
+            <section class="view" id="view-prompts" aria-label="提示词库">
+                <div class="view-body">
+                    <header class="view-head">
+                        <p class="view-tag">WORKSPACE<i>//</i>PROMPTS</p>
+                        <h2>提示词</h2>
+                        <p class="view-sub">把常用指令存成可复用的模板，需要时一键填进输入框。</p>
+                    </header>
+                    <form id="prompt-form" autocomplete="off"></form>
+                    <div id="prompt-list">
+                        <div class="list-hint">加载中…</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="view" id="view-models" aria-label="模型列表">
+                <div class="view-body">
+                    <header class="view-head">
+                        <p class="view-tag">WORKSPACE<i>//</i>MODELS</p>
+                        <h2>可用模型</h2>
+                        <p class="view-sub">查看已接入的模型与密钥状态，返回对话即可切换使用。</p>
+                    </header>
+                    <div class="list-panel" id="models-list">
+                        <div class="list-hint">加载中…</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="view" id="view-cua" aria-label="电脑操控">
+                <div class="view-body">
+                    <header class="view-head">
+                        <p class="view-tag">WORKSPACE<i>//</i>COMPUTER USE</p>
+                        <h2>电脑操控</h2>
+                        <p class="view-sub">让视觉模型看屏幕、动鼠标键盘，把「只有图形界面能做」的任务跑完。默认是演练模式（dry_run）：只截屏与决策，不真正操作键鼠。真实接管前请先确认下方环境状态。</p>
+                    </header>
+
+                    <div class="cua-stats" id="cua-stats">
+                        <span class="cua-stat">可用性 <b id="cua-stat-available">—</b></span>
+                        <span class="cua-stat">运行中 <b id="cua-stat-running">—</b></span>
+                        <span class="cua-stat">Python <b id="cua-stat-python">—</b></span>
+                        <span class="cua-stat">CUA <b id="cua-stat-cua">—</b></span>
+                        <span class="cua-stat">屏幕 <b id="cua-stat-env">—</b></span>
+                        <button type="button" class="btn btn-ghost cua-refresh" id="cua-refresh">刷新状态</button>
+                        <span class="cua-stat cua-stat-note" id="cua-stat-note"></span>
+                    </div>
+                    <p class="cua-note cua-status-notes" id="cua-status-notes"></p>
+
+                    <div class="cua-runbar">
+                        <span class="cua-run-status" id="cua-run-status">空闲</span>
+                        <span class="cua-replay-badge" id="cua-replay-badge" hidden>回放</span>
+                        <span class="cua-run-meta">run_id：<b id="cua-run-id">—</b></span>
+                        <span class="cua-run-meta" id="cua-run-steps"></span>
+                    </div>
+
+                    <section class="cua-card cua-history-card">
+                        <details class="cua-history" id="cua-history">
+                            <summary class="cua-history-summary">
+                                <span class="cua-history-title">历史运行</span>
+                                <span class="cua-history-count" id="cua-history-count">—</span>
+                                <span class="cua-history-hint">展开后点任意一条可回看它的轨迹（回放，不是实时执行）</span>
+                            </summary>
+                            <div class="cua-history-body">
+                                <div class="cua-history-head" aria-hidden="true">
+                                    <span>时间</span><span>任务</span><span>模型</span><span>状态</span><span>终止码</span><span>步数</span>
+                                </div>
+                                <div class="cua-history-list" id="cua-history-list">
+                                    <div class="list-hint">还没有运行记录。</div>
+                                </div>
+                                <div class="cua-history-actions">
+                                    <button type="button" class="btn btn-ghost" id="cua-history-refresh">刷新历史</button>
+                                    <span class="cua-history-note" id="cua-history-note" role="status" aria-live="polite"></span>
+                                </div>
+                            </div>
+                        </details>
+                    </section>
+
+                    <section class="cua-card">
+                        <h3>发起任务</h3>
+                        <p class="cua-card-sub">任务原文会原样交给视觉模型；模型只能从下方「视觉模型」里选，后端只接受 status.models 里的名字。步数与秒数按契约 §2.2 的范围校验。</p>
+                        <form id="cua-form" class="cua-form" autocomplete="off">
+                            <div class="field">
+                                <label for="cua-task">任务</label>
+                                <textarea class="input cua-textarea" id="cua-task" rows="4" maxlength="2000" placeholder="例：打开记事本，输入 hello，另存到桌面"></textarea>
+                            </div>
+                            <div class="cua-params">
+                                <div class="field">
+                                    <label for="cua-model">视觉模型</label>
+                                    <select class="select" id="cua-model" aria-label="选择视觉模型">
+                                        <option value="">加载中…</option>
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label for="cua-max-steps">最大步数（1–200）</label>
+                                    <input class="input" type="number" id="cua-max-steps" min="1" max="200" step="1" value="20" inputmode="numeric">
+                                </div>
+                                <div class="field">
+                                    <label for="cua-max-seconds">最长秒数（10–3600）</label>
+                                    <input class="input" type="number" id="cua-max-seconds" min="10" max="3600" step="10" value="600" inputmode="numeric">
+                                </div>
+                            </div>
+                            <div class="cua-toggles">
+                                <label class="cua-check"><input type="checkbox" id="cua-dry-run" checked> 演练模式（dry_run）：只截屏与决策，不真正点鼠标敲键盘</label>
+                                <label class="cua-check"><input type="checkbox" id="cua-hotkeys"> 允许危险快捷键（allow_dangerous_hotkeys）</label>
+                            </div>
+                            <div class="cua-actions">
+                                <button type="submit" class="btn" id="cua-start">启动</button>
+                                <button type="button" class="btn btn-danger" id="cua-stop" disabled>停止</button>
+                            </div>
+                        </form>
+                        <p class="cua-note" id="cua-form-note" role="status" aria-live="polite"></p>
+                    </section>
+
+                    <div class="cua-grid">
+                        <section class="cua-card">
+                            <h3>实时截图</h3>
+                            <p class="cua-card-sub">截图是可选事件（Python 侧 --events-images）：收不到也能正常跑，只是这里没有画面。</p>
+                            <div class="cua-shot" id="cua-shot">
+                                <div class="list-hint" id="cua-shot-empty">还没有画面。</div>
+                            </div>
+                            <p class="cua-shot-meta" id="cua-shot-meta"></p>
+                        </section>
+
+                        <section class="cua-card">
+                            <h3>最终报告</h3>
+                            <p class="cua-card-sub">运行结束后由 run_end 与 exit 事件汇总，只显示后端真的发过来的字段。</p>
+                            <div class="cua-report" id="cua-report">
+                                <div class="list-hint">还没有运行记录。</div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <section class="cua-card">
+                        <h3>实时轨迹</h3>
+                        <p class="cua-card-sub">每条至少含：步号、thought、action、ok/error、耗时；replan、expect 超时与执行器重试也会插入同一条流。</p>
+                        <div class="cua-trace" id="cua-trace" aria-live="polite">
+                            <div class="list-hint">还没有轨迹。</div>
+                        </div>
+                        <p class="cua-note" id="cua-trace-note" role="status" aria-live="polite"></p>
+                    </section>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- 弹层统一放在 body 尾部（重排时从各视图旁挪过来）：原生 <dialog> 走 showModal()
+         渲染在顶层，不挑 DOM 位置，集中放只是为了 index.html 可读、好找。 -->
+
+    <!-- 新建 / 查看 / 编辑技能。用原生 <dialog> + showModal()：自带 ESC 关闭与焦点陷阱。
+         已有技能的名字由 SKILL.md 的 frontmatter 决定，PATCH 也不接受改名，所以编辑时名字只读。 -->
+    <dialog class="skill-dialog" id="skill-dialog" role="dialog" aria-modal="true" aria-labelledby="skill-dialog-title">
+        <div class="skill-dialog-head">
+            <h2 id="skill-dialog-title">新建技能</h2>
+            <button type="button" class="skill-dialog-close" id="skill-dialog-close" aria-label="关闭技能弹层">&#215;</button>
+        </div>
+        <form class="skill-form" id="skill-form" autocomplete="off">
+            <div class="field">
+                <label for="skill-name">技能名</label>
+                <input type="text" class="input" id="skill-name" maxlength="120" placeholder="例如 caveman">
+            </div>
+            <div class="field">
+                <label for="skill-description">简介</label>
+                <input type="text" class="input" id="skill-description" maxlength="255" placeholder="一句话说明它解决什么问题">
+            </div>
+            <div class="field">
+                <label for="skill-body">正文（Markdown）</label>
+                <textarea class="input skill-textarea" id="skill-body" rows="12" spellcheck="false" placeholder="可以直接粘整份 SKILL.md（含 --- 开头的 frontmatter），服务端会自动解析。"></textarea>
+            </div>
+            <label class="cua-check skill-check"><input type="checkbox" id="skill-enabled" checked> 启用这个技能（停用后不会被自动检索选中）</label>
+            <p class="kb-note" id="skill-dialog-note" role="status" aria-live="polite"></p>
+            <div class="skill-dialog-actions">
+                <button type="submit" class="btn" id="skill-save">保存</button>
+                <button type="button" class="btn btn-outline" id="skill-edit" hidden>编辑</button>
+                <button type="button" class="btn btn-ghost" id="skill-cancel">取消</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog class="skill-dialog" id="workspace-dialog" role="dialog" aria-modal="true" aria-labelledby="workspace-dialog-title">
+        <div class="skill-dialog-head">
+            <h2 id="workspace-dialog-title">活动工作区</h2>
+            <button type="button" class="skill-dialog-close" id="workspace-dialog-close" aria-label="关闭工作区设置">&#215;</button>
+        </div>
+        <p class="skill-dialog-sub">可以启用多个目录。第一项是主工作区；其他目录可通过 @workspace2/路径、@workspace3/路径访问。</p>
+        <div class="workspace-list" id="workspace-list"></div>
+        <div class="skill-dialog-actions">
+            <button type="button" class="btn btn-outline" id="workspace-add">添加目录</button>
+            <button type="button" class="btn" id="workspace-save">保存工作区</button>
+        </div>
+        <p class="kb-note" id="workspace-note" role="status" aria-live="polite"></p>
+    </dialog>
+
+    <!-- 从文件夹导入技能。桌面端走 window.desktop.pickDirectory，网页端退化为手填绝对路径。 -->
+    <dialog class="skill-dialog" id="skill-import-dialog" role="dialog" aria-modal="true" aria-labelledby="skill-import-title">
+        <div class="skill-dialog-head">
+            <h2 id="skill-import-title">从文件夹导入技能</h2>
+            <button type="button" class="skill-dialog-close" id="skill-import-close" aria-label="关闭导入弹层">&#215;</button>
+        </div>
+        <p class="skill-dialog-sub">扫描目录下所有 SKILL.md 并入库，同名技能会被覆盖。目录必须是绝对路径，盘符根目录不行。</p>
+        <div class="field">
+            <label for="skill-import-dir">技能目录</label>
+            <div class="skill-import-row">
+                <input type="text" class="input" id="skill-import-dir" placeholder="例如 C:\Users\you\.agents\skills" aria-label="技能目录绝对路径" autocomplete="off">
+                <button type="button" class="btn btn-outline" id="skill-import-pick">选择文件夹</button>
+            </div>
+        </div>
+        <label class="cua-check skill-check"><input type="checkbox" id="skill-import-enabled" checked> 导入后立即启用</label>
+        <div class="skill-import-result" id="skill-import-result" role="status" aria-live="polite"></div>
+        <div class="skill-dialog-actions">
+            <button type="button" class="btn" id="skill-import-run">开始导入</button>
+            <button type="button" class="btn btn-ghost" id="skill-import-cancel">取消</button>
+        </div>
+    </dialog>
+
+    <!-- 契约 §7：密钥从页签移到右上角按钮，点开是弹层；#/keys 路由仍可达（chat.js handleRoute 特判）。
+         #keys-list 这个 id 保持不动，chat.js 的 loadKeysView() 无需改动。 -->
+    <dialog class="keys-dialog" id="keys-dialog" aria-labelledby="keys-dialog-title">
+        <div class="keys-dialog-head">
+            <h2 id="keys-dialog-title">我的 API Key</h2>
+            <button type="button" class="keys-dialog-close" id="keys-close" aria-label="关闭密钥面板">&#215;</button>
+        </div>
+        <p class="keys-dialog-sub">这里只显示已保存密钥的掩码；<a href="/settings">前往设置页</a>添加或更新 Key。</p>
+        <div class="list-panel" id="keys-list">
+            <div class="list-hint">加载中…</div>
+        </div>
+    </dialog>
+
+    <!-- 测试版警告弹窗：每次进入 #/cua 都弹（用户明确要求「每次」，所以不做 localStorage 只弹一次）。
+         用原生 <dialog> + showModal()：自带 ESC 关闭、焦点陷阱、::backdrop 与背景 inert；
+         role / aria-modal / aria-labelledby 仍显式写上，方便无障碍检查与读屏。
+         触发点只有 cua.js 的 onShow()，而它只由 chat.js 的 showView() 在「进入视图」时调用。 -->
+    <dialog class="cua-beta-dialog" id="cua-beta-dialog" role="dialog" aria-modal="true" aria-labelledby="cua-beta-title" aria-describedby="cua-beta-body">
+        <span class="cua-beta-tag" aria-hidden="true">测试版</span>
+        <h2 class="cua-beta-title" id="cua-beta-title">测试版，别当真</h2>
+        <div class="cua-beta-body" id="cua-beta-body">
+            <p>这个功能还没有完全做完。</p>
+            <p>它会真的接管你的鼠标和键盘——搞出来的蠢事肯定会把你笑死。</p>
+            <p>所以别让它碰你正在写的文档，也别让它点你不敢点的按钮。</p>
+        </div>
+        <div class="cua-beta-actions">
+            <button type="button" class="btn" id="cua-beta-ok">知道了，我胆子大</button>
+        </div>
+    </dialog>
+
+    <!-- 主动聊天的页内横幅（借鉴 Cyrene）：助手主动说话时在这里提示，不用系统通知。
+         容器由 proactive.js 填充，默认隐藏。 -->
+    <div id="proactive-banner" hidden></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="/static/js/runtime.js"></script>
+    <script src="/static/js/ambient.js"></script>
+    <script src="/static/js/kb.js"></script>
+    <!-- Markdown 渲染器：模型的回复按 Markdown 渲染（先转义 HTML，再套白名单语法） -->
+    <!-- 数学公式渲染（轻量兜底，能力边界见该文件头注释）。放在 md.js 之前，渲染时才拿得到 window.MATH。 -->
+    <script src="/static/js/math.js"></script>
+    <script src="/static/js/md.js"></script>
+    <script src="/static/js/cua.js"></script>
+    <!-- 技能视图与自动技能提示。和 kb.js / cua.js 一样先于 chat.js 加载，showView 里才拿得到 window.SKILLS。 -->
+    <script src="/static/js/skills.js"></script>
+    <script src="/static/js/assistants.js"></script>
+    <script src="/static/js/proactive.js"></script>
+    <script src="/static/js/prompts.js"></script>
+    <!-- 改版新增的三个小模块，都必须在 chat.js 之前加载：chat.js 启动时会调它们的 init。
+         kind.js = 顶栏四模式胶囊 ↔ #kind-select 的双向同步（真状态仍是那个 select）；
+         taskcard.js = 右上角「当前任务」卡片的渲染；
+         theme.js = 深浅主题切换（首帧的主题已在 head 的 theme-boot.js 里定好）。 -->
+    <!-- 页内对话框：Electron 不实现 window.prompt（工作目录 / 重命名会话都靠它）。 -->
+    <script src="/static/js/uiask.js"></script>
+    <!-- 胶囊下拉：把输入框那排的原生 select 换成按钮 + 页内浮层，select 仍是状态源。 -->
+    <script src="/static/js/chipselect.js"></script>
+    <script src="/static/js/kind.js"></script>
+    <script src="/static/js/taskcard.js"></script>
+    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/chat.js"></script>
+    <!-- 助手 / 提示词两个视图的懒加载钩子。
+         这两个视图的逻辑各在自己的文件里，chat.js 只管切视图；用一小段内联脚本把它们接起来，
+         就不必为了加两个页签去改 chat.js 的视图路由表。 -->
+    <script>
+      (function () {
+        function initFor(view) {
+          if (view === 'assistants' && window.ASSISTANTS && window.ASSISTANTS.init) window.ASSISTANTS.init();
+          if (view === 'prompts' && window.PROMPTS && window.PROMPTS.init) window.PROMPTS.init();
+        }
+        function current() { return (location.hash || '').replace(/^#\/?\//, ''); }
+        // 导航点击会触发 hashchange；只在这里加载，避免同一次切页发两次列表请求。
+        window.addEventListener('hashchange', function () { initFor(current()); });
+        document.addEventListener('DOMContentLoaded', function () { initFor(current()); });
+      })();
+    </script>
+</body>
+</html>
+{{end}}

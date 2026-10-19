@@ -1,0 +1,28 @@
+== Day 21 交叉验证 @ 2026-10-09 22:50:18 ==
+Base = https://blog-my-check-10974.app.workbuddy.host
+
+-- 第 1 组：可打开（页面 + 静态资源 + 探活）--
+[PASS] GET     /api/health                      -> 200 (723ms) CORS=* | {"status":"ok","service":"blog-my","version":"mock-1","time":"2026-10-09T14:50:20.194Z","uptime":109}
+[PASS] GET     /                                -> 200 (486ms) | <!DOCTYPE html> <html lang="zh-CN"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <ti...
+[PASS] GET     /hot                             -> 200 (433ms) | <!DOCTYPE html> <html lang="zh-CN"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <ti...
+[PASS] GET     /chat                            -> 200 (509ms) | <!DOCTYPE html> <html lang="zh-CN"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <ti...
+[PASS] GET     /static/css/style.css            -> 200 (461ms) | /* 设计令牌：深色玻璃拟态 + 霓虹渐变 */ :root { --bg: #070a12; --bg-2: #0b101d; --panel: rgba(15, 21, 37, 0.66); --panel-2: rgba(255, 255, 255, 0.04); --bo...
+
+-- 第 2 组：可读写（真实数据读 + 写入 + 回读 + 边界校验）--
+[PASS] GET     /api/hot?limit=3                 -> 200 (423ms) CORS=* | {"ok":true,"data":[{"platform":"微博","rank":1,"title":"曼城英超","heat":"新"},{"platform":"微博","rank":2,"title":"林绣茹杀了杜翠雀","heat":"新"},{"platform"...
+[PASS] GET     /api/favorites                   -> 200 (413ms) CORS=* | {"ok":true,"data":[{"id":1,"user_id":"00000000-0000-0000-0000-000000000001","title":"国足0比5负巴勒斯坦，如何评价本场比赛","url":null,"created_at":"2026-10-0...
+[PASS] POST    /api/favorites                   -> 201 (375ms) CORS=* | {"ok":true,"id":9,"title":"Day 21 交叉验证：公网真实读写往返 225018","url":"https://blog-my-check-10974.app.workbuddy.host/","created_at":"2026-10-09T14:...
+[PASS] POST    /api/favorites                   -> 409 (491ms) CORS=* | {"ok":false,"error":"该内容已在收藏中，请勿重复收藏"}
+[PASS] POST    /api/favorites                   -> 400 (474ms) CORS=* | {"ok":false,"error":"缺少必填字段 title（收藏内容标题不能为空）"}
+[PASS] POST    /api/favorites                   -> 400 (468ms) CORS=* | {"ok":false,"error":"请求体不是合法的 JSON"}
+[PASS] GET     /api/favorites                   -> 200 (336ms) CORS=* | {"ok":true,"data":[{"id":1,"user_id":"00000000-0000-0000-0000-000000000001","title":"国足0比5负巴勒斯坦，如何评价本场比赛","url":null,"created_at":"2026-10-0...
+[PASS] persistence      GET     /api/favorites (回读新写入项) -> 命中本次写入标题
+[INFO] 收藏条数：写入前 8 -> 写入后 9
+[INFO] /api/hot?limit=3 返回条目数：3
+[INFO] 本次写入标题：Day 21 交叉验证：公网真实读写往返 225018
+
+-- 第 3 组：无报错（跨域预检 + 错误分支状态码）--
+[PASS] OPTIONS /api/favorites                   -> 204 (417ms) CORS=* | 
+[PASS] GET     /api/health                      -> 200 (420ms) CORS=* | {"status":"ok","service":"blog-my","version":"mock-1","time":"2026-10-09T14:50:25.976Z","uptime":115}
+
+== 汇总：PASS 15 / FAIL 0 ==

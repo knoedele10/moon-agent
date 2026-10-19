@@ -1,0 +1,447 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blog-my.local/cua/action.schema.json",
+  "title": "CUA Step v1",
+  "description": "视觉 CUA 每一步的唯一允许输出。见 docs/cua/03-action-protocol.md。",
+  "type": "object",
+  "required": [
+    "protocol",
+    "thought",
+    "action",
+    "done"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "protocol": {
+      "const": "cua/1"
+    },
+    "thought": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1200
+    },
+    "done": {
+      "type": "boolean"
+    },
+    "risk": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "final": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": true,
+      "required": [
+        "status",
+        "summary"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "success",
+            "failed",
+            "need_human"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "answer": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 4000
+        }
+      },
+      "description": "done=true 时必填；终态的唯一权威来源。若同时给出 action.type=done，其 status/summary 必须与 final 一致。"
+    },
+    "expect": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "what": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30000
+        },
+        "must_change": {
+          "type": "boolean"
+        }
+      }
+    },
+    "action": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "type",
+            "x",
+            "y"
+          ],
+          "properties": {
+            "type": {
+              "const": "click"
+            },
+            "x": {
+              "type": "integer"
+            },
+            "y": {
+              "type": "integer"
+            },
+            "button": {
+              "enum": [
+                "left",
+                "right",
+                "middle"
+              ]
+            },
+            "clicks": {
+              "enum": [
+                1,
+                2
+              ]
+            },
+            "modifiers": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "ctrl",
+                  "alt",
+                  "shift",
+                  "win"
+                ]
+              },
+              "maxItems": 3
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "type",
+            "text"
+          ],
+          "properties": {
+            "type": {
+              "const": "type"
+            },
+            "text": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "interval_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 500
+            },
+            "clear_first": {
+              "type": "boolean"
+            },
+            "submit": {
+              "type": "boolean"
+            },
+            "target": {
+              "type": [
+                "string",
+                "object",
+                "null"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "type",
+            "keys"
+          ],
+          "properties": {
+            "type": {
+              "const": "hotkey"
+            },
+            "keys": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 3,
+              "items": {
+                "type": "string"
+              }
+            },
+            "repeat": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "type",
+            "from",
+            "to"
+          ],
+          "properties": {
+            "type": {
+              "const": "drag"
+            },
+            "from": {
+              "$ref": "#/$defs/point"
+            },
+            "to": {
+              "$ref": "#/$defs/point"
+            },
+            "duration_ms": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 5000
+            },
+            "button": {
+              "enum": [
+                "left",
+                "right",
+                "middle"
+              ]
+            },
+            "modifiers": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "ctrl",
+                  "alt",
+                  "shift",
+                  "win"
+                ]
+              },
+              "maxItems": 3
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "type",
+            "x",
+            "y"
+          ],
+          "properties": {
+            "type": {
+              "const": "scroll"
+            },
+            "x": {
+              "type": "integer"
+            },
+            "y": {
+              "type": "integer"
+            },
+            "dx": {
+              "type": "integer",
+              "minimum": -20,
+              "maximum": 20
+            },
+            "dy": {
+              "type": "integer",
+              "minimum": -20,
+              "maximum": 20
+            },
+            "unit": {
+              "enum": [
+                "line",
+                "page"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "type",
+            "x",
+            "y"
+          ],
+          "properties": {
+            "type": {
+              "const": "move"
+            },
+            "x": {
+              "type": "integer"
+            },
+            "y": {
+              "type": "integer"
+            },
+            "duration_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3000
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "type",
+            "ms"
+          ],
+          "properties": {
+            "type": {
+              "const": "wait"
+            },
+            "ms": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 10000
+            },
+            "reason": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "const": "screenshot"
+            },
+            "region": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": [
+                    "x",
+                    "y",
+                    "width",
+                    "height"
+                  ],
+                  "properties": {
+                    "x": {
+                      "type": "integer"
+                    },
+                    "y": {
+                      "type": "integer"
+                    },
+                    "width": {
+                      "type": "integer",
+                      "minimum": 16
+                    },
+                    "height": {
+                      "type": "integer",
+                      "minimum": 16
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "type",
+            "status",
+            "summary"
+          ],
+          "properties": {
+            "type": {
+              "const": "done"
+            },
+            "status": {
+              "enum": [
+                "success",
+                "failed",
+                "need_human"
+              ]
+            },
+            "summary": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ],
+      "description": "必须是一个动作对象（9 选 1），任何情况下都不可为 null，包括 done=true 时。见 03-action-protocol.md 第 2 节 v1 裁定。"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "done": {
+            "const": true
+          }
+        },
+        "required": [
+          "done"
+        ]
+      },
+      "then": {
+        "required": [
+          "final"
+        ],
+        "properties": {
+          "final": {
+            "type": "object",
+            "required": [
+              "status",
+              "summary"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "point": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "x",
+        "y"
+      ],
+      "properties": {
+        "x": {
+          "type": "integer"
+        },
+        "y": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

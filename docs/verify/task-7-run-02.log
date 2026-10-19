@@ -1,0 +1,342 @@
+﻿python : test_capability_table (ct_test_00_capability.SafetyNet.test_capability_table) ... ok
+所在位置 行:1 字符: 129
++ ... ]::new($false); python -X utf8 cua/tests/run_tests.py -v 2>&1 | Out-F ...
++                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (test_capability...y_table) ... ok:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+test_fake_defaults_are_deterministic (ct_test_00_capability.SafetyNet.test_fake_defaults_are_deterministic) ... ok
+test_fake_pyautogui_installed (ct_test_00_capability.SafetyNet.test_fake_pyautogui_installed) ... ok
+test_prose_brace_before_json (ct_test_01_json.AmbiguousJsonExtraction.test_prose_brace_before_json) ... ok
+test_toplevel_array (ct_test_01_json.AmbiguousJsonExtraction.test_toplevel_array) ... FAIL
+test_invalid_inputs_report_bad_json (ct_test_01_json.ImplJsonExtraction.test_invalid_inputs_report_bad_json) ... ok
+test_string_content_not_truncated_by_inner_brace (ct_test_01_json.ImplJsonExtraction.test_string_content_not_truncated_
+by_inner_brace) ... ok
+test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) ... ok
+test_bad_input_reports_bad_json (ct_test_01_json.OracleJsonExtraction.test_bad_input_reports_bad_json) ... ok
+test_balance_scanner_handles_escapes (ct_test_01_json.OracleJsonExtraction.test_balance_scanner_handles_escapes) ... ok
+test_balance_scanner_ignores_braces_in_strings (ct_test_01_json.OracleJsonExtraction.test_balance_scanner_ignores_brace
+s_in_strings) ... ok
+test_fence_strip (ct_test_01_json.OracleJsonExtraction.test_fence_strip) ... ok
+test_pure_and_wrapped (ct_test_01_json.OracleJsonExtraction.test_pure_and_wrapped) ... ok
+test_ambiguous_cases_land_in_allowed_set (ct_test_02_schema.AmbiguousSchema.test_ambiguous_cases_land_in_allowed_set) .
+.. ok
+test_impl_rejects_null_action (ct_test_02_schema.ContractRulingActionNeverNull.test_impl_rejects_null_action) ... ok
+test_oracle_matches_ruling (ct_test_02_schema.ContractRulingActionNeverNull.test_oracle_matches_ruling) ... ok
+test_impl_applies_ruling (ct_test_02_schema.DoneActionMustAgreeWithFinal.test_impl_applies_ruling) ... ok
+test_oracle_applies_ruling (ct_test_02_schema.DoneActionMustAgreeWithFinal.test_oracle_applies_ruling) ... ok
+test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.ImplSchema.test_invalid_steps_rejected_with_expected_
+code) ... ok
+test_lenient_float_coords_accepted (ct_test_02_schema.ImplSchema.test_lenient_float_coords_accepted) ... ok
+test_valid_steps_pass (ct_test_02_schema.ImplSchema.test_valid_steps_pass) ... ok
+test_error_table_covers_all_documented_codes (ct_test_02_schema.OracleSchema.test_error_table_covers_all_documented_cod
+es) ... ok
+test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.OracleSchema.test_invalid_steps_rejected_with_expecte
+d_code) ... ok
+test_lenient_float_coords_accepted_but_schema_invalid (ct_test_02_schema.OracleSchema.test_lenient_float_coords_accepte
+d_but_schema_invalid) ... FAIL
+test_schema_crosscheck (ct_test_02_schema.OracleSchema.test_schema_crosscheck)
+每个非法 fixture 的「是否违反 frozen schema」与预期一致（键名白名单属解析器规则，故例外）。 ... ok
+test_schema_module_available (ct_test_02_schema.OracleSchema.test_schema_module_available) ... ok
+test_valid_steps_pass (ct_test_02_schema.OracleSchema.test_valid_steps_pass) ... ok
+test_half_boundary_lands_in_allowed_set (ct_test_03_coords.AmbiguousHalfRounding.test_half_boundary_lands_in_allowed_se
+t) ... ok
+test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) ... ok
+test_monotonic_geometry_sanity (ct_test_03_coords.ImplCoords.test_monotonic_geometry_sanity)
+同一 origin/scale 下，图内坐标越大，屏幕坐标必须不减（防 x/y 颠倒）。 ... ok
+test_round_trip (ct_test_03_coords.ImplCoords.test_round_trip) ... ok
+test_half_up_is_documented_reading (ct_test_03_coords.OracleCoords.test_half_up_is_documented_reading) ... ok
+test_image_to_screen (ct_test_03_coords.OracleCoords.test_image_to_screen) ... ok
+test_round_trip (ct_test_03_coords.OracleCoords.test_round_trip) ... ok
+test_in_range_points_are_not_rejected (ct_test_04_bounds.ImplBoundsRejection.test_in_range_points_are_not_rejected) ...
+ 
+  test_in_range_points_are_not_rejected (ct_test_04_bounds.ImplBoundsRejection.test_in_range_points_are_not_rejected) (
+case='bottom_right') ... FAIL
+test_oob_reports_e_out_of_bounds_code (ct_test_04_bounds.ImplBoundsRejection.test_oob_reports_e_out_of_bounds_code)
+至少有一个契约入口把越界上报为 E_OUT_OF_BOUNDS（§4/§5 的错误码面）。 ... FAIL
+test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejected) .
+.. 
+  test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejected)
+ (case='x_equals_width') ... FAIL
+  test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejected)
+ (case='x_over_width') ... FAIL
+  test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejected)
+ (case='y_equals_height') ... FAIL
+  test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejected)
+ (case='y_over_height') ... FAIL
+  test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejected)
+ (case='negative_x') ... FAIL
+  test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejected)
+ (case='negative_y') ... FAIL
+  test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejected)
+ (case='far_out') ... FAIL
+setUpClass (ct_test_04_bounds.ImplBoundsThroughValidator) ... skipped '适配层：模块已存在（cua.action_parser）但找不到 Step 校验（带 image
+ 的越界检查） 的入口（契约 §10 只冻结模块名，未冻结函数名）'
+test_accepts_in_range (ct_test_04_bounds.ImplDedicatedBoundsChecker.test_accepts_in_range) ... 
+  test_accepts_in_range (ct_test_04_bounds.ImplDedicatedBoundsChecker.test_accepts_in_range) (case='origin') ... FAIL
+  test_accepts_in_range (ct_test_04_bounds.ImplDedicatedBoundsChecker.test_accepts_in_range) (case='typical') ... FAIL
+  test_accepts_in_range (ct_test_04_bounds.ImplDedicatedBoundsChecker.test_accepts_in_range) (case='bottom_right') ... 
+FAIL
+test_rejects_out_of_bounds (ct_test_04_bounds.ImplDedicatedBoundsChecker.test_rejects_out_of_bounds) ... ok
+test_in_range_accepted (ct_test_04_bounds.OracleBounds.test_in_range_accepted) ... ok
+test_no_clamping (ct_test_04_bounds.OracleBounds.test_no_clamping)
+拒绝就是拒绝：不得返回 clamp 后的 (W-1, H-1)。 ... ok
+test_out_of_bounds_rejected (ct_test_04_bounds.OracleBounds.test_out_of_bounds_rejected) ... ok
+test_casing_choice_is_recorded (ct_test_05_keys.AmbiguousKeyCasing.test_casing_choice_is_recorded) ... ok
+test_allowed_keys_pass (ct_test_05_keys.ImplKeyWhitelist.test_allowed_keys_pass) ... ok
+test_illegal_keys_rejected (ct_test_05_keys.ImplKeyWhitelist.test_illegal_keys_rejected) ... ok
+test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) ... ok
+test_legal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_legal_keys_in_step) ... ok
+test_hotkey_step_with_illegal_key (ct_test_05_keys.OracleKeyWhitelist.test_hotkey_step_with_illegal_key) ... ok
+test_hotkey_step_with_legal_keys (ct_test_05_keys.OracleKeyWhitelist.test_hotkey_step_with_legal_keys) ... ok
+test_whitelist_size_and_members (ct_test_05_keys.OracleKeyWhitelist.test_whitelist_size_and_members) ... ok
+test_max_retries_when_exposed (ct_test_06_errors.ImplErrorMaxRetries.test_max_retries_when_exposed) ... ok
+test_must_replan_flags (ct_test_06_errors.ImplErrorReplan.test_must_replan_flags) ... ok
+test_retryable_counterexample_is_retryable (ct_test_06_errors.ImplErrorRetryability.test_retryable_counterexample_is_re
+tryable) ... ok
+test_retryable_flags_for_all_documented_codes (ct_test_06_errors.ImplErrorRetryability.test_retryable_flags_for_all_doc
+umented_codes) ... ok
+test_stall_and_loop_are_not_retryable (ct_test_06_errors.ImplErrorRetryability.test_stall_and_loop_are_not_retryable) .
+.. ok
+test_4xx_not_retryable_5xx_retryable (ct_test_06_errors.ImplModelHttpContext.test_4xx_not_retryable_5xx_retryable) ... 
+ok
+test_max_retries (ct_test_06_errors.OracleErrorPolicy.test_max_retries) ... ok
+test_model_http_is_context_dependent (ct_test_06_errors.OracleErrorPolicy.test_model_http_is_context_dependent) ... ok
+test_must_replan_is_exactly_stall_and_loop (ct_test_06_errors.OracleErrorPolicy.test_must_replan_is_exactly_stall_and_l
+oop) ... ok
+test_retryable_sets (ct_test_06_errors.OracleErrorPolicy.test_retryable_sets) ... ok
+test_table_is_frozen_size (ct_test_06_errors.OracleErrorPolicy.test_table_is_frozen_size) ... ok
+test_guard_entry_presence_is_reported (ct_test_07_destructive.DestructiveGuardWithoutDedicatedEntry.test_guard_entry_pr
+esence_is_reported) ... ok
+test_destructive_button_is_refused_and_routed_to_human (ct_test_07_destructive.ImplDestructivePopupGuard.test_destructi
+ve_button_is_refused_and_routed_to_human) ... ok
+test_safe_button_is_not_forced_to_human (ct_test_07_destructive.ImplDestructivePopupGuard.test_safe_button_is_not_force
+d_to_human) ... ok
+test_hits (ct_test_07_destructive.ImplDestructiveWords.test_hits) ... ok
+test_safe_texts_are_not_hits (ct_test_07_destructive.ImplDestructiveWords.test_safe_texts_are_not_hits) ... ok
+test_destructive_hits_detail (ct_test_07_destructive.OracleDestructiveWords.test_destructive_hits_detail) ... ok
+test_hits (ct_test_07_destructive.OracleDestructiveWords.test_hits) ... ok
+test_safe_texts_are_not_hits (ct_test_07_destructive.OracleDestructiveWords.test_safe_texts_are_not_hits) ... ok
+test_word_table_matches_doc (ct_test_07_destructive.OracleDestructiveWords.test_word_table_matches_doc) ... ok
+test_failsafe_is_true_after_import (ct_test_08_modifier_release.FailsafeInvariant.test_failsafe_is_true_after_import) .
+.. ok
+test_no_source_disables_failsafe (ct_test_08_modifier_release.FailsafeInvariant.test_no_source_disables_failsafe) ... o
+k
+test_modifier_key_released_when_execution_fails (ct_test_08_modifier_release.ModifierReleaseOnFailure.test_modifier_key
+_released_when_execution_fails) ... skipped '执行路径未产生任何真实输入调用（failed code=E_INTERNAL exc=None @cua.executor.Executor.exe
+cute），残留键判据不成立'
+test_modifier_release_on_failsafe_exception (ct_test_08_modifier_release.ModifierReleaseOnFailure.test_modifier_release
+_on_failsafe_exception) ... skipped "hotkey 路径不使用 keyDown/keyUp（调用序列 ['hotkey']），改用鼠标路径取证"
+test_no_residual_keys_at_rest (ct_test_08_modifier_release.ModifierReleaseOnFailure.test_no_residual_keys_at_rest) ... 
+skipped '执行路径未产生输入调用，无法取证'
+test_dry_run_flag_exposed (ct_test_09_dryrun_mock.CliDryRunFlags.test_dry_run_flag_exposed) ... ok
+test_help_runs (ct_test_09_dryrun_mock.CliDryRunFlags.test_help_runs) ... ok
+test_mock_flag_exposed (ct_test_09_dryrun_mock.CliDryRunFlags.test_mock_flag_exposed) ... ok
+test_scope_note (ct_test_09_dryrun_mock.DryRunEvidenceScope.test_scope_note) ... ok
+test_click_under_dry_run (ct_test_09_dryrun_mock.DryRunMakesNoInputCalls.test_click_under_dry_run) ... ok
+test_hotkey_under_dry_run (ct_test_09_dryrun_mock.DryRunMakesNoInputCalls.test_hotkey_under_dry_run) ... ok
+test_type_under_dry_run (ct_test_09_dryrun_mock.DryRunMakesNoInputCalls.test_type_under_dry_run) ... ok
+test_backend_scan (ct_test_09_dryrun_mock.NoUninterceptableInputBackend.test_backend_scan) ... skipped "实现使用了记录式假件拦不住的输
+入后端 [('cua\\\\screenshot.py:61', 'user32')]：「零真实输入」判据不成立，需人工复核 dry-run 行为"
+
+======================================================================
+FAIL: test_toplevel_array (ct_test_01_json.AmbiguousJsonExtraction.test_toplevel_array)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_01_json.py", line 148, in test_toplevel_array
+    self.assertIsInstance(res.value, (list, tuple))
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ExtractResult(value=[1, 2, 3], method='direct', raw='[1, 2, 3]') is not an instance of (<class 'list'>,
+ <class 'tuple'>)
+
+======================================================================
+FAIL: test_lenient_float_coords_accepted_but_schema_invalid (ct_test_02_schema.OracleSchema.test_lenient_float_coords_a
+ccepted_but_schema_invalid)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_02_schema.py", line 161, in test_lenient_float_coords_accepted_but_schema_invalid
+    self.assertFalse(O.schema_valid(s), "schema 要求 integer；此处正是 md/schema 的差异点")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : schema 要求 integer；此处正是 md/schema 的差异点
+
+======================================================================
+FAIL: test_in_range_points_are_not_rejected (ct_test_04_bounds.ImplBoundsRejection.test_in_range_points_are_not_rejecte
+d) (case='bottom_right')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 75, in test_in_range_points_are_not_rejected
+    self.assertNotEqual(got, (W - 1, H - 1),
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+                        "合法坐标被改写成边界值，疑似 clamp")
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (1471, 827) == (1471, 827) : 合法坐标被改写成边界值，疑似 clamp
+
+======================================================================
+FAIL: test_oob_reports_e_out_of_bounds_code (ct_test_04_bounds.ImplBoundsRejection.test_oob_reports_e_out_of_bounds_cod
+e)
+至少有一个契约入口把越界上报为 E_OUT_OF_BOUNDS（§4/§5 的错误码面）。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 98, in test_oob_reports_e_out_of_bounds_code
+    self.assertIn("E_OUT_OF_BOUNDS", codes,
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+                  "越界拒绝未以 E_OUT_OF_BOUNDS 上报；观察到的入口/错误码：%r" % (seen,))
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'E_OUT_OF_BOUNDS' not found in [] : 越界拒绝未以 E_OUT_OF_BOUNDS 上报；观察到的入口/错误码：[('bounds_check', None)]
+
+======================================================================
+FAIL: test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejec
+ted) (case='x_equals_width')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 65, in test_out_of_bounds_points_are_rejected
+    self.fail("image(%s,%s) 未被拒绝，返回 %r；契约 §1.1/§8.2 要求报 "
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+              "E_OUT_OF_BOUNDS 且绝不 clamp" % (x, y, res.value))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: image(1472,10) 未被拒绝，返回 (1472, 10)；契约 §1.1/§8.2 要求报 E_OUT_OF_BOUNDS 且绝不 clamp
+
+======================================================================
+FAIL: test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejec
+ted) (case='x_over_width')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 65, in test_out_of_bounds_points_are_rejected
+    self.fail("image(%s,%s) 未被拒绝，返回 %r；契约 §1.1/§8.2 要求报 "
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+              "E_OUT_OF_BOUNDS 且绝不 clamp" % (x, y, res.value))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: image(1600,10) 未被拒绝，返回 (1600, 10)；契约 §1.1/§8.2 要求报 E_OUT_OF_BOUNDS 且绝不 clamp
+
+======================================================================
+FAIL: test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejec
+ted) (case='y_equals_height')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 65, in test_out_of_bounds_points_are_rejected
+    self.fail("image(%s,%s) 未被拒绝，返回 %r；契约 §1.1/§8.2 要求报 "
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+              "E_OUT_OF_BOUNDS 且绝不 clamp" % (x, y, res.value))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: image(10,828) 未被拒绝，返回 (10, 828)；契约 §1.1/§8.2 要求报 E_OUT_OF_BOUNDS 且绝不 clamp
+
+======================================================================
+FAIL: test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejec
+ted) (case='y_over_height')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 65, in test_out_of_bounds_points_are_rejected
+    self.fail("image(%s,%s) 未被拒绝，返回 %r；契约 §1.1/§8.2 要求报 "
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+              "E_OUT_OF_BOUNDS 且绝不 clamp" % (x, y, res.value))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: image(10,999) 未被拒绝，返回 (10, 999)；契约 §1.1/§8.2 要求报 E_OUT_OF_BOUNDS 且绝不 clamp
+
+======================================================================
+FAIL: test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejec
+ted) (case='negative_x')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 65, in test_out_of_bounds_points_are_rejected
+    self.fail("image(%s,%s) 未被拒绝，返回 %r；契约 §1.1/§8.2 要求报 "
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+              "E_OUT_OF_BOUNDS 且绝不 clamp" % (x, y, res.value))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: image(-1,10) 未被拒绝，返回 (-1, 10)；契约 §1.1/§8.2 要求报 E_OUT_OF_BOUNDS 且绝不 clamp
+
+======================================================================
+FAIL: test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejec
+ted) (case='negative_y')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 65, in test_out_of_bounds_points_are_rejected
+    self.fail("image(%s,%s) 未被拒绝，返回 %r；契约 §1.1/§8.2 要求报 "
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+              "E_OUT_OF_BOUNDS 且绝不 clamp" % (x, y, res.value))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: image(10,-1) 未被拒绝，返回 (10, -1)；契约 §1.1/§8.2 要求报 E_OUT_OF_BOUNDS 且绝不 clamp
+
+======================================================================
+FAIL: test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejec
+ted) (case='far_out')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 65, in test_out_of_bounds_points_are_rejected
+    self.fail("image(%s,%s) 未被拒绝，返回 %r；契约 §1.1/§8.2 要求报 "
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+              "E_OUT_OF_BOUNDS 且绝不 clamp" % (x, y, res.value))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: image(99999,99999) 未被拒绝，返回 (99999, 99999)；契约 §1.1/§8.2 要求报 E_OUT_OF_BOUNDS 且绝不 clamp
+
+======================================================================
+FAIL: test_accepts_in_range (ct_test_04_bounds.ImplDedicatedBoundsChecker.test_accepts_in_range) (case='origin')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 118, in test_accepts_in_range
+    self.assertFalse(A.rejected(res),
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+                     "专用越界判定误拒合法坐标 (%s,%s)：%s" % (x, y, res.describe()))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : 专用越界判定误拒合法坐标 (0,0)：failed code=None exc=AttributeError("'NoneType' object has no at
+tribute 'width'") @cua.screenshot.check_image_bounds
+
+======================================================================
+FAIL: test_accepts_in_range (ct_test_04_bounds.ImplDedicatedBoundsChecker.test_accepts_in_range) (case='typical')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 118, in test_accepts_in_range
+    self.assertFalse(A.rejected(res),
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+                     "专用越界判定误拒合法坐标 (%s,%s)：%s" % (x, y, res.describe()))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : 专用越界判定误拒合法坐标 (736,414)：failed code=None exc=AttributeError("'NoneType' object has n
+o attribute 'width'") @cua.screenshot.check_image_bounds
+
+======================================================================
+
+==== CAPABILITY_TABLE (task-7 verifier) ====
+repo=E:\blog-my
+cua_package_present=True
+extract_json       RESOLVED  <cap extract_json @cua.action_parser.extract_json>
+step_validate      RESOLVED  <cap step_validator @cua.action_parser.validate_step_dict>
+image_to_screen    RESOLVED  <cap image_to_screen @cua.screenshot.image_to_screen>
+screen_to_image    RESOLVED  <cap screen_to_image @cua.screenshot.screen_to_image>
+bounds_check       RESOLVED  <cap bounds_check @cua.screenshot.check_image_bounds>
+key_whitelist      RESOLVED  <cap key_whitelist_container @cua.executor.KEY_WHITELIST>
+error_policy       RESOLVED  <ct_adapter.PolicyView object at 0x00000235B2A6BCB0>
+destructive_words  RESOLVED  <cap is_destructive_fn @cua.executor.destructive_hits>
+click_guard        RESOLVED  <cap click_guard @cua.executor.destructive_guard>
+execute_action     RESOLVED  <cap executor_instance @cua.executor.Executor.execute>
+dry_run_executor   RESOLVED  <cap dry_run_instance @cua.executor.Executor.execute(dry_run=True)>
+==== END CAPABILITY_TABLE ====
+
+==== DRY-RUN 取证范围 ====
+已取证: CLI --help 暴露 --dry-run/--mock（子进程，假件已装）
+已取证: 执行入口 cua.executor.Executor.execute(dry_run=True) 在开关打开时不产生键鼠调用
+待验证: 主循环级（真实模型 + 截图的端到端 dry-run）需要实现提供截图/模型注入点
+==== END ====
+
+---- 汇总 ----
+模块: ct_test_00_capability, ct_test_01_json, ct_test_02_schema, ct_test_03_coords, ct_test_04_bounds, ct_test_05_keys, ct_test_06_errors, ct_test_07_destructive, ct_test_08_modifier_release, ct_test_09_dryrun_mock
+用例: run=83 failures=14 errors=0 skipped=5
+跳过原因（前 20 条）：
+  - ImplBoundsThroughValidator) :: 适配层：模块已存在（cua.action_parser）但找不到 Step 校验（带 image 的越界检查） 的入口（契约 §10 只冻结模块名，未冻结函数名）
+  - test_modifier_key_released_when_execution_fails :: 执行路径未产生任何真实输入调用（failed code=E_INTERNAL exc=None @cua.executor.Executor.execute），残留键判据不成立
+  - test_modifier_release_on_failsafe_exception :: hotkey 路径不使用 keyDown/keyUp（调用序列 ['hotkey']），改用鼠标路径取证
+  - test_no_residual_keys_at_rest :: 执行路径未产生输入调用，无法取证
+  - test_backend_scan :: 实现使用了记录式假件拦不住的输入后端 [('cua\\screenshot.py:61', 'user32')]：「零真实输入」判据不成立，需人工复核 dry-run 行为
+FAIL: test_accepts_in_range (ct_test_04_bounds.ImplDedicatedBoundsChecker.test_accepts_in_range) (case='bottom_right')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 118, in test_accepts_in_range
+    self.assertFalse(A.rejected(res),
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+                     "专用越界判定误拒合法坐标 (%s,%s)：%s" % (x, y, res.describe()))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : 专用越界判定误拒合法坐标 (1471,827)：failed code=None exc=AttributeError("'NoneType' object has 
+no attribute 'width'") @cua.screenshot.check_image_bounds
+
+----------------------------------------------------------------------
+Ran 83 tests in 3.843s
+
+FAILED (failures=14, skipped=5)

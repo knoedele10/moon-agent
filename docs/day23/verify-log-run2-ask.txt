@@ -1,0 +1,124 @@
+== Day 23 验收：本地多模态 RAG 知识库端到端 ==
+Base = http://127.0.0.1:8300
+时间 = 2026-10-11T05:38:31.022Z
+
+[自检] 内置 PNG 素材 213 字节（底图 166 + 本次运行专属 tEXt 块），尺寸 8x8，签名正确
+[自检] 派生 PNG 末尾 IEND 块完好，tEXt 标记 = day23-verify-20261011133831（逐运行不同，避免被他次运行的 sha256 去重命中）
+
+-- 第 0 步：登录 / 注册（知识库接口需要登录）--
+  账号 = kbverify  密码 = **************
+  POST /login -> status=302  location=/  session=session=NGI4Zjgw...(共 92 字符)
+[PASS] 拿到 session cookie（登录或注册）  期望=session=... 实际=session=NGI4Zjgw...(共 92 字符)
+  认证方式 = login；后续 /api/kb/* 请求都会带 Cookie: session=NGI4Zjgw...(共 92 字符)
+
+-- 第 1 步：探活 --
+[PASS] 探活 GET /api/health 返回 200  期望=200 实际=200
+[PASS] 探活响应 status="ok"  期望=ok 实际="ok"
+  探活响应（原样）：{"service":"blog-my","status":"ok","time":"2026-10-11T05:38:31Z","version":"go-1"}
+
+-- 第 2 步：文本入库（唯一中文长文本 + 暗号词）--
+  暗号词 = 紫罗兰-20261011133831
+  标题 = "Day 23 验收：本地多模态知识库文本 20261011133831"
+  正文长度 = 1505 字符
+[PASS] 文本入库返回 201  期望=201 实际=201
+[PASS] 文本入库 ok=true  期望=true 实际=true
+[PASS] 文本入库返回 id  期望=id 非空 实际=18
+[PASS] 文本入库 chunk_count >= 1  期望=>=1 实际=3
+[PASS] 入库回显 title 与请求逐字一致（中文未损坏）  期望=Day 23 验收：本地多模态知识库文本 20261011133831 实际=Day 23 验收：本地多模态知识库文本 20261011133831
+  入库响应（原样）：{"chunk_count":3,"duplicated":false,"id":18,"kind":"text","ok":true,"title":"Day 23 验收：本地多模态知识库文本 20261011133831"}
+  文档 id=18  chunk_count=3
+
+-- 第 3 步：列表可见 --
+[PASS] 列表接口返回 200  期望=200 实际=200
+[PASS] 列表 ok=true  期望=true 实际=true
+[PASS] 列表里能找到刚写入的 id  期望=18 实际=id=18
+  列表共 2 条
+  该条：kind=text chunk_count=3 created_at=2026-10-11T13:38:31+08:00 title="Day 23 验收：本地多模态知识库文本 20261011133831"
+
+-- 第 4 步：检索命中（query = 暗号词）--
+[PASS] 检索接口返回 200  期望=200 实际=200
+[PASS] 检索有命中（hits 非空）  期望=hits.length >= 1 实际=4
+[PASS] 排在第一位的命中包含暗号词  期望=含 紫罗兰-20261011133831 实际=本文件是 Day 23 端到端验收用的临时文本，暗号词是 紫罗兰-20261011133831。这个暗号词只应出现在这一份文本里，任何其他文档都不该包含它。 【...(+500 chars)
+[PASS] 首位命中的 document_id 指向刚写入的文档  期望=18 实际=18
+  首位命中：score=0.44446693684893573  chunk_id=35  kind="text"  document_id=18
+  命中总数=4，各条 score=0.44446693684893573, 0.4376625445558987, 0.4138305396747544, 0.2767244191064221
+
+-- 第 5 步：详情可查 --
+[PASS] 详情接口返回 200  期望=200 实际=200
+[PASS] 详情返回 id 与写入一致  期望=18 实际=18
+[PASS] 详情 kind 为 text  期望=text 实际="text"
+[PASS] 详情返回的 chunks 非空  期望=chunks.length >= 1 实际=3
+[PASS] chunks 拼接后包含暗号词  期望=含 紫罗兰-20261011133831 实际=包含
+  chunks 数量=3，前几个 seq:kind = 0:"text"  1:"text"  2:"text"
+  第一个 chunk 片段：本文件是 Day 23 端到端验收用的临时文本，暗号词是 紫罗兰-20261011133831。这个暗号词只应出现在这一份文本里，任何其他文档都不该包含它。 【验收段落 01】本地多模态知识库同时索引...(+480 chars)
+
+-- 第 6 步：图片入库（multipart/form-data，字段名 file）--
+  上传文件名 = verify-day23-20261011133831.png，multipart 体积 = 391 字节（Content-Length 用字节数，不用字符数）
+  上传超时 = 300000ms（视觉模型推理较慢，可用 --upload-timeout 调整）
+[PASS] 图片上传返回 201  期望=201 实际=201
+[PASS] 图片上传 ok=true  期望=true 实际=true
+[PASS] 上传后 kind 判定为 image  期望=image 实际="image"
+[PASS] 图片入库 chunk_count >= 1  期望=>=1 实际=1
+  图片入库响应（原样）：{"chunk_count":1,"duplicated":false,"id":19,"kind":"image","ok":true,"title":"verify-day23-20261011133831.png"}
+  图片文档 id=19  chunk_count=1（数量由视觉模型/切块策略决定，不做断言）
+
+-- 附：图片去重契约（同一份字节再传一次）--
+  去重响应（原样）：{"chunk_count":1,"duplicated":true,"id":19,"kind":"image","ok":true,"title":"verify-day23-20261011133831.png"}
+[PASS] 重复上传同一份字节返回 200（而非 201）  期望=200 实际=200
+[PASS] 重复上传 duplicated=true  期望=true 实际=true
+[PASS] 重复上传返回的是同一个文档 id  期望=19 实际=19
+
+-- 第 7 步：图片可被检索（尽力而为：视觉描述不可预测，没命中记 WARN 不记 FAIL）--
+[PASS] 按图片文件名检索能返回 200  期望=200 实际=200
+[PASS] 按图片文件名检索有命中（尽力而为）  期望=hits.length >= 1 实际=5
+  命中 5 条，首位：score=0.5893139649455632  document_id=19  kind="image_caption"
+  首位文本片段：【图片】verify-day23-20261011133831.png 【描述】 画面主体为渐变色背景，从左上角的深蓝色过渡到右下角的浅绿色，中间部分包含紫色、粉色、蓝色和绿色等颜色。画面没有明显的场景、图表趋势或结构。 【文字】 无
+  命中文档 id 列表：19, 17, 18, 18, 18（图片文档 id=19）
+  参考：query="图片" -> status=200 命中 5 条，首位 score=0.4950902072172843，首位片段：【图片】verify-day23-20261011133831.png 【描述】 画面主体为渐变色背景，从左上角的深蓝色过渡到右下角的浅绿色，中间部分包含紫色、粉色、蓝色和绿色等颜色。画面没有明显的场...(+17 chars)
+
+-- 附（--ask）：/api/kb/ask SSE 契约冒烟（最多记 WARN）--
+[PASS] ask 返回 200  期望=200 实际=200
+[PASS] ask 第一个事件是 sources  期望=sources 实际=sources
+[PASS] ask 至少有一个 delta 事件  期望=含 delta 实际=有
+[PASS] ask 以 done 事件结束  期望=done 实际=done
+  事件序列：sources -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> delta -> done（共 54 个事件，delta 52 个）
+  sources.hits 数量=5，首位 document_id=19 score=0.44466873799338963
+  拼接出的回答（前 160 字）：紫罗兰-20261011133831是Day 23端到端验收的暗号词，只应出现在特定的文本里，用于验证检索结果。[2][4][5]
+  SSE 原文（截断）：event: sources data: {"hits":[{"chunk_id":38,"document_id":19,"seq":0,"kind":"image_caption","title":"verify-day23-20261011133831.png","text":"【图片】verify-day23-20261011133831.png\n【描述】\n画面主体为渐变色背景，从左上角的深蓝色过渡到右下角的浅绿色，中间部分包含紫色、粉色、蓝色和绿色等颜色。画面没有明显的场景、图表趋势或结构。\n\n【文字】\n无","score":0.44466873799338963},{"c...(+4231 chars)
+
+-- 第 8 步：删除闭环（DELETE 文本文档 -> 列表消失 -> 再删 404）--
+[PASS] DELETE 返回 200  期望=200 实际=200
+[PASS] DELETE 响应 ok=true  期望=true 实际=true
+[PASS] DELETE 响应 deleted=true  期望=true 实际=true
+[PASS] DELETE 响应的 id 与请求一致  期望=18 实际=18
+[PASS] 删除后列表里不再有该 id  期望=不包含 实际=不包含
+[PASS] 删除后详情返回 404  期望=404 实际=404
+[PASS] 重复 DELETE 返回 404  期望=404 实际=404
+  删除响应（原样）：{"deleted":true,"id":18,"ok":true}
+  删除后列表共 2 条
+
+  提示：图片文档 id=19 未删除，留作多模态证据；如需清理可手动 DELETE /api/kb/documents/19
+
+-- 第 9 步：契约边界（未登录 / 非法 id / 空 query / 非法 JSON / 不支持的类型 / 未知模型）--
+[PASS] 未登录访问 /api/kb/* 返回 401  期望=401 实际=401
+[PASS] 未登录错误体为 {"error":"未登录"}  期望=未登录 实际=未登录
+[PASS] 非数字 id 返回 400  期望=400 实际=400
+[PASS] 非数字 id 的错误信息为「id 非法」  期望=id 非法 实际=id 非法
+[PASS] 不存在的文档返回 404  期望=404 实际=404
+[PASS] 不存在文档的错误信息为「文档不存在」  期望=文档不存在 实际=文档不存在
+[PASS] 检索空 query 返回 400  期望=400 实际=400
+[PASS] 检索空 query 的错误信息为「查询内容为空」  期望=查询内容为空 实际=查询内容为空
+[PASS] ask 空 query 返回 400（而不是 200 + SSE error）  期望=400 实际=400
+[PASS] ask 空 query 的错误信息为「query 不能为空」  期望=query 不能为空 实际=query 不能为空
+[PASS] ask 空 query 的响应是 JSON 而不是 SSE  期望=application/json 实际=application/json
+[PASS] 非法 JSON 返回 400  期望=400 实际=400
+[PASS] 非法 JSON 的错误信息为「请求格式错误」  期望=请求格式错误 实际=请求格式错误
+[PASS] .pdf 上传返回 400  期望=400 实际=400
+[PASS] .pdf 的错误信息含「不支持的文件类型」  期望=含 不支持的文件类型 实际=不支持的文件类型 ".pdf"（先支持 .txt/.md 与 .png/.jpg/.webp/.gif）
+[PASS] ask 未知模型仍是 200 + SSE（头已发出，错误只能走事件）  期望=200 实际=200
+[PASS] ask 未知模型首个事件是 sources  期望=sources 实际=sources
+[PASS] ask 未知模型以 error 事件收尾，信息为「llm: 端点不存在」  期望=llm: 端点不存在 实际=llm: 端点不存在
+[PASS] ask 未知模型不会收到 done 事件  期望=不含 done 实际=不含 done
+
+== 汇总：PASS 59 / WARN 0 / FAIL 0 ==
+退出码 = 0（有 FAIL 即 1，否则 0）

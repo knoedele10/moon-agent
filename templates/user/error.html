@@ -1,0 +1,22 @@
+{{define "user/error.html"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <!-- 主题要在首次绘制前定好，否则深色主题会先闪一帧浅色（与对话页同一份逻辑）。 -->
+    <script src="/static/js/theme-boot.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="error-page">
+    <div class="error-card">
+        <p class="card-tag">REQUEST ERROR</p>
+        <div class="glyph">!</div>
+        <h1>{{.Title}}</h1>
+        <p class="content">{{.Content}}</p>
+        <a class="btn" href="/">返回首页</a>
+    </div>
+</body>
+</html>
+{{end}}

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>blog-my 检查台</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    body { background: var(--bg); }
+    .dash-wrap { max-width: 720px; margin: 0 auto; padding: 32px 16px 48px; }
+    .dash-wrap h1 { font-size: 22px; margin: 0 0 8px; color: var(--text); }
+    .dash-sub { color: var(--text-muted); font-size: 13px; margin: 0 0 24px; }
+    .dash-card { border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 20px; }
+    .dash-card h2 { font-size: 15px; margin: 0 0 12px; color: var(--text); }
+    .health-line { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); }
+    .health-dot { width: 10px; height: 10px; border-radius: 50%; background: #3fb68b; flex: none; }
+    .health-dot.bad { background: #e06c75; }
+    .health-meta { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
+    .hot-item { display: flex; align-items: baseline; gap: 12px; padding: 10px 4px; border-bottom: 1px solid var(--border); }
+    .hot-item:last-child { border-bottom: none; }
+    .hot-rank { color: var(--accent); font-weight: 700; width: 28px; flex: none; }
+    .hot-title { color: var(--text); flex: 1; font-size: 14px; }
+    .hot-platform { color: var(--text-faint); font-size: 12px; flex: none; }
+    .fav-item { padding: 10px 4px; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text); }
+    .fav-item:last-child { border-bottom: none; }
+    .fav-time { color: var(--text-faint); font-size: 12px; margin-top: 2px; }
+    .list-hint { color: var(--text-muted); font-size: 13px; padding: 8px 4px; }
+    .dash-foot { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
+    .dash-links { margin-top: 16px; font-size: 13px; }
+    .dash-links a { color: var(--accent); text-decoration: none; margin-right: 16px; }
+  </style>
+</head>
+<body>
+  <div class="dash-wrap">
+    <h1>blog-my 检查台</h1>
+    <p class="dash-sub">服务状态与数据库真实数据一览（Day 20）</p>
+
+    <div class="dash-card">
+      <h2>服务健康</h2>
+      <div class="health-line"><span id="healthDot" class="health-dot"></span><span id="healthText">检查中…</span></div>
+      <div class="health-meta" id="healthMeta"></div>
+    </div>
+
+    <div class="dash-card">
+      <h2>今日热搜（真实数据）</h2>
+      <div id="hotList"><div class="list-hint">加载中…</div></div>
+    </div>
+
+    <div class="dash-card">
+      <h2>我的收藏</h2>
+      <div id="favList"><div class="list-hint">加载中…</div></div>
+    </div>
+
+    <p class="dash-foot" id="footTime"></p>
+    <div class="dash-links">
+      <a href="/chat">对话页 /chat</a>
+      <a href="/hot">热搜页 /hot</a>
+    </div>
+  </div>
+
+  <script>
+    // Day 20 本地接线：本地打开（localhost/127.0.0.1）时请求公网 API —— 这是跨域，
+    // 靠服务端配置的 CORS 响应头放行；部署到公网后同源请求，走相对路径。
+    var API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      ? 'https://blog-my-check-10974.app.workbuddy.host'
+      : '';
+
+    // 服务健康
+    fetch(API_BASE + '/api/health').then(function (r) { return r.json(); }).then(function (d) {
+      document.getElementById('healthText').textContent = d.status === 'ok' ? '服务正常' : '状态异常：' + d.status;
+      document.getElementById('healthMeta').textContent =
+        'service: ' + d.service + ' · version: ' + d.version + ' · 服务时间: ' + new Date(d.time).toLocaleString('zh-CN');
+    }).catch(function () {
+      document.getElementById('healthDot').className = 'health-dot bad';
+      document.getElementById('healthText').textContent = '健康检查失败';
+    });
+
+    // 今日热搜（真实数据快照）
+    fetch(API_BASE + '/api/hot').then(function (r) { return r.json(); }).then(function (d) {
+      var list = document.getElementById('hotList');
+      list.textContent = '';
+      d.data.forEach(function (item) {
+        var row = document.createElement('div');
+        row.className = 'hot-item';
+        var rank = document.createElement('span'); rank.className = 'hot-rank'; rank.textContent = item.rank;
+        var title = document.createElement('span'); title.className = 'hot-title'; title.textContent = item.title;
+        var p = document.createElement('span'); p.className = 'hot-platform'; p.textContent = item.platform;
+        row.appendChild(rank); row.appendChild(title); row.appendChild(p);
+        list.appendChild(row);
+      });
+      // 余力加练：最后更新时间（每次刷新页面都会重新取数并更新）
+      document.getElementById('footTime').textContent =
+        '最后更新时间：' + new Date().toLocaleString('zh-CN') + '　｜　热搜数据快照日期：' + d.fetched_at;
+    }).catch(function () {
+      document.getElementById('hotList').innerHTML = '<div class="list-hint">加载失败，请刷新重试</div>';
+    });
+
+    // 我的收藏（POST 写入后刷新这里会跟着变）
+    fetch(API_BASE + '/api/favorites').then(function (r) { return r.json(); }).then(function (d) {
+      var list = document.getElementById('favList');
+      list.textContent = '';
+      if (!d.data.length) {
+        list.innerHTML = '<div class="list-hint">还没有收藏</div>';
+        return;
+      }
+      d.data.forEach(function (item) {
+        var row = document.createElement('div');
+        row.className = 'fav-item';
+        var t = document.createElement('div'); t.textContent = item.title;
+        row.appendChild(t);
+        if (item.created_at) {
+          var time = document.createElement('div');
+          time.className = 'fav-time';
+          time.textContent = new Date(item.created_at).toLocaleString('zh-CN');
+          row.appendChild(time);
+        }
+        list.appendChild(row);
+      });
+    }).catch(function () {
+      document.getElementById('favList').innerHTML = '<div class="list-hint">加载失败，请刷新重试</div>';
+    });
+  </script>
+</body>
+</html>

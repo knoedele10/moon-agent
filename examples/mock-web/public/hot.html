@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>今日热搜</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body { background: var(--bg); }
+        .hot-wrap { max-width: 720px; margin: 0 auto; padding: 32px 16px 48px; }
+        .hot-wrap h1 { font-size: 22px; margin: 0 0 8px; color: var(--text); }
+        .hot-sub { color: var(--text-muted); font-size: 13px; margin: 0 0 24px; }
+        .hot-item { display: flex; align-items: baseline; gap: 12px; padding: 12px 8px; border-bottom: 1px solid var(--border); }
+        .hot-rank { color: var(--accent); font-weight: 700; width: 28px; flex: none; }
+        .hot-title { color: var(--text); flex: 1; }
+        .hot-heat { color: #ff8fa3; font-size: 12px; flex: none; }
+        .hot-platform { color: var(--text-faint); font-size: 12px; flex: none; }
+    </style>
+</head>
+<body>
+    <div class="hot-wrap">
+        <h1>今日热搜</h1>
+        <p class="hot-sub">来自微博 / 知乎 / 百度热榜的真实数据（2026-10-03）</p>
+        <div id="list"><div class="list-hint">加载中…</div></div>
+    </div>
+    <script>
+        // Day 20 本地接线：本地打开时请求公网 API（跨域，靠服务端 CORS 头放行）；公网上走同源相对路径
+        var API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+            ? 'https://blog-my-check-10974.app.workbuddy.host'
+            : '';
+        fetch(API_BASE + '/api/hot').then(function (r) { return r.json(); }).then(function (d) {
+            var list = document.getElementById('list');
+            list.textContent = '';
+            d.data.forEach(function (item) {
+                var row = document.createElement('div');
+                row.className = 'hot-item';
+                var rank = document.createElement('span'); rank.className = 'hot-rank'; rank.textContent = item.rank;
+                var title = document.createElement('span'); title.className = 'hot-title'; title.textContent = item.title;
+                row.appendChild(rank); row.appendChild(title);
+                if (item.heat) { var h = document.createElement('span'); h.className = 'hot-heat'; h.textContent = item.heat; row.appendChild(h); }
+                var p = document.createElement('span'); p.className = 'hot-platform'; p.textContent = item.platform; row.appendChild(p);
+                list.appendChild(row);
+            });
+        }).catch(function () {
+            document.getElementById('list').innerHTML = '<div class="list-hint">加载失败</div>';
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,181 @@
+﻿python : test_capability_table (ct_test_00_capability.SafetyNet.test_capability_table) ... ok
+所在位置 行:1 字符: 129
++ ... ]::new($false); python -X utf8 cua/tests/run_tests.py -v 2>&1 | Out-F ...
++                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (test_capability...y_table) ... ok:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+test_fake_defaults_are_deterministic (ct_test_00_capability.SafetyNet.test_fake_defaults_are_deterministic) ... ok
+test_fake_pyautogui_installed (ct_test_00_capability.SafetyNet.test_fake_pyautogui_installed) ... ok
+test_prose_brace_before_json (ct_test_01_json.AmbiguousJsonExtraction.test_prose_brace_before_json) ... ok
+test_toplevel_array (ct_test_01_json.AmbiguousJsonExtraction.test_toplevel_array) ... ok
+test_invalid_inputs_report_bad_json (ct_test_01_json.ImplJsonExtraction.test_invalid_inputs_report_bad_json) ... ok
+test_string_content_not_truncated_by_inner_brace (ct_test_01_json.ImplJsonExtraction.test_string_content_not_truncated_
+by_inner_brace) ... ok
+test_valid_inputs_extract (ct_test_01_json.ImplJsonExtraction.test_valid_inputs_extract) ... ok
+test_bad_input_reports_bad_json (ct_test_01_json.OracleJsonExtraction.test_bad_input_reports_bad_json) ... ok
+test_balance_scanner_handles_escapes (ct_test_01_json.OracleJsonExtraction.test_balance_scanner_handles_escapes) ... ok
+test_balance_scanner_ignores_braces_in_strings (ct_test_01_json.OracleJsonExtraction.test_balance_scanner_ignores_brace
+s_in_strings) ... ok
+test_fence_strip (ct_test_01_json.OracleJsonExtraction.test_fence_strip) ... ok
+test_pure_and_wrapped (ct_test_01_json.OracleJsonExtraction.test_pure_and_wrapped) ... ok
+test_ambiguous_cases_land_in_allowed_set (ct_test_02_schema.AmbiguousSchema.test_ambiguous_cases_land_in_allowed_set) .
+.. ok
+test_impl_rejects_null_action (ct_test_02_schema.ContractRulingActionNeverNull.test_impl_rejects_null_action) ... ok
+test_oracle_matches_ruling (ct_test_02_schema.ContractRulingActionNeverNull.test_oracle_matches_ruling) ... ok
+test_impl_applies_ruling (ct_test_02_schema.DoneActionMustAgreeWithFinal.test_impl_applies_ruling) ... ok
+test_oracle_applies_ruling (ct_test_02_schema.DoneActionMustAgreeWithFinal.test_oracle_applies_ruling) ... ok
+test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.ImplSchema.test_invalid_steps_rejected_with_expected_
+code) ... ok
+test_lenient_float_coords_accepted (ct_test_02_schema.ImplSchema.test_lenient_float_coords_accepted) ... ok
+test_valid_steps_pass (ct_test_02_schema.ImplSchema.test_valid_steps_pass) ... ok
+test_error_table_covers_all_documented_codes (ct_test_02_schema.OracleSchema.test_error_table_covers_all_documented_cod
+es) ... ok
+test_invalid_steps_rejected_with_expected_code (ct_test_02_schema.OracleSchema.test_invalid_steps_rejected_with_expecte
+d_code) ... ok
+test_lenient_float_coords_accepted_but_schema_invalid (ct_test_02_schema.OracleSchema.test_lenient_float_coords_accepte
+d_but_schema_invalid) ... ok
+test_schema_crosscheck (ct_test_02_schema.OracleSchema.test_schema_crosscheck)
+每个非法 fixture 的「是否违反 frozen schema」与预期一致（键名白名单属解析器规则，故例外）。 ... ok
+test_schema_module_available (ct_test_02_schema.OracleSchema.test_schema_module_available) ... ok
+test_valid_steps_pass (ct_test_02_schema.OracleSchema.test_valid_steps_pass) ... ok
+test_half_boundary_lands_in_allowed_set (ct_test_03_coords.AmbiguousHalfRounding.test_half_boundary_lands_in_allowed_se
+t) ... ok
+test_image_to_screen (ct_test_03_coords.ImplCoords.test_image_to_screen) ... ok
+test_monotonic_geometry_sanity (ct_test_03_coords.ImplCoords.test_monotonic_geometry_sanity)
+同一 origin/scale 下，图内坐标越大，屏幕坐标必须不减（防 x/y 颠倒）。 ... ok
+test_round_trip (ct_test_03_coords.ImplCoords.test_round_trip) ... ok
+test_half_up_is_documented_reading (ct_test_03_coords.OracleCoords.test_half_up_is_documented_reading) ... ok
+test_image_to_screen (ct_test_03_coords.OracleCoords.test_image_to_screen) ... ok
+test_round_trip (ct_test_03_coords.OracleCoords.test_round_trip) ... ok
+test_in_range_points_are_not_rejected (ct_test_04_bounds.ImplBoundsRejection.test_in_range_points_are_not_rejected) ...
+ ok
+test_no_clamping_on_oob (ct_test_04_bounds.ImplBoundsRejection.test_no_clamping_on_oob)
+拒绝绝不等于 clamp：若越界点被换算返回，返回值不得是夹回边界的结果。 ... ok
+test_oob_reports_e_out_of_bounds_code (ct_test_04_bounds.ImplBoundsRejection.test_oob_reports_e_out_of_bounds_code)
+至少有一个契约入口把越界上报为 E_OUT_OF_BOUNDS（§4/§5 的错误码面）。 ... ok
+test_out_of_bounds_points_are_rejected (ct_test_04_bounds.ImplBoundsRejection.test_out_of_bounds_points_are_rejected) .
+.. ok
+test_click_at_width (ct_test_04_bounds.ImplBoundsThroughExecutor.test_click_at_width) ... ok
+test_drag_endpoint_out_of_bounds (ct_test_04_bounds.ImplBoundsThroughExecutor.test_drag_endpoint_out_of_bounds) ... ok
+test_in_range_still_accepted (ct_test_04_bounds.ImplBoundsThroughExecutor.test_in_range_still_accepted) ... ok
+test_screenshot_region_out_of_bounds (ct_test_04_bounds.ImplBoundsThroughExecutor.test_screenshot_region_out_of_bounds)
+ ... FAIL
+test_scroll_anchor_out_of_bounds (ct_test_04_bounds.ImplBoundsThroughExecutor.test_scroll_anchor_out_of_bounds) ... ok
+test_accepts_in_range (ct_test_04_bounds.ImplDedicatedBoundsChecker.test_accepts_in_range) ... ok
+test_rejects_out_of_bounds (ct_test_04_bounds.ImplDedicatedBoundsChecker.test_rejects_out_of_bounds) ... ok
+test_in_range_accepted (ct_test_04_bounds.OracleBounds.test_in_range_accepted) ... ok
+test_no_clamping (ct_test_04_bounds.OracleBounds.test_no_clamping)
+拒绝就是拒绝：不得返回 clamp 后的 (W-1, H-1)。 ... ok
+test_out_of_bounds_rejected (ct_test_04_bounds.OracleBounds.test_out_of_bounds_rejected) ... ok
+test_casing_choice_is_recorded (ct_test_05_keys.AmbiguousKeyCasing.test_casing_choice_is_recorded) ... ok
+test_allowed_keys_pass (ct_test_05_keys.ImplKeyWhitelist.test_allowed_keys_pass) ... ok
+test_illegal_keys_rejected (ct_test_05_keys.ImplKeyWhitelist.test_illegal_keys_rejected) ... ok
+test_illegal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_illegal_keys_in_step) ... ok
+test_legal_keys_in_step (ct_test_05_keys.ImplKeyWhitelistThroughValidator.test_legal_keys_in_step) ... ok
+test_hotkey_step_with_illegal_key (ct_test_05_keys.OracleKeyWhitelist.test_hotkey_step_with_illegal_key) ... ok
+test_hotkey_step_with_legal_keys (ct_test_05_keys.OracleKeyWhitelist.test_hotkey_step_with_legal_keys) ... ok
+test_whitelist_size_and_members (ct_test_05_keys.OracleKeyWhitelist.test_whitelist_size_and_members) ... ok
+test_max_retries_when_exposed (ct_test_06_errors.ImplErrorMaxRetries.test_max_retries_when_exposed) ... ok
+test_must_replan_flags (ct_test_06_errors.ImplErrorReplan.test_must_replan_flags) ... ok
+test_retryable_counterexample_is_retryable (ct_test_06_errors.ImplErrorRetryability.test_retryable_counterexample_is_re
+tryable) ... ok
+test_retryable_flags_for_all_documented_codes (ct_test_06_errors.ImplErrorRetryability.test_retryable_flags_for_all_doc
+umented_codes) ... ok
+test_stall_and_loop_are_not_retryable (ct_test_06_errors.ImplErrorRetryability.test_stall_and_loop_are_not_retryable) .
+.. ok
+test_4xx_not_retryable_5xx_retryable (ct_test_06_errors.ImplModelHttpContext.test_4xx_not_retryable_5xx_retryable) ... 
+ok
+test_max_retries (ct_test_06_errors.OracleErrorPolicy.test_max_retries) ... ok
+test_model_http_is_context_dependent (ct_test_06_errors.OracleErrorPolicy.test_model_http_is_context_dependent) ... ok
+test_must_replan_is_exactly_stall_and_loop (ct_test_06_errors.OracleErrorPolicy.test_must_replan_is_exactly_stall_and_l
+oop) ... ok
+test_retryable_sets (ct_test_06_errors.OracleErrorPolicy.test_retryable_sets) ... ok
+test_table_is_frozen_size (ct_test_06_errors.OracleErrorPolicy.test_table_is_frozen_size) ... ok
+test_guard_entry_presence_is_reported (ct_test_07_destructive.DestructiveGuardWithoutDedicatedEntry.test_guard_entry_pr
+esence_is_reported) ... ok
+test_destructive_button_is_refused_and_routed_to_human (ct_test_07_destructive.ImplDestructivePopupGuard.test_destructi
+ve_button_is_refused_and_routed_to_human) ... ok
+test_safe_button_is_not_forced_to_human (ct_test_07_destructive.ImplDestructivePopupGuard.test_safe_button_is_not_force
+d_to_human) ... ok
+test_hits (ct_test_07_destructive.ImplDestructiveWords.test_hits) ... ok
+test_safe_texts_are_not_hits (ct_test_07_destructive.ImplDestructiveWords.test_safe_texts_are_not_hits) ... ok
+test_destructive_hits_detail (ct_test_07_destructive.OracleDestructiveWords.test_destructive_hits_detail) ... ok
+test_hits (ct_test_07_destructive.OracleDestructiveWords.test_hits) ... ok
+test_safe_texts_are_not_hits (ct_test_07_destructive.OracleDestructiveWords.test_safe_texts_are_not_hits) ... ok
+test_word_table_matches_doc (ct_test_07_destructive.OracleDestructiveWords.test_word_table_matches_doc) ... ok
+test_failsafe_is_true_after_import (ct_test_08_modifier_release.FailsafeInvariant.test_failsafe_is_true_after_import) .
+.. ok
+test_no_source_disables_failsafe (ct_test_08_modifier_release.FailsafeInvariant.test_no_source_disables_failsafe) ... o
+k
+test_failsafe_exception_maps_to_e_executor_failsafe (ct_test_08_modifier_release.ModifierReleaseOnFailure.test_failsafe
+_exception_maps_to_e_executor_failsafe)
+FAILSAFE 触发必须是 E_EXECUTOR_FAILSAFE（§5 不可重试），且不残留按下的键。 ... ok
+test_failsafe_on_mouse_maps_to_e_executor_failsafe (ct_test_08_modifier_release.ModifierReleaseOnFailure.test_failsafe_
+on_mouse_maps_to_e_executor_failsafe)
+点选（含 ctrl 修饰）中途触发 FAILSAFE：错误码正确且修饰键已补 keyUp。 ... ok
+test_modifier_key_released_when_execution_fails (ct_test_08_modifier_release.ModifierReleaseOnFailure.test_modifier_key
+_released_when_execution_fails) ... ok
+test_no_residual_keys_at_rest (ct_test_08_modifier_release.ModifierReleaseOnFailure.test_no_residual_keys_at_rest) ... 
+ok
+test_dry_run_flag_exposed (ct_test_09_dryrun_mock.CliDryRunFlags.test_dry_run_flag_exposed) ... ok
+test_help_runs (ct_test_09_dryrun_mock.CliDryRunFlags.test_help_runs) ... ok
+test_mock_flag_exposed (ct_test_09_dryrun_mock.CliDryRunFlags.test_mock_flag_exposed) ... ok
+test_scope_note (ct_test_09_dryrun_mock.DryRunEvidenceScope.test_scope_note) ... ok
+test_click_under_dry_run (ct_test_09_dryrun_mock.DryRunMakesNoInputCalls.test_click_under_dry_run) ... ok
+test_hotkey_under_dry_run (ct_test_09_dryrun_mock.DryRunMakesNoInputCalls.test_hotkey_under_dry_run) ... ok
+test_type_under_dry_run (ct_test_09_dryrun_mock.DryRunMakesNoInputCalls.test_type_under_dry_run) ... ok
+test_backend_scan (ct_test_09_dryrun_mock.NoUninterceptableInputBackend.test_backend_scan) ... ok
+
+======================================================================
+FAIL: test_screenshot_region_out_of_bounds (ct_test_04_bounds.ImplBoundsThroughExecutor.test_screenshot_region_out_of_b
+ounds)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 178, in test_screenshot_region_out_of_bounds
+    self._expect_oob("region_oob", {"type": "screenshot",
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                    "region": {"x": W - 10, "y": 10, "width": 100, "height": 100}})
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\blog-my\cua\tests\ct_test_04_bounds.py", line 163, in _expect_oob
+    self.assertEqual(got, "E_OUT_OF_BOUNDS",
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+                     "%s：应为 E_OUT_OF_BOUNDS，实际 %s（入口 %s）"
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     % (name, got, self.cap.where))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'E_INTERNAL' != 'E_OUT_OF_BOUNDS'
+- E_INTERNAL
++ E_OUT_OF_BOUNDS
+ : region_oob：应为 E_OUT_OF_BOUNDS，实际 E_INTERNAL（入口 cua.executor.Executor.execute）
+
+----------------------------------------------------------------------
+Ran 90 tests in 5.134s
+
+FAILED (failures=1)
+
+==== CAPABILITY_TABLE (task-7 verifier) ====
+repo=E:\blog-my
+cua_package_present=True
+extract_json       RESOLVED  <cap extract_json @cua.action_parser.extract_json>
+step_validate      RESOLVED  <cap step_validator @cua.action_parser.validate_step_dict>
+image_to_screen    RESOLVED  <cap image_to_screen @cua.screenshot.image_to_screen>
+screen_to_image    RESOLVED  <cap screen_to_image @cua.screenshot.screen_to_image>
+bounds_check       RESOLVED  <cap bounds_check @cua.screenshot.check_image_bounds>
+key_whitelist      RESOLVED  <cap key_whitelist_container @cua.executor.KEY_WHITELIST>
+error_policy       RESOLVED  <ct_adapter.PolicyView object at 0x000002B1197701A0>
+destructive_words  RESOLVED  <cap is_destructive_fn @cua.executor.destructive_hits>
+click_guard        RESOLVED  <cap click_guard @cua.executor.destructive_guard>
+execute_action     RESOLVED  <cap executor_instance @cua.executor.Executor.execute>
+dry_run_executor   RESOLVED  <cap dry_run_instance @cua.executor.Executor.execute(dry_run=True)>
+==== END CAPABILITY_TABLE ====
+
+==== DRY-RUN 取证范围 ====
+已取证: CLI --help 暴露 --dry-run/--mock（子进程，假件已装）
+已取证: 执行入口 cua.executor.Executor.execute(dry_run=True) 在开关打开时不产生键鼠调用
+待验证: 主循环级（真实模型 + 截图的端到端 dry-run）需要实现提供截图/模型注入点
+==== END ====
+
+---- 汇总 ----
+模块: ct_test_00_capability, ct_test_01_json, ct_test_02_schema, ct_test_03_coords, ct_test_04_bounds, ct_test_05_keys, ct_test_06_errors, ct_test_07_destructive, ct_test_08_modifier_release, ct_test_09_dryrun_mock
+用例: run=90 failures=1 errors=0 skipped=0

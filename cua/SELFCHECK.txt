@@ -1,0 +1,183 @@
+CUA 离线自检证据（task-5）
+生成时间：2026-10-11 13:42:26
+工作目录：E:\blog-my
+Python：3.13.13 (tags/v3.13.13:01104ce, Apr  7 2026, 19:25:48) [MSC v.1944 64 bit (AMD64)]
+
+本文件由下列两条命令的真实输出拼接而成（stdout+stderr 原样保留），
+全程无显示器、无网络、不动真实鼠标键盘：
+  $ -m cua.main --selfcheck
+  $ -m cua.main --dry-run --mock --no-log --script cua/mock/demo.json
+
+==============================================================================
+$ -m cua.main --selfcheck
+exit code: 0
+==============================================================================
+=== CUA 离线自检（协议 cua/1，cua 0.1.0）===
+工作目录：E:\blog-my
+Python：3.13.13 (tags/v3.13.13:01104ce, Apr  7 2026, 19:25:48) [MSC v.1944 64 bit (AMD64)]
+模式：无显示器 / 不动真实鼠标 / 不截图（MockScreenshot + DryRunDevice）
+建议对照命令：python -m cua.main --selfcheck
+
+
+== 1 环境与依赖 ==
+  [PASS] Python >= 3.10  -> 3.13.13
+  [PASS] pyautogui / Pillow / numpy 可用且 FAILSAFE=True  -> pyautogui=0.9.54 FAILSAFE=True Pillow=12.2.0 numpy=2.2.0
+  [PASS] jsonschema 可选依赖状态  -> jsonschema=4.23.0（仅用于交叉校验，不是硬依赖）
+  [PASS] 冻结契约 action.schema.json 存在  -> E:\blog-my\docs\cua\action.schema.json
+      · 真实鼠标/键盘全程未被调用（设备为 DryRunDevice / RecordingDevice）
+      · 网络未被调用（无 API 探针；模型为 MockClient）
+
+== 2 契约一致性 ==
+  [PASS] 动作类型与 schema 一致  -> 9 种动作与 schema oneOf 逐项一致
+  [PASS] 错误码表与协议文档逐条对齐  -> 20 个错误码全部出现在冻结契约第 5 节
+  [PASS] 系统提示词与 02-agent-prompt.md 对齐  -> 系统提示词逐字取自 02-agent-prompt.md 第 1 节 text 代码块（6097 字）
+  [PASS] 错误码总数为 20  -> 20
+  [PASS] 错误策略表（可重试/上限/分类）  -> 重试上限与分类逐条核对通过（E_MODEL_HTTP 单独按状态码判定）
+  [PASS] E_MODEL_HTTP 5xx 可重试
+  [PASS] E_MODEL_HTTP 4xx 不可重试
+  [PASS] E_STALL 属于重规划而非重试
+  [PASS] E_LOOP 属于重规划而非重试
+
+== 3 Step 提取（协议 2.1 宽进） ==
+  [PASS] 全文直解  -> 全文直解
+  [PASS] 剥代码围栏  -> 剥代码围栏（含前后说明文字）
+  [PASS] 平衡括号扫描  -> 第一个平衡对象扫描
+  [PASS] 字符串内花括号/转义  -> 正确跳过字符串内的花括号与转义
+  [PASS] 反斜杠/引号转义  -> 反斜杠与引号转义
+  [PASS] 提取失败报 E_BAD_JSON  -> 空/无 JSON/未闭合 -> E_BAD_JSON
+
+== 4 Schema 校验（协议第 2、3 节） ==
+  [PASS] 9 种动作合法样例全部通过  -> 9 种动作全部通过校验
+  [PASS] 未知字段忽略  -> 未知字段被忽略（向前兼容），并记录到 meta：['future_field']
+  [PASS] 小数坐标宽容取整  -> 640.4 -> 640，210.6 -> 211，meta.coord_rounded=True
+  [PASS] 非法样例错误码映射  -> 16 条非法样例全部按预期报错
+  [PASS] 与 jsonschema 交叉校验  -> 自研校验子集与 jsonschema Draft2020-12 判定一致（25 个样例）
+  [PASS] 终态字段裁定（2026-10-11）  -> action=null 恒 E_SCHEMA；缺 final E_SCHEMA；done/final 不一致 E_SCHEMA；done+任意动作合法
+
+== 5 坐标换算（协议 1.1） ==
+  [PASS] 协议第 4 节换算样例  -> image(640,210) + scale=0.7667 -> screen(835,274)，与协议第 4 节样例一致
+  [PASS] 局部帧 origin/scale 换算与逆换算  -> 局部帧 origin=(100,50) scale=2.0：(10,20) -> (105,60) 且可逆
+  [PASS] round_half_up 确定性  -> round_half_up 对 .5 一律向上（int(floor(x+0.5))）
+  [PASS] 局部截图区域换算  -> image 空间 region -> 屏幕矩形 (105, 60, 50, 30)
+
+== 6 越界拒绝（绝不 clamp，协议 1.1 / 8.2） ==
+  [PASS] 越界拒绝 x=width  -> 拒绝 x=width：坐标 x=1472 超出图像宽度 1472
+  [PASS] 越界拒绝 x=-1  -> 拒绝 x=-1：坐标 x=-1 超出图像宽度 1472
+  [PASS] 越界拒绝 y=height  -> 拒绝 y=height：坐标 y=828 超出图像高度 828
+  [PASS] 越界拒绝 y=-1  -> 拒绝 y=-1：坐标 y=-1 超出图像高度 828
+  [PASS] 越界错误消息回显实际值与图像尺寸  -> 坐标 x=1600 超出图像宽度 1472
+  [PASS] 越界时不产生设备操作  -> 越界点击未产生任何设备操作（绝不 clamp）
+  [PASS] 局部截图区域越界由执行器拒绝  -> 越界区域由执行器自己拒绝（未触达 provider）；贴边合法区域（x+width==image.width）放行
+
+== 7 执行器（9 种动作 / 安全不变量） ==
+  [PASS] 9 种动作逐个执行  -> 9 种动作均可执行并产生预期设备操作
+  [PASS] ActionResult 结构  -> ActionResult 字段与协议第 4 节一致
+  [PASS] 修饰键成对释放  -> 修饰键 key_down/key_up 成对且执行后无残留
+  [PASS] 异常路径释放修饰键  -> FAILSAFE -> E_EXECUTOR_FAILSAFE，且 ctrl 已释放
+  [PASS] 拖拽异常仍抬起鼠标  -> 拖拽中途异常也会 mouse_up
+  [PASS] 键名白名单与危险组合键  -> 白名单外与危险组合键被拦截；allowlist 打开后放行
+  [PASS] type 输入路径  -> ASCII/中文/clear_first/submit/target 路径均正确
+  [PASS] scroll 方向与单位映射  -> dy 正负映射与 page 放大均正确（page=5 行）
+  [PASS] 每步 sleep >= 150ms（实测计时）  -> 实测单步耗时 150ms（>=150ms）
+  [PASS] FAILSAFE 常开且不可配置  -> FAILSAFE=True 且不是配置项
+  [PASS] screenshot 局部放大与坐标空间切换  -> region -> origin=(100, 100) scale=2.000（= zoom 2.0 × 基准 scale 0.767，协议公式一致）
+
+== 8 错误对象与重试策略 ==
+  [PASS] CuaError.to_dict  -> to_dict 字段与协议第 4 节失败样例一致
+  [PASS] RetryTracker 决策  -> E_BAD_JSON 2 次 / E_OUT_OF_BOUNDS 1 次 / E_STALL,E_LOOP 直接重规划
+  [PASS] E_SCHEMA 重试上限为 2
+  [PASS] 反馈文本要求只输出一个 JSON
+
+== 9 弹窗与卡死检测（协议第 7 节） ==
+  [PASS] 模态框样张判为疑似弹窗  -> bbox=(557, 378, 1363, 702) 面积比=0.126 填充率=1.00 信号=['bbox_rule', 'center_block', 'background_darkened', 'modal_like']
+  [PASS] 同帧反例  -> 同帧：无变化、非弹窗
+  [PASS] 微小变化反例  -> 极小变化反例：bbox 面积比 0.000000
+  [PASS] 整屏变化反例  -> 整屏突变反例：面积比 1.000
+  [PASS] 破坏性词表  -> 中英文命中：['删除'] / ['delete']；安全文案不误伤；destructive_guard=['删除']
+  [PASS] StallDetector  -> 连续 N 步无变化才触发；有变化即清零
+  [PASS] LoopDetector  -> 同一（动作，画面哈希）第 3 次触发 E_LOOP；画面变化即分离
+  [PASS] 弹窗裁剪区域裁剪  -> 弹窗裁剪提示会被裁进当前帧：{'x': 84, 'y': 84, 'width': 16, 'height': 16}
+
+== 10 API-first 路由（协议第 6 节） ==
+  [PASS] 默认落到 GUI 兜底  -> 无任何 API 探针 -> L3（L0~L2 均无可用能力（已探测 0 个探针），按协议第 6 节落到 GUI 视觉操控兜底）
+  [PASS] L0 命中即停  -> L0 可用即停：探测到 GitHub API
+  [PASS] 跳过不可用级别  -> L0 不可用 -> L1；两次探测结果都落记录
+  [PASS] 关闭兜底的行为  -> 关闭 GUI 兜底且无 API -> E_NEED_HUMAN
+
+== 11 端到端（mock 模型 + 合成屏幕 + dry-run） ==
+  [PASS] 正常任务闭环  -> 3 步成功；坏 JSON 回喂 1 次；640.4/210.6 -> screen(835,275)
+  [PASS] 越界回喂后恢复  -> 越界 -> 回喂当前 image 尺寸 -> 修正成功（未 clamp）
+  [PASS] E_STALL 强制重规划  -> 冻结画面：9 步后强制重规划 2 次 -> 终止 E_STALL
+  [PASS] E_LOOP 中断策略  -> 同一（动作，画面哈希）第 3 次触发 -> 重规划 2 次 -> E_LOOP（5 步）
+  [PASS] 步数预算  -> 步数预算 40 -> 2（自检用）时优雅退出
+  [PASS] 墙钟预算  -> 墙钟预算与步数预算双重约束（注入时钟：10s 预算）
+  [PASS] risk=high 护栏  -> risk=high 默认需护栏放行，未放行即 E_NEED_HUMAN
+  [PASS] 弹窗破坏性按钮硬约束  -> 疑似弹窗 + 破坏性按钮 -> 不点击，直接 E_NEED_HUMAN
+  [PASS] 弹窗 esc 升级转人工  -> 弹窗持续 -> 按 2 次 esc -> 仍无效转人工
+  [PASS] 模型超时路径  -> E_MODEL_TIMEOUT 退避重试 2 次 -> E_NEED_HUMAN
+  [PASS] need_human 收尾  -> 模型自报 need_human：正确地交还控制权
+  [PASS] 手动取消路径 E_CANCEL  -> loop.cancel() -> E_CANCEL（第 1 步后停手并释放按键）
+  [PASS] dry-run 空转验证  -> 全程 DryRunDevice：15 条模拟操作，真实 pyautogui 未被调用
+
+== 12 已知边界与待验证项（只登记，不改契约） ==
+      · 2026-10-11 裁定：action 恒为必填动作对象（不可为 null），final.status/summary 是终态唯一权威来源。
+      · E_ARG_RANGE 与 E_SCHEMA 的边界：action 内 minimum/maximum 越界 -> E_ARG_RANGE，其余结构不符 -> E_SCHEMA。
+      · 弹窗判定使用两级阈值（弱>8 计 change_ratio，强>45 定形状），否则整屏压暗会把 bbox 撑满。
+      · 多显示器虚拟桌面合并坐标系未实测（pyautogui 只报主屏几何）——待验证。
+      · 弹窗按钮文字识别依赖模型给出的文本字段，未接入 OCR —— 待验证。
+      · 本地 VLM 真实端到端（Ollama qwen2.5vl:7b）未在本自检中跑过 —— 待验证。
+
+== 13 预算分档（2026-10-11 裁定） ==
+  [PASS] 分档取值  -> cloud=云端 API 后端：40 步 / 300s / 截图长边 1472；local=本地 VLM 后端：40 步 / 1800s / 截图长边 1280（本地单步 9~78s）
+  [PASS] 默认值与分档应用  -> Config() 默认 cloud(40/300/1472)；local -> 40/1800/1280
+  [PASS] auto 判定与显式覆盖优先级  -> auto 按 base_url 判定；显式 --max-seconds/--max-steps 覆盖分档
+  [PASS] local 档在闭环中生效  -> local 档在完整闭环中生效（合成屏 1920 -> 送模型宽 1280，墙钟 1800s）
+  [PASS] 终态动作仍被执行  -> done=true 配 click：动作执行后按 final 收尾
+
+== 结论 ==
+  通过 81 项，失败 0 项
+  自检完成时间：2026-10-11 13:42:34
+  说明：本自检全程使用 MockScreenshot + DryRunDevice/RecordingDevice，
+        不截图、不移动鼠标、不按键；真实 pyautogui 仅被导入用于断言 FAILSAFE=True。
+
+==============================================================================
+$ -m cua.main --dry-run --mock --no-log --script cua/mock/demo.json
+exit code: 0
+==============================================================================
+=== CUA 运行 ===
+任务：离线演示：点击搜索框 -> 输入关键词 -> 提交 -> 结束
+模式：dry_run=True mock_model=True mock_screen=True
+模型：mock（qwen2.5vl:7b）
+日志：（内存）
+
+--- 逐步轨迹 ---
+[step 1] risk=low extraction=fence coord_rounded=True
+         thought: 点击搜索框
+         action : {"type": "click", "x": 640, "y": 211}
+         result : ok=True error=None screen_changed=True duration=150ms
+[step 2] risk=low extraction=direct coord_rounded=False
+         thought: 输入关键词并回车
+         action : {"type": "type", "text": "hello cua", "clear_first": true, "submit": true}
+         result : ok=True error=None screen_changed=True duration=150ms
+[step 3] risk=low extraction=direct coord_rounded=False
+         thought: 任务完成
+         action : {"type": "done", "status": "success", "summary": "演示脚本跑通"}
+         result : ok=True error=None screen_changed=None duration=Nonems
+
+--- 报告 ---
+任务：离线演示：点击搜索框 -> 输入关键词 -> 提交 -> 结束
+结果：成功
+终止码：（正常结束）
+终止说明：-
+步数：3  重规划：0  弹窗事件：0  用时：0.6s
+路由：L3（L0~L2 均无可用能力（已探测 0 个探针），按协议第 6 节落到 GUI 视觉操控兜底）
+final：{"status": "success", "summary": "演示脚本跑通"}
+
+--- 设备操作记录（dry_run，未触碰真实鼠标/键盘）---
+[ 1] {"button": "left", "clicks": 1, "op": "click", "x": 835, "y": 275}
+[ 2] {"key": "ctrl", "op": "key_down"}
+[ 3] {"key": "a", "op": "press"}
+[ 4] {"key": "ctrl", "op": "key_up"}
+[ 5] {"interval": 0.0, "op": "write", "text": "hello cua"}
+[ 6] {"key": "enter", "op": "press"}
+

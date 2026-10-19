@@ -1,0 +1,45 @@
+{{define "user/register.html"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <!-- 主题要在首次绘制前定好，否则深色主题会先闪一帧浅色（与对话页同一份逻辑）。 -->
+    <script src="/static/js/theme-boot.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="auth-page">
+    <div class="auth-card">
+        <div class="auth-brand">
+            <span class="logo" aria-hidden="true">M</span>
+            <span class="brand-text">
+                <span class="brand-name">多模型工作台</span>
+                <span class="brand-mid">AI<i>//</i>WORKSPACE</span>
+            </span>
+        </div>
+        <p class="auth-tag">GET STARTED</p>
+        <h1>创建账号</h1>
+        <p class="auth-sub">创建账号，保存你的对话与模型配置。</p>
+
+        {{if .Error}}<div class="alert alert-error" role="alert">{{.Error}}</div>{{end}}
+
+        <form action="/register" method="post" autocomplete="on">
+            <div class="field">
+                <label for="username">用户名</label>
+                <input class="input" type="text" id="username" name="username" placeholder="设置用户名" autocomplete="username" required autofocus>
+            </div>
+            <div class="field">
+                <label for="password">密码</label>
+                <input class="input" type="password" id="password" name="password" placeholder="设置密码（至少 6 位）" autocomplete="new-password" required>
+            </div>
+            <button type="submit" class="btn btn-block">注册</button>
+        </form>
+
+        <div class="auth-footer">
+            已有账号？<a href="/login">去登录</a>
+        </div>
+    </div>
+</body>
+</html>
+{{end}}

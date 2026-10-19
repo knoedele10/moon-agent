@@ -1,0 +1,17 @@
+node_modules/
+bin/
+dist/
+build/
+# AI 文件工具的沙箱目录（内容由运行时产生，不入库）
+workspace/
+*.log
+# 例外：独立验收的证据日志要入库（*.log 默认忽略，这里放开 docs/verify/）
+!docs/verify/*.log
+.env
+.gstack/
+.gocache/
+.tmp*/
+# 用户生成的文档与解析附件，不作为应用源码发布
+artifacts/
+__pycache__/
+*.pyc

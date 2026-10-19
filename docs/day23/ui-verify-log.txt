@@ -1,0 +1,69 @@
+== Day 23 验收（前端页面）：知识库视图端到端 ==
+Base = http://127.0.0.1:8300
+时间 = 2026-10-11T05:20:50.293Z
+
+playwright-core 来自：C:/Users/woshiss/AppData/Roaming/npm/node_modules/openclaw/node_modules/playwright-core
+Chromium 可执行文件：C:/Users/woshiss/AppData/Local/ms-playwright/chromium-1223/chrome-win64/chrome.exe
+临时素材：C:\Users\woshiss\AppData\Local\Temp\day23-ui-bnjs0t\ui-verify-20261011132050.md（2517 字节）、C:\Users\woshiss\AppData\Local\Temp\day23-ui-bnjs0t\ui-verify-20261011132050.png（209 字节）
+
+-- 第 0 步：登录 --
+[PASS] 登录后离开 /login  期望=不在 /login 实际=http://127.0.0.1:8300/
+
+-- 第 1 步：知识库入口（导航 + 视图）--
+[PASS] 侧栏存在「知识库」导航项  期望=存在 实际=1 个
+[PASS] 导航项文案为「知识库」  期望=知识库 实际=知识库
+[PASS] hash 变为 #/kb  期望=#/kb 实际=/kb
+[PASS] 知识库视图可见  期望=可见 实际=true
+[PASS] 对话区在知识库视图下隐藏  期望=隐藏 实际=false
+[PASS] 统计数字已加载（不是占位 …）  期望=数字 实际=0
+  截图：docs\day23\screenshots\kb-1-view.png
+
+-- 第 2 步：上传 .md 文件（前端上传路径）--
+[PASS] 文件选择器已选中素材  期望=ui-verify-20261011132050.md 实际=ui-verify-20261011132050.md
+  上传提示：已入库：id=14，kind=text，切出 2 个块。
+[PASS] 上传后提示「已入库」  期望=含 已入库 实际=已入库：id=14，kind=text，切出 2 个块。
+[PASS] 文档列表出现刚上传的文件  期望=ui-verify-20261011132050.md 实际=文本 ui-verify-20261011132050.md id=14 · 块 2 · 2.5 KB · text/plain; charset=utf-8 · 2026-10-11 13:20 删除
+  截图：docs\day23\screenshots\kb-2-upload.png
+
+-- 第 3 步：检索（前端检索路径）--
+[PASS] 检索结果渲染出命中块  期望=>= 1 实际=2 个
+  命中 1：相似度 0.432 | document_id=14 chunk_id=28 seq=0
+  命中 2：相似度 0.411 | document_id=14 chunk_id=29 seq=1
+[PASS] 命中的块里至少有一条包含检索词（召回证据）  期望=含 UIVERIFY-20261011132050 实际=有
+[PASS] 命中里包含刚上传文档的块（document_id=14）  期望=包含 实际=14, 14
+[PASS] 排在第一位的命中包含检索词（软断言：向量检索不保证词法排序）  期望=含 UIVERIFY-20261011132050 实际=前端验收专用文本，暗号词是 UIVERIFY-20261011132050。 【前端验收段落 01】这段文字由前端验收脚本生成，用来验证「粘贴/上传文本 -> 切块 -> 嵌入 -...
+  截图：docs\day23\screenshots\kb-3-search.png
+
+-- 第 4 步：上传 PNG（多模态：视觉模型生成描述后入库，较慢）--
+  图片上传耗时 13.3s，提示：已入库：id=15，kind=image，切出 1 个块。
+[PASS] 图片上传后提示「已入库」  期望=含 已入库 实际=已入库：id=15，kind=image，切出 1 个块。
+[PASS] 图片上传提示 kind=image  期望=含 kind=image 实际=已入库：id=15，kind=image，切出 1 个块。
+[PASS] 文档列表出现图片文档  期望=ui-verify-20261011132050.png 实际=图片 ui-verify-20261011132050.png id=15 · 块 1 · 209 B · image/png · 2026-10-11 13:21 删除 文本 ui-verify-20261011132050.md id=14 · 块 2 · 2.5 KB · text/plain; charset=utf-8 · 2026-10-11 13:20 删除
+  截图：docs\day23\screenshots\kb-4-image-upload.png
+
+-- 第 5 步：基于知识库问答（前端 SSE 路径）--
+  可选模型：deepseek-chat, deepseek-reasoner, gpt-4o, gpt-4o-mini, moonshot-v1-8k, moonshot-v1-32k, qwen-plus, qwen-max, qwen-turbo, glm-4-plus, glm-4-flash, claude-opus-5, claude-sonnet-5, claude-haiku-4-5-20251001, gemini-2.0-flash, gemini-1.5-pro, ernie-4.0-8k, ernie-3.5-8k, doubao-pro-32k, qwen2.5:7b, qwen3:4b, qwen2.5vl:7b, mock-echo
+  选中模型：qwen2.5:7b
+[PASS] 问答流式结束后提问按钮恢复可用  期望=恢复可用 实际=已恢复
+  问答耗时 4.6s；出处 3 条
+  回答（前 180 字）：本次前端验收文本里的暗号词是 UIVERIFY-20261011132050。[1][2][3]
+[PASS] 问答渲染出 sources 出处区  期望=>= 1 实际=1 个
+[PASS] 出处条目数 >= 1  期望=>= 1 实际=3 个
+[PASS] 回答正文非空  期望=非空 实际=48 字
+[PASS] 回答包含暗号词（软断言：取决于模型）  期望=含 UIVERIFY-20261011132050 实际=本次前端验收文本里的暗号词是 UIVERIFY-20261011132050。[1][2][3]
+[PASS] 问答没有渲染错误提示  期望=0 实际=0 个
+  截图：docs\day23\screenshots\kb-5-ask.png
+
+-- 第 6 步：删除文本文档 --
+[PASS] 删除前列表里能找到该行  期望=存在 实际=存在
+[PASS] 删除后列表里不再有该文档  期望=不包含 实际=不包含
+  行数：2 -> 1
+  截图：docs\day23\screenshots\kb-6-delete.png
+[PASS] 清理：本次创建的图片文档已删除  期望=不包含 实际=不包含
+  截图：docs\day23\screenshots\kb-7-cleanup.png
+[PASS] 页面加载的资源没有 4xx/5xx（/favicon.ico 除外）  期望=0 实际=0 条
+[PASS] 页面没有 JS console 报错（favicon/静态资源 404 已在上面单独判定）  期望=0 实际=0 条
+  console.error: Failed to load resource: the server responded with a status of 404 (Not Found)
+
+== 汇总：PASS 28 / WARN 0 / FAIL 0 ==
+退出码 = 0（有 FAIL 即 1，否则 0）

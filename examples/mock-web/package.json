@@ -1,0 +1,13 @@
+{
+  "name": "blog-my-mock",
+  "version": "1.0.0",
+  "private": true,
+  "description": "blog-my 公网 mock 版：/api/health + mock 业务接口 + 前端静态页面",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

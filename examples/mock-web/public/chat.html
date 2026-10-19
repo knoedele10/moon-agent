@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多模型对话</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-head">
+                <div class="brand-row">
+                    <span class="logo">✦</span>
+                    <span>多模型对话</span>
+                </div>
+                <button type="button" class="btn btn-block" id="new-chat">＋ 新建对话</button>
+            </div>
+            <nav class="view-nav" aria-label="功能导航">
+                <a class="view-tab active" href="#/chat" data-view="chat" aria-current="page">对话</a>
+                <a class="view-tab" href="#/models" data-view="models">模型</a>
+                <a class="view-tab" href="#/keys" data-view="keys">密钥</a>
+            </nav>
+            <div class="conv-filter">
+                <input type="search" id="conv-filter" class="input" placeholder="筛选会话标题…" aria-label="筛选会话" autocomplete="off">
+            </div>
+            <nav class="conv-list" id="conv-list" aria-label="会话列表">
+                <div class="list-hint">加载中…</div>
+            </nav>
+        </aside>
+
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+        <main class="main">
+            <header class="topbar">
+                <button type="button" class="hamburger" id="sidebar-toggle" aria-label="切换侧栏">☰</button>
+                <div class="topbar-title" id="topbar-title">新对话</div>
+                <div class="model-wrap">
+                    <select class="select" id="model-select" aria-label="选择模型">
+                        <option value="">加载模型…</option>
+                    </select>
+                </div>
+                <div class="user-actions">
+                    <span class="username" title="demo">demo</span>
+                    <a class="btn btn-ghost" href="/login">API Key</a>
+                    <a class="btn btn-ghost" href="/login">退出</a>
+                </div>
+            </header>
+
+            <section class="messages" id="messages">
+                <div class="empty-state" id="empty-state">
+                    <div class="glyph">✦</div>
+                    <h2>开始新的对话</h2>
+                    <p>在下方输入你的问题，选择顶部的模型即可开始。</p>
+                </div>
+                <div class="thread" id="thread"></div>
+            </section>
+
+            <div class="composer">
+                <form class="composer-inner" id="composer" autocomplete="off">
+                    <textarea id="input" rows="1" placeholder="输入消息，Enter 发送，Shift+Enter 换行"></textarea>
+                    <button type="submit" class="send-btn" id="send-btn" aria-label="发送">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </form>
+                <div class="composer-hint">内容由 AI 生成，请注意甄别。</div>
+            </div>
+
+            <section class="view" id="view-models" aria-label="模型列表">
+                <div class="view-body">
+                    <header class="view-head">
+                        <h2>可用模型</h2>
+                        <p class="view-sub">这里列出可用于对话的模型，标着「已配置」的表示已经填好 API Key。</p>
+                    </header>
+                    <div class="list-panel" id="models-list">
+                        <div class="list-hint">加载中…</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="view" id="view-keys" aria-label="API Key 列表">
+                <div class="view-body">
+                    <header class="view-head">
+                        <h2>我的 API Key</h2>
+                        <p class="view-sub">这里列出已经保存的密钥，只显示掩码，完整密钥不会出现在页面上。</p>
+                    </header>
+                    <div class="list-panel" id="keys-list">
+                        <div class="list-hint">加载中…</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="/static/js/chat.js"></script>
+</body>
+</html>

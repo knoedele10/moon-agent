@@ -1,0 +1,20 @@
+{
+  "seq": 6,
+  "mode": "actions",
+  "at": "2026-10-11T11:44:08.197Z",
+  "url": "/v1/chat/completions",
+  "auth_seen": true,
+  "model": "deepseek-flash",
+  "max_tokens": 16384,
+  "temperature": 0,
+  "messages": [
+    {
+      "role": "user",
+      "content": "复验 MARKER-5-4u5z76"
+    }
+  ],
+  "message_content_types": [
+    "string"
+  ],
+  "reply_content_len": 123
+}

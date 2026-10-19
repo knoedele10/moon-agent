@@ -1,0 +1,48 @@
+== Day 22 验收：PATCH / DELETE 闭环 @ 2026-10-10T14:24:37.562Z ==
+Base = http://127.0.0.1:8123
+
+[PASS] 服务探活 GET /api/health  期望=200 实际=200
+
+-- 第 1 步：POST 造一条待改待删的数据 --
+[PASS] 创建测试数据 POST /api/favorites  期望=201 实际=201
+  新记录 id=7  title="Day 22 验收：待改待删的一条 277571"  url="https://example.com/before"
+
+-- 第 2 步：改之前（GET 读出原始值）--
+[PASS] 改之前：GET 能读到该条  期望=id=7 实际=id=7
+  改之前：title="Day 22 验收：待改待删的一条 277571"  url="https://example.com/before"
+
+-- 第 3 步：PATCH 改一条数据 --
+[PASS] PATCH 成功返回 200  期望=200 实际=200
+  PATCH 请求体：{"title":"Day 22 验收：已改成新标题 277571","url":"https://example.com/after"}
+  PATCH 响应体：{"ok":true,"before":{"title":"Day 22 验收：待改待删的一条 277571","url":"https://example.com/before"},"data":{"id":7,"title":"Day 22 验收：已改成新标题 277571","url":"https://example.com/after","user_id":null,"created_at":"2026-10-10T14:24:37.574Z","updated_at":"2026-10-10T14:24:37.578Z"}}
+[PASS] PATCH 响应带 before 原值  期望=Day 22 验收：待改待删的一条 277571 实际=Day 22 验收：待改待删的一条 277571
+
+-- 第 4 步：改之后（GET 回读，确认新值已生效）--
+[PASS] 改之后：title 变成新值  期望=Day 22 验收：已改成新标题 277571 实际=Day 22 验收：已改成新标题 277571
+[PASS] 改之后：url 变成新值  期望=https://example.com/after 实际=https://example.com/after
+  改之后：title="Day 22 验收：已改成新标题 277571"  url="https://example.com/after"
+
+-- 第 5 步：PATCH 的坏输入都要被挡住 --
+[PASS] PATCH 空请求体被拒  期望=400 实际=400
+[PASS] PATCH 改成与别的记录重名被拒  期望=409 实际=409
+[PASS] PATCH 不存在的 id 返回 404  期望=404 实际=404
+[PASS] PATCH 非法 JSON 被拒  期望=400 实际=400
+
+-- 第 6 步：DELETE 删一条数据 --
+  删除前：GET 返回 7 条，含 id=7
+[PASS] DELETE 成功返回 200  期望=200 实际=200
+  DELETE 响应体：{"ok":true,"id":7,"deleted":true,"soft":true,"deleted_at":"2026-10-10T14:24:37.588Z"}
+[PASS] 删除后：该条不再返回  期望=该条消失 实际=已消失
+[PASS] 删除后：条数比删除前少 1  期望=6 实际=6
+  删除后：GET 返回 6 条，id=7 已不在列表中
+[PASS] 重复 DELETE 返回 404  期望=404 实际=404
+
+-- 第 7 步：软删除证据（数据没真删，还在文件里）--
+[PASS] 软删除：记录仍在数据文件中  期望=is_deleted=true 实际=is_deleted=true
+  文件里该条：{"id":7,"title":"Day 22 验收：已改成新标题 277571","url":"https://example.com/after","user_id":null,"created_at":"2026-10-10T14:24:37.574Z","updated_at":"2026-10-10T14:24:37.578Z","is_deleted":true,"deleted_at":"2026-10-10T14:24:37.588Z"}
+
+-- 第 8 步：跨域预检放行 PATCH / DELETE --
+[PASS] OPTIONS 预检返回 204  期望=204 实际=204
+[PASS] 预检响应允许 PATCH 与 DELETE  期望=含 PATCH,DELETE 实际=GET,POST,PATCH,DELETE,OPTIONS
+
+== 汇总：PASS 18 / FAIL 0 ==
