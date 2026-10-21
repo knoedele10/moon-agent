@@ -781,6 +781,66 @@ textarea:focus-visible,
   gap: 6px;
 }
 
+.public-access-control {
+  position: relative;
+  flex: none;
+}
+
+.public-access-control[hidden],
+.public-access-panel[hidden],
+.public-access-stop[hidden] {
+  display: none;
+}
+
+.public-access-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(360px, calc(100vw - 28px));
+  padding: 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 22%);
+}
+
+.public-access-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.public-access-status {
+  margin: 8px 0 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.public-access-status[data-state="error"] {
+  color: var(--danger, #c43d3d);
+}
+
+.public-access-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.public-access-link-row .input {
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+}
+
+.public-access-stop {
+  width: 100%;
+  margin-top: 10px;
+  color: var(--danger, #c43d3d);
+}
+
 .model-wrap {
   display: flex;
   flex: none;
@@ -5950,3 +6010,12 @@ dialog::backdrop { background: var(--overlay); backdrop-filter: blur(5px); }
 }
 
 
+.evolution-panel {
+  margin-block: 0 24px;
+  padding: 16px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 12px;
+}
+.evolution-panel summary { cursor: pointer; font-weight: 600; }
+.evolution-panel p, .evolution-panel li { line-height: 1.65; overflow-wrap: anywhere; }
+.evolution-panel ul { padding-inline-start: 22px; margin-bottom: 0; }

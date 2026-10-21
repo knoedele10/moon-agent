@@ -73,3 +73,5 @@ Interface 是 `agent.Run` / `Config` / `Event`。Eino 和 legacy 是两个 Adapt
 迁移前源码备份在 `build/refactor/snapshots/2026-10-19-before-layout.zip`，迁移清单在 `build/refactor/layout-moves.json`。该备份不包含 `.env`、用户数据库、缓存和运行数据；只用于本轮代码对照，不是完整数据备份。恢复需按清单逐项比较，不能直接覆盖后续工作。
 
 当前布局决策见 [ADR-0001](adr/0001-application-layout.md)。
+
+2026-10-21 增补：工具发现、权限装配和经验学习统一流程见 [ADR-0002](adr/0002-agent-capability-assembly.md)。主会话、子会话和确认重放共用 `internal/web/hermes_runtime.go`；机制实现分别放在 `internal/agent/toolsys`、`evolve`、`mcps`，不再从 HTTP handler 直接维护另一套工具权限。

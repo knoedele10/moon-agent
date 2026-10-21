@@ -128,6 +128,18 @@
                             <option value="">加载模型…</option>
                         </select>
                     </div>
+                    <div class="public-access-control" id="public-access-control" hidden>
+                        <button type="button" class="btn btn-ghost" id="public-access-toggle" aria-expanded="false" aria-controls="public-access-panel">公网访问</button>
+                        <section class="public-access-panel" id="public-access-panel" hidden aria-label="公网访问">
+                            <p class="public-access-title">分享此桌面应用</p>
+                            <p class="public-access-status" id="public-access-status" role="status">启动后会生成临时链接，应用关闭时自动断开。</p>
+                            <div class="public-access-link-row">
+                                <input class="input" id="public-access-url" type="text" readonly aria-label="公网访问链接" placeholder="尚未启动">
+                                <button type="button" class="btn btn-primary" id="public-access-copy" disabled>复制</button>
+                            </div>
+                            <button type="button" class="btn btn-ghost public-access-stop" id="public-access-stop" hidden>停止公网访问</button>
+                        </section>
+                    </div>
                     <!-- 深浅主题开关：两枚图标叠着放，由 [data-theme] 决定显示哪一枚，JS 不用换图标。 -->
                     <button type="button" class="icon-btn theme-toggle" id="theme-toggle" title="切换深浅主题" aria-label="切换深浅主题">
                         <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
@@ -317,6 +329,19 @@
                         <button type="button" class="btn btn-outline" id="skill-import-open" aria-haspopup="dialog" aria-controls="skill-import-dialog">从文件夹导入</button>
                         <button type="button" class="btn" id="skill-new-open" aria-haspopup="dialog" aria-controls="skill-dialog">新建技能</button>
                     </div>
+
+                    <details class="evolution-panel" id="evolution-panel">
+	                    <summary>学习记录与工具能力</summary>
+                        <p id="evolution-status" role="status" aria-live="polite">展开后查看助手积累的经验。</p>
+                        <p id="evolution-tools"></p>
+                        <div class="skill-toolbar">
+                            <button type="button" class="btn btn-outline" id="evolution-refresh">刷新记录</button>
+                            <button type="button" class="btn btn-outline" id="evolution-review">分析最近任务</button>
+                            <button type="button" class="btn btn-outline" id="evolution-apply" hidden>采用学习建议</button>
+                            <button type="button" class="btn btn-ghost" id="evolution-rollback" hidden>撤销最近一次自动学习</button>
+                        </div>
+                        <ul id="evolution-report"></ul>
+                    </details>
 
                     <div class="list-panel" id="skill-list">
                         <div class="list-hint">加载中…</div>
@@ -601,6 +626,7 @@
     <script src="/static/js/cua.js"></script>
     <!-- 技能视图与自动技能提示。和 kb.js / cua.js 一样先于 chat.js 加载，showView 里才拿得到 window.SKILLS。 -->
     <script src="/static/js/skills.js"></script>
+    <script src="/static/js/evolution.js"></script>
     <script src="/static/js/assistants.js"></script>
     <script src="/static/js/proactive.js"></script>
     <script src="/static/js/prompts.js"></script>
@@ -614,6 +640,7 @@
     <script src="/static/js/chipselect.js"></script>
     <script src="/static/js/kind.js"></script>
     <script src="/static/js/taskcard.js"></script>
+    <script src="/static/js/public-access.js"></script>
     <script src="/static/js/theme.js"></script>
     <script src="/static/js/chat.js"></script>
     <!-- 助手 / 提示词两个视图的懒加载钩子。

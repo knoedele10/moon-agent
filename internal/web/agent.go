@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"blog-my/internal/agent"
+	"blog-my/internal/agent/evolve"
 	"blog-my/internal/llm"
 	"blog-my/internal/model"
 
@@ -128,6 +129,41 @@ func agentFSRootFor(userID string) string {
 	return ""
 }
 
+// ownerUserID 返回本机主账号（最早创建的那个）的 id；没有账号或库不可用时返回空。
+//
+// 注意：User.Id 是随机 UUID，不能按 id 排序，必须按 created_at。
+func ownerUserID() string {
+	if model.DB == nil {
+		return ""
+	}
+	var u model.User
+	if err := model.DB.Select("id").Order("created_at asc, id asc").First(&u).Error; err != nil {
+		return ""
+	}
+	return u.Id
+}
+
+// isOwnerUser 判断该用户是不是本机主账号。
+//
+// 非主账号（例如开放注册期间自助建的号）不继承 AGENT_FS_ROOT 的全局工作区回退，
+// 也不放行工作区外的绝对路径：桌面端的「本机文件能力」属于本机主人，不属于任何
+// 能连上 127.0.0.1 的人（审计 P1-3：隧道 × 开放注册 × 全局工作区）。
+func isOwnerUser(userID string) bool {
+	if userID == "" {
+		return false
+	}
+	// 没有数据库、或库里一个账号都没有：这不是多用户场景（测试/首启），
+	// 按单机主人处理——此时也根本没有人能登录进来。
+	if model.DB == nil {
+		return true
+	}
+	owner := ownerUserID()
+	if owner == "" {
+		return true
+	}
+	return userID == owner
+}
+
 // agentFSRootsFor 读取用户的多个活动工作区；旧记录与环境变量仍回落为单目录。
 func agentFSRootsFor(userID string) []string {
 	if model.DB != nil && userID != "" {
@@ -144,7 +180,7 @@ func agentFSRootsFor(userID string) []string {
 			}
 		}
 	}
-	if root := agentFSRoot(); root != "" {
+	if root := agentFSRoot(); root != "" && isOwnerUser(userID) {
 		return []string{root}
 	}
 	return nil
@@ -407,6 +443,14 @@ func runAgentChat(in turnInput) {
 	// 用户这条消息是不是对上一次“确认请求”的肯定答复？只有这种情况才放行风险工具。
 	confirmed := isAffirmative(content) && lastAssistantWasConfirmRequest(historyLike(history))
 
+	// 自我进化装配：AGENT_EVOLVE 未配置时 evo 为 nil，下面每一步都要判空。
+	evo := newHermesEvolve(userID)
+	evo.BeginRun(evolve.RunMeta{
+		SessionID: strconv.FormatUint(uint64(conv.Id), 10), ConversationID: strconv.FormatUint(uint64(conv.Id), 10),
+		UserID: userID, Model: modelID, Engine: agentEngineName(), Mode: mode, StartedAt: time.Now(),
+	})
+	defer evo.Finish("interrupted", "运行在执行器完成前结束")
+
 	// 待确认调用的两种归宿（详见 web/agent_pending.go）：
 	//   - 用户确认了 → 直接执行上次被拦下的那次调用，不等模型重发；
 	//   - 用户拒绝了 → 把它丢掉，否则下次一句“好的”会把旧操作又翻出来。
@@ -414,7 +458,7 @@ func runAgentChat(in turnInput) {
 	var pendingEntry *agentTraceEntry
 	if confirmed {
 		if p := takePendingTool(conv.Id); p != nil {
-			pendingMsgs, pendingEntry = runPendingTool(ctx, userID, root, mode, p, sendEvent, roots[1:]...)
+			pendingMsgs, pendingEntry = runPendingToolWithEvolution(ctx, userID, root, mode, p, sendEvent, evo, additionalWorkspaceRoots(roots)...)
 		}
 	} else if isRejection(content) && lastAssistantWasConfirmRequest(historyLike(history)) {
 		clearPendingTool(conv.Id)
@@ -459,6 +503,8 @@ func runAgentChat(in turnInput) {
 	// 画像每轮都带上（短且稳定）；零散记忆再按相关度补充。
 	systemPrompt += kbProfileBlock(userID)
 	systemPrompt += skillBlock
+	// 结构化记忆 + 自进化须知：AGENT_EVOLVE 未启用时 PromptBlock 返回空串。
+	systemPrompt += evo.PromptBlock()
 	// 会话模式的说明放在靠后位置（离对话最近），并**先于**画像注入，
 	// 这样它能盖住前面那套「你可以调用工具做事」的通用描述。
 	systemPrompt += profileFor(kind).Prompt
@@ -494,6 +540,20 @@ func runAgentChat(in turnInput) {
 	// 这两个值决定「还能不能再派活」与「容量按谁统计」，必须按会话真实身份算，不能写死 0。
 	depth, rootSessionID := conversationDelegation(conv)
 
+	// 工具集：先按会话模式/执行档位构建全量工具，再按 AGENT_TOOLSETS 选择。
+	// 没配置 AGENT_TOOLSETS 时 keep 为空，filterToolsByToolsets 原样返回——行为不变。
+	tools := bindSubagentContext(
+		buildAgentTools(agentToolPolicy{
+			UserID: userID, AssistantID: in.assistantID, Root: root, Roots: additionalWorkspaceRoots(roots), Kind: kind, Mode: mode,
+			Confirmed: confirmed, Depth: depth,
+		}),
+		conv, history, modelID, kind, root, rootSessionID, additionalWorkspaceRoots(roots)...)
+	// MCP 工具（AGENT_MCP_CONFIG / AGENT_MCP_JSON）：没配置时返回 nil，行为不变。
+	// 放在工具集过滤之前：外部工具也受 AGENT_TOOLSETS 约束，且能享受落盘包装。
+	tools, toolSource := assembleRuntimeTools(tools, agentToolPolicy{
+		UserID: userID, Kind: kind, Mode: mode, Confirmed: confirmed,
+	}, evo)
+
 	cfg := agent.Config{
 		Model:               modelID,
 		APIKey:              key,
@@ -505,12 +565,8 @@ func runAgentChat(in turnInput) {
 		LimitRecoveryRounds: agentLimitRecoveryRounds(mode),
 		// 按会话模式过滤工具：陪伴模式不给文件/网页/SQL，代码模式不给联网/Office。
 		// 工作模式（白名单为 nil）原样返回，行为与改造前一致。
-		Tools: bindSubagentContext(
-			buildAgentTools(agentToolPolicy{
-				UserID: userID, AssistantID: in.assistantID, Root: root, Roots: additionalWorkspaceRoots(roots), Kind: kind, Mode: mode,
-				Confirmed: confirmed, Depth: depth,
-			}),
-			conv, history, modelID, kind, root, rootSessionID, additionalWorkspaceRoots(roots)...),
+		Tools:      tools,
+		ToolSource: toolSource,
 		Exec: &agent.Exec{
 			// 技能目录对模型只读：read/list 能看，写类工具一律不认它。
 			ReadRoot:  agentSkillsDir(),
@@ -519,8 +575,17 @@ func runAgentChat(in turnInput) {
 			Roots:     additionalWorkspaceRoots(roots),
 			// 工作区是**首选**目录而不是硬沙箱：工作区外的绝对路径允许操作，
 			// 写类工具在非 auto 档会先经 outsideWorkspaceTool 问过用户。
-			AllowOutside: true,
+			// 仅主账号享有：非主账号被限制在自己的工作区内。
+			AllowOutside: isOwnerUser(userID),
 		},
+	}
+	// 只读工具并发（AGENT_TOOL_PARALLEL=read）：白名单由 web 层给出，agent 包不认识具体工具，
+	// 只看名字——这样 run_command / office_edit / skill_run 这类「看起来能读」的调用不会被误并发。
+	// 只在传统循环生效；Eino ReAct 的执行器保持串行（见 docs/agent/11-hermes-parity.md §5）。
+	if parallelMode() == "read" {
+		cfg.Parallel = true
+		cfg.ParallelMax = agentIntEnv("AGENT_TOOL_PARALLEL_MAX")
+		cfg.ParallelTools = readOnlyToolNames()
 	}
 	if agentUsesEino() {
 		cm, err := registry.NewToolCallingModel(ctx, modelID, key, llm.ChatRequest{
@@ -553,6 +618,8 @@ func runAgentChat(in turnInput) {
 			if ev.ToolCall == nil {
 				return
 			}
+			// 轨迹：记下开始时间，结果事件里算耗时。
+			evo.ObserveToolCall(ev.ToolCall.ID, ev.ToolCall.Name, ev.ToolCall.Arguments)
 			// 记下这次调用：如果它是风险工具且本轮未获确认，紧接着的 need_input
 			// 就是确认壳拦下的，届时把参数落库（用户确认后直接执行）。
 			if riskyTool(ev.ToolCall.Name) && !confirmed {
@@ -566,6 +633,9 @@ func runAgentChat(in turnInput) {
 			})
 
 		case agent.EvToolResult:
+			if !ev.AwaitUser {
+				evo.ObserveToolResult(ev.ToolID, ev.ToolName, ev.OK, !ev.OK, ev.Summary)
+			}
 			trace = append(trace, agentTraceEntry{
 				Name:    ev.ToolName,
 				OK:      ev.OK,
@@ -635,6 +705,19 @@ func runAgentChat(in turnInput) {
 		runHistory = append(append([]llm.Message{}, cr.History...), pendingMsgs...)
 	}
 	runErr := agent.Run(ctx, cfg, runHistory, emit)
+
+	// 轨迹收尾：把这一轮的结局与原因写进去，供以后评测/提炼。
+	if evo.Enabled() {
+		outcome, note := trajectoryOutcome(runErr, needInput, sawDone)
+		evo.Finish(outcome, note)
+		names := make([]string, 0, len(pickedSkills))
+		for _, picked := range pickedSkills {
+			names = append(names, picked.Name)
+		}
+		evo.RecordSelectedSkills(names, outcome)
+		// suggest 产出建议；auto 按有据可查的成功轨迹固化技能。
+		evo.CurateAsync(runtimeMayLearn(agentToolPolicy{Kind: kind, Mode: mode}))
+	}
 
 	// 落库：轨迹先于回复（时间顺序上工具确实先跑）。
 	if len(trace) > 0 {

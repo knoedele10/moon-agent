@@ -31,6 +31,18 @@ type Tool interface {
 	Execute(ctx context.Context, args json.RawMessage, ex *Exec) (Result, error)
 }
 
+// ToolSource 是循环读取「本轮该暴露哪些工具」、并按名解析工具的来源。
+//
+// Registry 是它的静态实现；动态目录（例如 toolsys.Catalog：模型自己用 tool_search
+// 激活新工具）也实现它，循环因此不必知道工具是从哪来的。Defs 必须稳定排序，
+// 否则每轮提示词都会变，提示词缓存全废。
+type ToolSource interface {
+	// Defs 返回本轮交给模型的工具定义清单。
+	Defs() []llm.ToolDef
+	// Lookup 按名字取工具；运行中新增的工具也要能查到。
+	Lookup(name string) (Tool, bool)
+}
+
 // Result 是一次工具执行的结果。
 type Result struct {
 	// Content 是给模型看的正文（工具结果的文本）。失败时这里是给模型看的错误说明。
@@ -163,6 +175,34 @@ func (r *Registry) Defs() []llm.ToolDef {
 		})
 	}
 	return out
+}
+
+// toolSourceOf 选出这次运行的工具来源：显式配置优先，否则用静态注册表。
+func toolSourceOf(cfg Config, reg *Registry) ToolSource {
+	if cfg.ToolSource != nil {
+		return cfg.ToolSource
+	}
+	return reg
+}
+
+// availableToolNames 用于错误文案里给出「可用工具」清单。
+//
+// 这里走 Defs 而不是 Registry.Names：动态目录里没激活的工具不该被算成「可用」，
+// 否则模型会以为随时能调，反而增加无效调用。
+func availableToolNames(src ToolSource) string {
+	if src == nil {
+		return "（当前没有可用工具）"
+	}
+	defs := src.Defs()
+	if len(defs) == 0 {
+		return "（当前没有可用工具）"
+	}
+	names := make([]string, 0, len(defs))
+	for _, d := range defs {
+		names = append(names, d.Name)
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
 }
 
 // sortedNames 用于错误文案里给出「可用工具」清单。

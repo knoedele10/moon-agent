@@ -866,7 +866,7 @@ func cuaCreateRun(c *gin.Context) {
 // cuaRunEvents SSE（契约 2.3）：首个 start、CUA 的 kind 原样透传、最后 exit。
 func cuaRunEvents(c *gin.Context) {
 	run := cuaMgr.find(c.Param("id"))
-	if run == nil {
+	if run == nil || run.UserID != currentUserID(c) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "run 不存在"})
 		return
 	}
@@ -925,7 +925,7 @@ func cuaRunEvents(c *gin.Context) {
 // cuaStopRun 停止该 run（杀进程树，契约 2.4）。
 func cuaStopRun(c *gin.Context) {
 	run := cuaMgr.find(c.Param("id"))
-	if run == nil {
+	if run == nil || run.UserID != currentUserID(c) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "run 不存在"})
 		return
 	}
@@ -939,9 +939,14 @@ func cuaStopRun(c *gin.Context) {
 
 // cuaListRuns 历史（内存最近 50 条，契约 2.5），新的在前。
 func cuaListRuns(c *gin.Context) {
+	owner := currentUserID(c)
 	runs := cuaMgr.list()
 	items := make([]cuaRunItem, 0, len(runs))
 	for _, r := range runs {
+		// 只回当前用户自己的 run：run.Task 是自由文本，跨用户可见即等于泄漏。
+		if r.UserID != owner {
+			continue
+		}
 		items = append(items, r.item())
 	}
 	c.JSON(http.StatusOK, gin.H{"runs": items})

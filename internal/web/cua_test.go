@@ -39,14 +39,29 @@ func cuaTestSetup() {
 
 func cuaTestRouter() *gin.Engine {
 	r := gin.New()
+	// 测试里没有真实会话中间件：用 X-Test-User 头顶替登录态，
+	// 让「只返回当前用户自己的 run」这类归属校验能被真实覆盖。
+	r.Use(func(c *gin.Context) {
+		if u := c.GetHeader("X-Test-User"); u != "" {
+			c.Set(ctxUserIDKey, u)
+		}
+		c.Next()
+	})
 	r.GET("/api/cua/status", cuaStatus)
 	r.GET("/api/cua/runs", cuaListRuns)
 	r.POST("/api/cua/runs", cuaCreateRun)
+	r.GET("/api/cua/runs/:id/events", cuaRunEvents)
+	r.POST("/api/cua/runs/:id/stop", cuaStopRun)
 	r.POST("/internal/cua/llm/v1/chat/completions", cuaLLMProxy)
 	return r
 }
 
 func cuaDo(r *gin.Engine, method, path, body, auth string) *httptest.ResponseRecorder {
+	return cuaDoAs(r, method, path, body, auth, "")
+}
+
+// cuaDoAs 以指定用户身份发请求；user 为空表示未登录（currentUserID 返回 ""）。
+func cuaDoAs(r *gin.Engine, method, path, body, auth, user string) *httptest.ResponseRecorder {
 	var req *http.Request
 	if body == "" {
 		req = httptest.NewRequest(method, path, nil)
@@ -56,6 +71,9 @@ func cuaDo(r *gin.Engine, method, path, body, auth string) *httptest.ResponseRec
 	}
 	if auth != "" {
 		req.Header.Set("Authorization", auth)
+	}
+	if user != "" {
+		req.Header.Set("X-Test-User", user)
 	}
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -237,7 +255,8 @@ func TestCuaCreateRunBoundaries(t *testing.T) {
 	}
 
 	// 409：先占住唯一运行位。
-	busy := newCUARun(cuaNewID(), "u1", "占位", "deepseek-flash", cuaNewID(), true)
+	// 该测试路由没有会话，占用位用匿名用户（UserID ""）建，与 HTTP 建出来的 run 同口径。
+	busy := newCUARun(cuaNewID(), "", "占位", "deepseek-flash", cuaNewID(), true)
 	if !cuaMgr.reserve(busy) {
 		t.Fatal("占位 run 抢占失败")
 	}
@@ -262,6 +281,57 @@ func TestCuaCreateRunBoundaries(t *testing.T) {
 	}
 	if list.Runs[0].Status != "running" || list.Runs[0].RunID != busy.ID {
 		t.Errorf("列表项不对：%+v", list.Runs[0])
+	}
+}
+
+// 归属隔离（P1 回归）：列表只回当前用户自己的 run；
+// 别人的 run 在事件流与停止接口上一律 404，且不能泄漏任务文本。
+func TestCuaRunIsolation(t *testing.T) {
+	cuaTestSetup()
+	r := cuaTestRouter()
+
+	alice := newCUARun(cuaNewID(), "alice", "看我的屏幕", "deepseek-flash", cuaNewID(), true)
+	if !cuaMgr.reserve(alice) {
+		t.Fatal("alice 的 run 抢占失败")
+	}
+	alice.finish("done", "", 0)
+	cuaMgr.clearCurrent(alice)
+
+	bob := newCUARun(cuaNewID(), "bob", "别人的任务", "deepseek-flash", cuaNewID(), true)
+	if !cuaMgr.reserve(bob) {
+		t.Fatal("bob 的 run 抢占失败")
+	}
+	bob.finish("done", "", 0)
+	cuaMgr.clearCurrent(bob)
+
+	// 列表：alice 只看到自己那条，且响应体里没有 bob 的任务文本。
+	lw := cuaDoAs(r, http.MethodGet, "/api/cua/runs", "", "", "alice")
+	if lw.Code != http.StatusOK {
+		t.Fatalf("列表状态码 = %d", lw.Code)
+	}
+	var list struct {
+		Runs []cuaRunItem `json:"runs"`
+	}
+	if err := json.Unmarshal(lw.Body.Bytes(), &list); err != nil {
+		t.Fatalf("列表解析失败：%v", err)
+	}
+	if len(list.Runs) != 1 || list.Runs[0].RunID != alice.ID {
+		t.Fatalf("alice 只该看到自己的 run，实际 %s", lw.Body.String())
+	}
+	if strings.Contains(lw.Body.String(), "别人的任务") {
+		t.Fatal("列表泄漏了他人任务文本")
+	}
+
+	// 越权：事件流与停止都必须 404，不能给出"存在但无权"的差异信号。
+	if code := cuaDoAs(r, http.MethodGet, "/api/cua/runs/"+alice.ID+"/events", "", "", "bob").Code; code != http.StatusNotFound {
+		t.Errorf("bob 读 alice 事件流应 404，实际 %d", code)
+	}
+	if code := cuaDoAs(r, http.MethodPost, "/api/cua/runs/"+alice.ID+"/stop", "", "", "bob").Code; code != http.StatusNotFound {
+		t.Errorf("bob 停 alice 任务应 404，实际 %d", code)
+	}
+	// 本人：已结束的 run 走历史补发，仍应 200。
+	if code := cuaDoAs(r, http.MethodGet, "/api/cua/runs/"+alice.ID+"/events", "", "", "alice").Code; code != http.StatusOK {
+		t.Errorf("alice 读自己的事件流应 200，实际 %d", code)
 	}
 }
 

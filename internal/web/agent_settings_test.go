@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"blog-my/internal/model"
 )
 
 // 工作区是用户能直接改的东西，校验必须挡住三类会出事的值：
@@ -49,15 +51,25 @@ func TestValidateWorkspaceAcceptsAndCreatesDir(t *testing.T) {
 	}
 }
 
-// 没设过工作区时必须回落到环境变量（DB 未初始化时代码路径更短，正好单测）。
+// 没设过工作区时按「本机主人」回落环境变量；非主账号/未登录不回落。
+//
+// 这条策略来自审计 P1-3：AGENT_FS_ROOT 是本机全局目录，不能因为
+// 任何人都能连上 127.0.0.1 就分发给每一个账号。
 func TestAgentFSRootForFallsBackToEnv(t *testing.T) {
+	oldDB := model.DB
+	model.DB = nil // 固定成「没有账号」的单机场景，避免受同包其它用例影响
+	t.Cleanup(func() { model.DB = oldDB })
+
 	t.Setenv("AGENT_FS_ROOT", `D:\fallback-workspace`)
-	if got := agentFSRootFor(""); got != `D:\fallback-workspace` {
-		t.Fatalf("应当回落到 AGENT_FS_ROOT: %q", got)
+	if got := agentFSRootFor("u1"); got != `D:\fallback-workspace` {
+		t.Fatalf("主账号应当回落到 AGENT_FS_ROOT: %q", got)
+	}
+	if got := agentFSRootFor(""); got != "" {
+		t.Fatalf("未登录不该拿到回落工作区: %q", got)
 	}
 
 	t.Setenv("AGENT_FS_ROOT", "  ")
-	if got := agentFSRootFor(""); got != "" {
+	if got := agentFSRootFor("u1"); got != "" {
 		t.Fatalf("环境变量为空时应返回空串: %q", got)
 	}
 }

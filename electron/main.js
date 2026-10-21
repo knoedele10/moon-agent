@@ -5,7 +5,7 @@
 //   projectRoot 打包态 = process.resourcesPath（extraResources 放的 bin/ 与 templates/），
 //   开发态 = 仓库根。配置来源优先 userData/.env（安装态绝不依赖仓库 .env），缺失则生成
 //   带注释的模板并继续启动；解析出的键值以环境变量传给 Go 子进程。
-const { app, BrowserWindow, shell, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, dialog, ipcMain, clipboard } = require('electron');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -53,6 +53,126 @@ let serverProc = null;
 let mainWindow = null;
 let serverUrl = null;
 let quitting = false;
+let publicTunnelProc = null;
+let publicTunnelUrl = '';
+let publicTunnelStatus = 'stopped';
+let publicTunnelError = '';
+let publicTunnelStartPromise = null;
+
+function publicAccessState() {
+  return { status: publicTunnelStatus, url: publicTunnelUrl, error: publicTunnelError };
+}
+
+function publishPublicAccessState() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('public-access:state', publicAccessState());
+  }
+}
+
+function stopPublicAccess() {
+  if (publicTunnelProc) {
+    const proc = publicTunnelProc;
+    publicTunnelProc = null;
+    try { proc.kill(); } catch (_) { /* process may already have exited */ }
+  }
+  publicTunnelUrl = '';
+  publicTunnelStatus = 'stopped';
+  publicTunnelError = '';
+  publishPublicAccessState();
+}
+
+function startPublicAccess() {
+  if (publicTunnelStatus === 'connected' && publicTunnelUrl) return Promise.resolve(publicAccessState());
+  if (publicTunnelStartPromise) return publicTunnelStartPromise;
+  if (!serverUrl) return Promise.reject(new Error('本地服务还没有启动'));
+
+  let localPort;
+  try {
+    const local = new URL(serverUrl);
+    if (!['127.0.0.1', 'localhost'].includes(local.hostname)) {
+      return Promise.reject(new Error('本地服务地址无效'));
+    }
+    localPort = local.port;
+  } catch (_) {
+    return Promise.reject(new Error('无法读取本地服务端口'));
+  }
+  if (!localPort) return Promise.reject(new Error('无法读取本地服务端口'));
+
+  publicTunnelStatus = 'connecting';
+  publicTunnelUrl = '';
+  publicTunnelError = '';
+  publishPublicAccessState();
+
+  publicTunnelStartPromise = new Promise((resolve, reject) => {
+    let settled = false;
+    let output = '';
+    let lineBuffer = '';
+    let timer;
+    let proc;
+    const fail = (message) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      publicTunnelProc = null;
+      publicTunnelStatus = 'error';
+      publicTunnelError = message;
+      publishPublicAccessState();
+      reject(new Error(message));
+    };
+    const readOutput = (chunk) => {
+      output += chunk.toString();
+      lineBuffer += chunk.toString();
+      const lines = lineBuffer.split(/\r?\n/);
+      lineBuffer = lines.pop() || '';
+      for (const line of lines) {
+        const match = line.match(/tunneled with .*?(https:\/\/[^\s]+)/i);
+        if (!match || settled) continue;
+        settled = true;
+        clearTimeout(timer);
+        publicTunnelUrl = match[1].replace(/[),.]+$/, '');
+        publicTunnelStatus = 'connected';
+        publicTunnelError = '';
+        publishPublicAccessState();
+        resolve(publicAccessState());
+      }
+    };
+
+    try {
+      proc = spawn('ssh', [
+        '-T',
+        '-o', 'StrictHostKeyChecking=accept-new',
+        '-o', 'BatchMode=yes',
+        '-o', 'ServerAliveInterval=60',
+        '-o', 'ServerAliveCountMax=3',
+        '-o', 'ExitOnForwardFailure=yes',
+        '-R', `80:127.0.0.1:${localPort}`,
+        'nokey@localhost.run',
+      ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    } catch (err) {
+      fail(`启动 SSH 失败：${err.message}`);
+      return;
+    }
+    publicTunnelProc = proc;
+    proc.stdout.on('data', readOutput);
+    proc.stderr.on('data', readOutput);
+    proc.on('error', (err) => fail(`找不到系统 SSH（OpenSSH）：${err.message}`));
+    proc.on('exit', (code) => {
+      if (publicTunnelProc === proc) publicTunnelProc = null;
+      if (!settled) {
+        const detail = output.trim().split(/\r?\n/).filter(Boolean).slice(-1)[0];
+        fail(detail || `公网隧道启动失败（退出码 ${code}）`);
+      } else if (publicTunnelStatus === 'connected') {
+        publicTunnelUrl = '';
+        publicTunnelStatus = 'error';
+        publicTunnelError = `公网隧道已断开（退出码 ${code}）`;
+        publishPublicAccessState();
+      }
+    });
+    timer = setTimeout(() => fail('连接公网隧道超时，请检查网络后重试'), 45000);
+  }).finally(() => { publicTunnelStartPromise = null; });
+
+  return publicTunnelStartPromise;
+}
 
 function startServer() {
   return new Promise((resolve, reject) => {
@@ -217,6 +337,18 @@ ipcMain.handle('pick-directory', async () => {
   return res.filePaths[0];
 });
 
+ipcMain.handle('public-access:get-state', () => publicAccessState());
+ipcMain.handle('public-access:start', () => startPublicAccess());
+ipcMain.handle('public-access:stop', () => {
+  stopPublicAccess();
+  return publicAccessState();
+});
+ipcMain.handle('public-access:copy', () => {
+  if (!publicTunnelUrl) return false;
+  clipboard.writeText(publicTunnelUrl);
+  return true;
+});
+
 // 单实例：避免双击两次启两个 Go 进程占用同一份 MySQL 连接。
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -249,7 +381,13 @@ if (!gotLock) {
 let quitFlushTimer = null;
 app.on('before-quit', () => {
   quitting = true;
+  stopPublicAccess();
   if (quitFlushTimer) return; // before-quit 可能触发多次
   quitFlushTimer = setTimeout(stopServer, 1500);
 });
-process.on('exit', stopServer);
+process.on('exit', () => {
+  if (publicTunnelProc) {
+    try { publicTunnelProc.kill(); } catch (_) { /* process may already have exited */ }
+  }
+  stopServer();
+});

@@ -22,6 +22,8 @@ func Setup(r *gin.Engine, reg *llm.Registry) {
 	// 单测里测试自己会装，所以"测试全绿但生产走不通"这种缺口单测抓不到
 	// （实际上就漏过一次，由 cua-ui 的真机端到端发现）。
 	agent.SetStreamer(agent.RegistryStreamer(reg))
+	// 配了但不生效的开关要在启动日志里说清楚（典型：eino 执行器下开只读并发）。
+	warnIfParallelIneffective()
 
 	// 只读 SQL 工具需要数据库句柄；取不到就保持未配置（工具会明确报错，而不是 panic）。
 	if model.DB != nil {
@@ -111,6 +113,14 @@ func Setup(r *gin.Engine, reg *llm.Registry) {
 		api.POST("/cua/runs/:id/stop", cuaStopRun)
 
 		api.GET("/keys", listKeys)
+		// 自我进化（对标 Hermes）：总览 / 技能账本 / 手动固化 / 工具目录。
+		// AGENT_EVOLVE 未启用时 read 接口如实返回 enabled=false，curate 返回 409。
+		api.GET("/agent/evolution", getEvolutionStatus)
+		api.GET("/agent/evolution/skills", getEvolutionSkills)
+		api.POST("/agent/evolution/curate", postEvolutionCurate)
+		api.GET("/agent/evolution/journal", getEvolutionJournal)
+		api.POST("/agent/evolution/rollback", postEvolutionRollback)
+		api.GET("/agent/tool-catalog", getToolCatalog)
 		// 自定义助手：一个助手 = 一套「人格 + 默认模型 + 档位 + 工作区」。
 		// 字段留空表示继承用户全局设置（见 model/assistant.go 的语义说明）。
 		api.GET("/assistants", listAssistants)

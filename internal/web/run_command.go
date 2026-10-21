@@ -150,10 +150,6 @@ func (runCommandTool) Execute(ctx context.Context, raw json.RawMessage, ex *agen
 	}, nil
 }
 
-func resolveCommandWorkingDir(root, cwd string) (string, error) {
-	return resolveCommandWorkingDirForRoots(root, nil, cwd)
-}
-
 func resolveCommandWorkingDirForRoots(root string, roots []string, cwd string) (string, error) {
 	if filepath.IsAbs(cwd) {
 		return "", fmt.Errorf("cwd 只能是工作区内的相对路径")

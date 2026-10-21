@@ -12,6 +12,7 @@ import (
 
 	"blog-my/internal/llm"
 
+	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/flow/agent/react"
@@ -22,6 +23,46 @@ var errEinoNeedsInput = errors.New("agent: 等待用户输入")
 
 const executionStatePrefix = "【本轮实际执行状态】"
 
+// disclosureEinoModel 在每次模型请求前绑定最新目录。ReAct 的工具节点仍负责
+// 已登记工具；搜索后新激活的工具通过 unknown 入口执行同一套权限与预算检查。
+// 不缓存带工具的模型实例，避免下一轮继续使用搜索前的 schema。
+type disclosureEinoModel struct {
+	inner  einomodel.ToolCallingChatModel
+	source ToolSource
+	bindMu *sync.Mutex
+}
+
+func (m *disclosureEinoModel) WithTools(_ []*schema.ToolInfo) (einomodel.ToolCallingChatModel, error) {
+	// 构图时拿到的是快照，必须留到真正请求模型时再读目录。
+	return &disclosureEinoModel{inner: m.inner, source: m.source, bindMu: m.bindMu}, nil
+}
+
+func (m *disclosureEinoModel) current() (einomodel.ToolCallingChatModel, error) {
+	m.bindMu.Lock()
+	defer m.bindMu.Unlock()
+	infos, err := llm.ToToolInfos(m.source.Defs())
+	if err != nil {
+		return nil, err
+	}
+	return m.inner.WithTools(infos)
+}
+
+func (m *disclosureEinoModel) Generate(ctx context.Context, input []*schema.Message, opts ...einomodel.Option) (*schema.Message, error) {
+	bound, err := m.current()
+	if err != nil {
+		return nil, err
+	}
+	return bound.Generate(ctx, input, opts...)
+}
+
+func (m *disclosureEinoModel) Stream(ctx context.Context, input []*schema.Message, opts ...einomodel.Option) (*schema.StreamReader[*schema.Message], error) {
+	bound, err := m.current()
+	if err != nil {
+		return nil, err
+	}
+	return bound.Stream(ctx, input, opts...)
+}
+
 // einoRunState holds the project's execution rules around Eino's ReAct graph.
 // Eino decides when to call the model or tools; the adapters retain the
 // existing permission, retry, event and completion contracts.
@@ -29,7 +70,7 @@ type einoRunState struct {
 	runToolState
 	mu     sync.Mutex
 	emit   func(Event)
-	reg    *Registry
+	source ToolSource
 	ex     *Exec
 	stream StreamFunc
 	cfg    Config
@@ -117,13 +158,14 @@ func (s *einoRunState) call(ctx context.Context, name, args string) (string, err
 		s.executed++
 	}
 
-	res := s.runToolState.execute(ctx, s.reg, call, s.ex, budgetErr)
+	res := s.runToolState.execute(ctx, s.source, call, s.ex, budgetErr)
 	if s.budget != nil && s.budget.rounds > 0 && budgetErr == nil {
 		s.budget.record(name, res)
 	}
 
 	s.send(Event{Kind: EvToolResult, ToolID: call.ID, ToolName: name, OK: !res.IsError,
-		Summary: summarize(name, res), Detail: res.Content, Display: res.Display})
+		AwaitUser: strings.TrimSpace(res.AwaitUser) != "",
+		Summary:   summarize(name, res), Detail: res.Content, Display: res.Display})
 	if res.Image != nil && len(res.Image.Data) > 0 {
 		s.images[call.ID] = res.Image
 	}
@@ -271,43 +313,55 @@ func runEino(ctx context.Context, cfg Config, history []llm.Message, emit func(E
 		ex = &Exec{}
 	}
 	reg := NewRegistry(cfg.Tools...)
-	infos, err := llm.ToToolInfos(reg.Defs())
-	if err != nil {
-		emitError(emit, err)
-		return err
-	}
+	source := toolSourceOf(cfg, reg)
 	budget := newRunBudget(cfg)
-	state := &einoRunState{emit: emit, reg: reg, ex: ex, stream: Streamer(), cfg: cfg, budget: budget,
+	state := &einoRunState{emit: emit, source: source, ex: ex, stream: Streamer(), cfg: cfg, budget: budget,
 		maxCalls: maxCalls, images: make(map[string]*ImagePart)}
-	adapters := make([]tool.BaseTool, 0, len(infos))
-	for _, info := range infos {
-		inner, _ := reg.Lookup(info.Name)
-		adapters = append(adapters, &einoToolAdapter{state: state, inner: inner, info: info})
+	chatModel := cfg.EinoModel
+	if cfg.ToolSource != nil {
+		chatModel = &disclosureEinoModel{inner: chatModel, source: source, bindMu: &sync.Mutex{}}
 	}
-	modelWrapper := &retryEinoModel{inner: cfg.EinoModel, limit: maxIter, calls: new(atomic.Int64)}
+	modelWrapper := &retryEinoModel{inner: chatModel, limit: maxIter, calls: new(atomic.Int64)}
 	if budget.rounds > 0 {
 		modelWrapper.limit = budget.maxIterations()
 		modelWrapper.budget = budget
 	}
-	reactAgent, err := react.NewAgent(ctx, &react.AgentConfig{
-		ToolCallingModel: modelWrapper,
-		ToolsConfig: compose.ToolsNodeConfig{
-			Tools: adapters, ExecuteSequentially: true, UnknownToolsHandler: state.unknown,
-		},
-		MaxStep:         modelWrapper.limit*2 + 2,
-		MessageRewriter: state.rewrite,
-		StreamToolCallChecker: func(ctx context.Context, reader *schema.StreamReader[*schema.Message]) (bool, error) {
-			return scanEinoOutput(state, ctx, reader)
-		},
-	})
-	if err != nil {
-		emitError(emit, err)
-		return err
+	// 每个 pass 重建工具节点；pass 内每一轮模型请求由 disclosureEinoModel
+	// 重新绑定目录，确保 tool_search 激活的定义立即在下一轮可见。
+	buildReactAgent := func() (*react.Agent, error) {
+		infos, infosErr := llm.ToToolInfos(source.Defs())
+		if infosErr != nil {
+			return nil, infosErr
+		}
+		adapters := make([]tool.BaseTool, 0, len(infos))
+		for _, info := range infos {
+			inner, ok := source.Lookup(info.Name)
+			if !ok {
+				continue
+			}
+			adapters = append(adapters, &einoToolAdapter{state: state, inner: inner, info: info})
+		}
+		return react.NewAgent(ctx, &react.AgentConfig{
+			ToolCallingModel: modelWrapper,
+			ToolsConfig: compose.ToolsNodeConfig{
+				Tools: adapters, ExecuteSequentially: true, UnknownToolsHandler: state.unknown,
+			},
+			MaxStep:         modelWrapper.limit*2 + 2,
+			MessageRewriter: state.rewrite,
+			StreamToolCallChecker: func(ctx context.Context, reader *schema.StreamReader[*schema.Message]) (bool, error) {
+				return scanEinoOutput(state, ctx, reader)
+			},
+		})
 	}
 	input := llm.ToSchemaMessages(withSystemPrompt(history, cfg.SystemPrompt))
 	var allText strings.Builder
 	for pass := 0; pass < 3; pass++ {
 		state.resetOutputPass()
+		reactAgent, err := buildReactAgent()
+		if err != nil {
+			emitError(emit, err)
+			return err
+		}
 		reader, err := reactAgent.Stream(ctx, input)
 		if err != nil {
 			if state.needInput != "" && errors.Is(err, errEinoNeedsInput) {

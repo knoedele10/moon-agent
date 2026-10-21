@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"blog-my/internal/agent"
+	"blog-my/internal/agent/evolve"
 	"blog-my/internal/llm"
 	"blog-my/internal/model"
 )
@@ -314,10 +315,12 @@ func (r *subagentRunner) executeChild(ctx context.Context, req agent.SubagentReq
 	var (
 		acc       strings.Builder
 		needInput string
+		sawDone   bool
 		activity  = "正在启动子 agent"
 		lastWrite time.Time
 		lastBytes int
 	)
+	evo := newHermesEvolve(userID)
 	persistProgress := func(nextActivity string, force bool) {
 		now := time.Now()
 		if !force && !lastWrite.IsZero() && now.Sub(lastWrite) < 700*time.Millisecond && acc.Len()-lastBytes < 256 {
@@ -344,15 +347,20 @@ func (r *subagentRunner) executeChild(ctx context.Context, req agent.SubagentReq
 			persistProgress("正在生成回复", false)
 		case agent.EvToolCall:
 			if ev.ToolCall != nil {
+				evo.ObserveToolCall(ev.ToolCall.ID, ev.ToolCall.Name, ev.ToolCall.Arguments)
 				persistProgress("正在调用工具："+ev.ToolCall.Name, true)
 			}
 		case agent.EvToolResult:
+			if !ev.AwaitUser {
+				evo.ObserveToolResult(ev.ToolID, ev.ToolName, ev.OK, !ev.OK, ev.Summary)
+			}
 			detail := strings.TrimSpace(ev.Summary)
 			if detail == "" {
 				detail = "已返回结果"
 			}
 			persistProgress(ev.ToolName+"："+detail, true)
 		case agent.EvDone:
+			sawDone = true
 			// 与 runAgentChat 同一套收集口径：done 只在没有增量文本时补一次，避免重复。
 			if ev.Content != "" && acc.Len() == 0 {
 				acc.WriteString(ev.Content)
@@ -372,14 +380,18 @@ func (r *subagentRunner) executeChild(ctx context.Context, req agent.SubagentReq
 	history = append(history, parentHistory...)
 	history = append(history, llm.Message{Role: llm.RoleUser, Content: req.Prompt})
 
+	tools, source := assembleRuntimeTools(subagentToolsFor(userID, req, depth), agentToolPolicy{
+		UserID: userID, Kind: req.Kind, Mode: req.Mode, Child: true,
+	}, evo)
 	cfg := agent.Config{
 		Model:               req.Model,
 		APIKey:              subagentAPIKey(userID, req.Model),
-		SystemPrompt:        subagentSystemPrompt(req),
+		SystemPrompt:        subagentSystemPrompt(req) + evo.PromptBlock(),
 		MaxIterations:       subagentMaxIterations(),
 		MaxToolCalls:        subagentMaxToolCalls(),
 		LimitRecoveryRounds: agentLimitRecoveryRounds(req.Mode),
-		Tools:               subagentToolsFor(userID, req, depth),
+		Tools:               tools,
+		ToolSource:          source,
 		Exec: &agent.Exec{
 			// SessionID 用**子会话 id**：agent/fs 的观察表按 SessionID 存，
 			// 复用父会话 id 会让父子的文件读写互相踩锁。
@@ -389,8 +401,11 @@ func (r *subagentRunner) executeChild(ctx context.Context, req agent.SubagentReq
 			ReadRoot:  agentSkillsDir(),
 			// auto 子 agent 与根 agent 使用相同的外部绝对路径策略；plan/confirm
 			// 下的写操作已由 subagentDenyTool 拒绝，不会因此绕过确认。
-			AllowOutside: subagentAllowOutside(req.Mode),
+			AllowOutside: isOwnerUser(userID) && subagentAllowOutside(req.Mode),
 		},
+	}
+	if parallelMode() == "read" {
+		cfg.Parallel, cfg.ParallelMax, cfg.ParallelTools = true, agentIntEnv("AGENT_TOOL_PARALLEL_MAX"), readOnlyToolNames()
 	}
 	if agentUsesEino() {
 		cm, modelErr := registry.NewToolCallingModel(ctx, req.Model, cfg.APIKey, llm.ChatRequest{})
@@ -399,7 +414,14 @@ func (r *subagentRunner) executeChild(ctx context.Context, req agent.SubagentReq
 		}
 		cfg.EinoModel = cm
 	}
+	evo.BeginRun(evolve.RunMeta{
+		SessionID: strconv.FormatUint(uint64(childID), 10), ConversationID: strconv.FormatUint(uint64(childID), 10),
+		UserID: userID, Model: req.Model, Engine: agentEngineName(), Mode: req.Mode, StartedAt: time.Now(),
+	})
 	runErr := agent.Run(ctx, cfg, history, emit)
+	outcome, note := trajectoryOutcome(runErr, needInput, sawDone)
+	evo.Finish(outcome, note)
+	evo.CurateAsync()
 
 	reply = strings.TrimSpace(acc.String())
 	if runErr != nil {

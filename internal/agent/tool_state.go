@@ -21,7 +21,7 @@ type runToolState struct {
 // execute applies execution safety and records successful mutations/verification.
 // A budget rejection still gets a result, preserving tool-call/result pairing.
 // Engine-specific budgets, events, images and user-input handling stay outside.
-func (s *runToolState) execute(ctx context.Context, reg *Registry, call llm.ToolCall, ex *Exec, budgetErr error) Result {
+func (s *runToolState) execute(ctx context.Context, source ToolSource, call llm.ToolCall, ex *Exec, budgetErr error) Result {
 	fp, se := toolFingerprint(call.Name, call.Arguments), toolSideEffect(call.Name)
 	var res Result
 	switch {
@@ -36,12 +36,12 @@ func (s *runToolState) execute(ctx context.Context, reg *Registry, call llm.Tool
 			Content: fmt.Sprintf("这次调用与之前一次「结果未知」的操作完全相同（%s），已拒绝重复执行。请先确认上一步是否生效，不要重试。", call.Name),
 			Display: map[string]any{"code": "UNCERTAIN_EFFECT_BLOCKED", "tool": call.Name}}
 	default:
-		res = executeTool(ctx, reg, call, ex)
+		res = executeTool(ctx, source, call, ex)
 		if res.IsError {
 			cat := classifyToolError(res.Content)
 			if decideRetry(cat, se) {
 				// One retry only; non-idempotent calls are never replayed.
-				res = executeTool(ctx, reg, call, ex)
+				res = executeTool(ctx, source, call, ex)
 				if res.IsError {
 					cat = classifyToolError(res.Content)
 				}
@@ -55,14 +55,24 @@ func (s *runToolState) execute(ctx context.Context, reg *Registry, call llm.Tool
 			}
 		}
 	}
-	s.step++
-	if !res.IsError {
-		if mutatingTools[call.Name] {
-			s.lastMutationSeq = s.step
-		}
-		if verifyingTools[call.Name] {
-			s.lastVerifySeq = s.step
-		}
-	}
+	s.recordStep(call.Name, res)
 	return res
+}
+
+// recordStep 是**唯一**的记账入口：推进步数，并在成功时记录「改动」与「验证」。
+//
+// 并行批与串行都走这里，否则「写完之后同一轮并发读回两个文件」不会被记成已验证，
+// 收尾时会误判「改动未验证」并要求模型再解释一轮（真实发生过，见 parallel_test.go）。
+// 记账只看工具名，不看是否在批里：批里的只读工具本来就在白名单内，不会有写工具。
+func (s *runToolState) recordStep(name string, res Result) {
+	s.step++
+	if res.IsError {
+		return
+	}
+	if mutatingTools[name] {
+		s.lastMutationSeq = s.step
+	}
+	if verifyingTools[name] {
+		s.lastVerifySeq = s.step
+	}
 }

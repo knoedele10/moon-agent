@@ -46,11 +46,16 @@ func riskyTool(name string) bool {
 		return true
 	// skill_write 写的是技能库而不是用户文件，但“助手以后会怎么做”被改了，
 	// 影响面不小，按风险工具处理：confirm 档先问、plan 档不给。
-	case "skill_write":
+	case "skill_write", "skill_improve", "skill_archive", "memory_forget":
 		return true
 	}
 	// 以后新增的 shell / python / 外部服务连接器都按风险工具处理，
 	// 避免“新加了一个危险工具但忘了加进名单”。
+	// MCP 工具是外部进程：能做什么由第三方服务器决定，能力边界不在我们手里，
+	// 因此一律按风险处理；前缀判断也自动覆盖以后新增的服务器。
+	if strings.HasPrefix(name, "mcp__") {
+		return true
+	}
 	return false
 }
 

@@ -27,6 +27,10 @@ test('首次生成的模板里带 AGENT_* 默认值，且沙箱目录在用户�
   assert.strictEqual(vars.AGENT_FS_ROOT, workspaceDir(USER_DATA));
   assert.strictEqual(vars.AGENT_MAX_ITERATIONS, '32');
   assert.strictEqual(vars.AGENT_MAX_TOOL_CALLS, '96');
+  assert.strictEqual(vars.AGENT_TOOL_DISCLOSURE, 'search');
+  assert.strictEqual(vars.AGENT_TOOL_SPILL_BYTES, '32768');
+  assert.strictEqual(vars.AGENT_SKILL_LINT, 'block');
+  assert.strictEqual(vars.AGENT_EVOLVE, 'auto');
   // 沙箱必须落在用户目录内，不能是仓库路径或安装路径。
   assert.ok(vars.AGENT_FS_ROOT.startsWith(USER_DATA));
 });
@@ -47,7 +51,24 @@ test('老配置缺 AGENT_* 时，启动前补上桌面默认值（平滑升级�
 
   assert.strictEqual(merged.AGENT_TOOLS, '1');
   assert.strictEqual(merged.AGENT_FS_ROOT, workspaceDir(USER_DATA));
+  assert.strictEqual(merged.AGENT_TOOL_DISCLOSURE, 'search');
+  assert.strictEqual(merged.AGENT_TOOL_SPILL_BYTES, '32768');
+  assert.strictEqual(merged.AGENT_SKILL_LINT, 'block');
+  assert.strictEqual(merged.AGENT_EVOLVE, 'auto');
   assert.strictEqual(merged.APP_SECRET, 'x');
+});
+
+test('显式 Hermes 配置优先保留', () => {
+  const merged = agentEnvDefaults({
+    AGENT_EVOLVE: 'suggest',
+    AGENT_TOOL_DISCLOSURE: 'always',
+    AGENT_TOOL_SPILL_BYTES: '8192',
+    AGENT_SKILL_LINT: 'warn',
+  }, USER_DATA);
+  assert.strictEqual(merged.AGENT_EVOLVE, 'suggest');
+  assert.strictEqual(merged.AGENT_TOOL_DISCLOSURE, 'always');
+  assert.strictEqual(merged.AGENT_TOOL_SPILL_BYTES, '8192');
+  assert.strictEqual(merged.AGENT_SKILL_LINT, 'warn');
 });
 
 test('显式配置优先：AGENT_TOOLS=0 与自定义根目录不被覆盖', () => {

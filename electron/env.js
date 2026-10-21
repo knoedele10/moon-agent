@@ -79,6 +79,11 @@ function agentEnvDefaults(vars, userDataDir, bundledRoot) {
   if (!hasValue(out.AGENT_MAX_ITERATIONS)) out.AGENT_MAX_ITERATIONS = DEFAULT_AGENT_MAX_ITERATIONS;
   if (!hasValue(out.AGENT_MAX_TOOL_CALLS)) out.AGENT_MAX_TOOL_CALLS = DEFAULT_AGENT_MAX_TOOL_CALLS;
   if (!hasValue(out.AGENT_LIMIT_RECOVERY_ROUNDS)) out.AGENT_LIMIT_RECOVERY_ROUNDS = '2';
+  // Hermes-inspired tool discovery and learning defaults. Explicit user values always win.
+  if (!hasValue(out.AGENT_TOOL_DISCLOSURE)) out.AGENT_TOOL_DISCLOSURE = 'search';
+  if (!hasValue(out.AGENT_TOOL_SPILL_BYTES)) out.AGENT_TOOL_SPILL_BYTES = '32768';
+  if (!hasValue(out.AGENT_SKILL_LINT)) out.AGENT_SKILL_LINT = 'block';
+  if (!hasValue(out.AGENT_EVOLVE)) out.AGENT_EVOLVE = 'auto';
   return out;
 }
 
@@ -129,6 +134,11 @@ function envTemplate({ secret, userDataDir }) {
     'AGENT_MAX_TOOL_CALLS=' + DEFAULT_AGENT_MAX_TOOL_CALLS,
     '# 自主模式达到阶段上限后自动续行的次数；0 关闭，最多 8。',
     'AGENT_LIMIT_RECOVERY_ROUNDS=2',
+    '# 工具发现、超长结果分页与安全技能学习。显式设置可覆盖这些默认值。',
+    'AGENT_TOOL_DISCLOSURE=search',
+    'AGENT_TOOL_SPILL_BYTES=32768',
+    'AGENT_SKILL_LINT=block',
+    'AGENT_EVOLVE=auto',
     '',
   ].join('\n');
 }

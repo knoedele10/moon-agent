@@ -40,6 +40,7 @@ func Run(ctx context.Context) error {
 	r.LoadHTMLGlob(filepath.Join(templates, "*", "*.html"))
 	r.Static("/static", filepath.Join(templates, "static"))
 	web.Setup(r, llm.NewDefaultRegistry())
+	defer web.CloseAgentRuntime()
 	ln, err := net.Listen("tcp", net.JoinHostPort(env("APP_HOST", "127.0.0.1"), env("APP_PORT", "8080")))
 	if err != nil {
 		return fmt.Errorf("监听失败: %w", err)

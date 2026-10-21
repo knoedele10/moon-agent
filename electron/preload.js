@@ -7,5 +7,14 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('desktop', {
   // 返回选中的绝对路径；用户取消时返回 null。
   pickDirectory: () => ipcRenderer.invoke('pick-directory'),
+  getPublicAccessState: () => ipcRenderer.invoke('public-access:get-state'),
+  startPublicAccess: () => ipcRenderer.invoke('public-access:start'),
+  stopPublicAccess: () => ipcRenderer.invoke('public-access:stop'),
+  copyPublicAccessUrl: () => ipcRenderer.invoke('public-access:copy'),
+  onPublicAccessState: (callback) => {
+    const handler = (_event, state) => callback(state);
+    ipcRenderer.on('public-access:state', handler);
+    return () => ipcRenderer.removeListener('public-access:state', handler);
+  },
   isDesktop: true,
 });

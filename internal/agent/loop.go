@@ -30,16 +30,17 @@ const roleTool = "tool"
 
 // Event 是主循环投递的事件（契约 §3）。
 type Event struct {
-	Kind     EventKind
-	Content  string         // delta / done：文本
-	ToolCall *llm.ToolCall  // tool_call
-	ToolName string         // tool_result
-	ToolID   string         // tool_result
-	OK       bool           // tool_result：false 表示工具报错（已回灌给模型，不代表循环结束）
-	Summary  string         // tool_result：给前端一行摘要
-	Detail   string         // tool_result：完整结果（前端折叠展示）
-	Display  map[string]any // tool_result：结构化摘要
-	Err      error
+	Kind      EventKind
+	Content   string         // delta / done：文本
+	ToolCall  *llm.ToolCall  // tool_call
+	ToolName  string         // tool_result
+	ToolID    string         // tool_result
+	OK        bool           // tool_result：false 表示工具报错（已回灌给模型，不代表循环结束）
+	AwaitUser bool           // tool_result：正在等待用户输入/确认，不能作为已执行成功的学习证据
+	Summary   string         // tool_result：给前端一行摘要
+	Detail    string         // tool_result：完整结果（前端折叠展示）
+	Display   map[string]any // tool_result：结构化摘要
+	Err       error
 }
 
 // Config 是一次 agent 运行的配置（契约 §3）。
@@ -58,7 +59,21 @@ type Config struct {
 	MaxToolCalls        int // 0 → DefaultMaxToolCalls
 	LimitRecoveryRounds int // 0 keeps strict limits; auto mode enables bounded replanning windows
 	Tools               []Tool
-	Exec                *Exec
+	// ToolSource 非空时优先于 Tools：循环每轮从它取定义、按名解析工具，
+	// 因此运行中新增的工具（tool_search 激活）下一轮就能被模型看到。
+	// 为空时行为与改造前完全一致（由 Tools 建静态注册表）。
+	ToolSource ToolSource
+	Exec       *Exec
+
+	// Parallel 为 true 时，同一轮里**连续**的只读调用并发执行（见 parallel.go）；
+	// 写/执行/网络工具仍严格串行，事件与历史按输入顺序回放。
+	// 默认 false：与改造前逐字节一致（web 层由 AGENT_TOOL_PARALLEL=read 打开）。
+	Parallel bool
+	// ParallelMax 是并发上限，0 → DefaultParallelMax。
+	ParallelMax int
+	// ParallelTools 是允许并发的工具名白名单。agent 包不认识具体工具，
+	// 只按名字判断，避免把「看起来像读」当成「真的只读」。
+	ParallelTools map[string]bool
 }
 
 const (
@@ -132,7 +147,8 @@ func Run(ctx context.Context, cfg Config, history []llm.Message, emit func(Event
 	}
 
 	reg := NewRegistry(cfg.Tools...)
-	defs := reg.Defs()
+	source := toolSourceOf(cfg, reg)
+	defs := source.Defs()
 	msgs := withSystemPrompt(history, cfg.SystemPrompt)
 
 	executed := 0
@@ -175,6 +191,9 @@ func Run(ctx context.Context, cfg Config, history []llm.Message, emit func(Event
 				msgs = append(msgs, llm.Message{Role: llm.RoleSystem, Content: notice})
 			}
 		}
+		// 每轮重新取一次定义：动态目录（tool_search 激活）会在运行中增删工具，
+		// 只取一次的话模型永远看不到新激活的工具。静态注册表下这一步是常量开销。
+		defs = source.Defs()
 		req := llm.ChatRequest{
 			Model:       cfg.Model,
 			Messages:    msgs,
@@ -219,65 +238,183 @@ func Run(ctx context.Context, cfg Config, history []llm.Message, emit func(Event
 			ToolCalls: calls,
 		})
 
-		for _, call := range calls {
-			// 每个被阻止的调用仍必须有结果，避免破坏工具消息的对应关系。
-			// 语义 6：执行前检查取消。
+		// 语义 2 后半：执行调用。只读调用在 AGENT_TOOL_PARALLEL=read 时按「连续批」并发，
+		// 其余（以及开关关闭时）逐个串行——串行路径与改造前一字不差。
+		for _, group := range planCallGroups(cfg, calls) {
+			if len(group) == 1 {
+				call := calls[group[0]]
+				// 每个被阻止的调用仍必须有结果，避免破坏工具消息的对应关系。
+				// 语义 6：执行前检查取消。
+				if err := ctx.Err(); err != nil {
+					emitError(emit, err)
+					return err
+				}
+				// 语义 4：调用次数触顶。
+				if budget.rounds == 0 && executed >= maxCalls {
+					err := fmt.Errorf("%w：本次运行已执行 %d 次工具调用（上限 %d），模型在第 %d 轮仍在请求调用 %q",
+						ErrMaxToolCalls, executed, maxCalls, iter, call.Name)
+					emitError(emit, err)
+					return err
+				}
+				var budgetErr error
+				if budget.rounds > 0 {
+					budgetErr = budget.reserveTool()
+				}
+				if budgetErr == nil {
+					executed++
+				}
+
+				res := toolState.execute(ctx, source, call, ex, budgetErr)
+				if budget.rounds > 0 && budgetErr == nil {
+					budget.record(call.Name, res)
+				}
+
+				emitEvent(emit, Event{
+					Kind:      EvToolResult,
+					ToolID:    call.ID,
+					ToolName:  call.Name,
+					OK:        !res.IsError,
+					AwaitUser: strings.TrimSpace(res.AwaitUser) != "",
+					Summary:   summarize(call.Name, res),
+					Detail:    res.Content,
+					Display:   res.Display,
+				})
+
+				// 语义 2.5：工具要求用户补充输入 → 立即停轮，把问题交给上层展示。
+				// 不能继续调模型：模型会自己把用户的答案编出来（这正是要避免的幻觉）。
+				if strings.TrimSpace(res.AwaitUser) != "" {
+					// 带上 Display：ask_user 的候选项要能传到前端渲染成按钮，而不是只当成一段文字。
+					emitEvent(emit, Event{Kind: EvNeedInput, ToolID: call.ID, ToolName: call.Name, Content: res.AwaitUser, Display: res.Display})
+					return nil
+				}
+
+				msgs = append(msgs, llm.Message{
+					Role:       roleTool,
+					Content:    res.Content,
+					ToolCallID: call.ID,
+					ToolName:   call.Name,
+				})
+
+				// Result.Image：tool 角色的消息带不了图片，所以作为一条独立 user 消息追加。
+				if res.Image != nil && len(res.Image.Data) > 0 {
+					msgs = append(msgs, llm.Message{
+						Role:    llm.RoleUser,
+						Content: fmt.Sprintf("（下面的图片由工具 %s 返回）", call.Name),
+						Images:  []llm.Image{{MIME: res.Image.MIME, Data: res.Image.Data}},
+					})
+				}
+				continue
+			}
+
+			// 并行只读批：先把预算一次性占好，再并发执行，最后按输入顺序回放事件与消息。
+			// 预算在**启动前**占：中途取消不会留下「已经算进上限但没跑」的空账。
 			if err := ctx.Err(); err != nil {
 				emitError(emit, err)
 				return err
 			}
-			// 语义 4：调用次数触顶。
-			if budget.rounds == 0 && executed >= maxCalls {
+			if budget.rounds == 0 && executed+len(group) > maxCalls {
 				err := fmt.Errorf("%w：本次运行已执行 %d 次工具调用（上限 %d），模型在第 %d 轮仍在请求调用 %q",
-					ErrMaxToolCalls, executed, maxCalls, iter, call.Name)
+					ErrMaxToolCalls, executed, maxCalls, iter, calls[group[len(group)-1]].Name)
 				emitError(emit, err)
 				return err
 			}
-			var budgetErr error
-			if budget.rounds > 0 {
-				budgetErr = budget.reserveTool()
-			}
-			if budgetErr == nil {
+			batch := make([]llm.ToolCall, 0, len(group))
+			budgetErrOf := make(map[int]error, len(group))
+			for _, idx := range group {
+				call := calls[idx]
+				// 与串行同一判据：调用次数触顶就立即中止（不是整批拒绝，也不吞掉剩余额度）。
+				if budget.rounds == 0 && executed >= maxCalls {
+					err := fmt.Errorf("%w：本次运行已执行 %d 次工具调用（上限 %d），模型在第 %d 轮仍在请求调用 %q",
+						ErrMaxToolCalls, executed, maxCalls, iter, call.Name)
+					emitError(emit, err)
+					return err
+				}
+				var budgetErr error
+				if budget.rounds > 0 {
+					budgetErr = budget.reserveTool()
+				}
+				if budgetErr != nil {
+					// 被预算拒绝的调用**不执行**：串行路径在 tool_state.go 里同样不调工具，
+					// 这里若把它塞进批，副作用已经发生、模型却收到「没有执行」——那是假话。
+					budgetErrOf[idx] = budgetErr
+					continue
+				}
 				executed++
+				batch = append(batch, call)
 			}
-
-			res := toolState.execute(ctx, reg, call, ex, budgetErr)
-			if budget.rounds > 0 && budgetErr == nil {
-				budget.record(call.Name, res)
+			var results []Result
+			if len(batch) > 0 {
+				results = runReadOnlyBatch(ctx, source, ex, batch, parallelMax(cfg))
 			}
+			// 回放：按输入顺序补齐每个调用的 tool 消息与事件（含被预算拒绝的），
+			// 这样 tool_call/result 永远配对；需要用户输入时先补完同批，再单独发 need_input。
+			cur := 0
+			needInputAt := -1
+			for _, idx := range group {
+				call := calls[idx]
+				var res Result
+				if budgetErr, denied := budgetErrOf[idx]; denied {
+					res = Result{IsError: true, Content: budgetErr.Error()}
+				} else {
+					res = results[cur]
+					cur++
+				}
+				if budget.rounds > 0 {
+					if _, denied := budgetErrOf[idx]; !denied {
+						budget.record(call.Name, res)
+					}
+				}
+				// 记账必须走唯一入口：并发读回的文件也算「验证过」。
+				toolState.recordStep(call.Name, res)
 
-			emitEvent(emit, Event{
-				Kind:     EvToolResult,
-				ToolID:   call.ID,
-				ToolName: call.Name,
-				OK:       !res.IsError,
-				Summary:  summarize(call.Name, res),
-				Detail:   res.Content,
-				Display:  res.Display,
-			})
-
-			// 语义 2.5：工具要求用户补充输入 → 立即停轮，把问题交给上层展示。
-			// 不能继续调模型：模型会自己把用户的答案编出来（这正是要避免的幻觉）。
-			if strings.TrimSpace(res.AwaitUser) != "" {
-				// 带上 Display：ask_user 的候选项要能传到前端渲染成按钮，而不是只当成一段文字。
+				emitEvent(emit, Event{
+					Kind:      EvToolResult,
+					ToolID:    call.ID,
+					ToolName:  call.Name,
+					OK:        !res.IsError,
+					AwaitUser: strings.TrimSpace(res.AwaitUser) != "",
+					Summary:   summarize(call.Name, res),
+					Detail:    res.Content,
+					Display:   res.Display,
+				})
+				if needInputAt < 0 && strings.TrimSpace(res.AwaitUser) != "" {
+					needInputAt = idx
+				}
+				msgs = append(msgs, llm.Message{
+					Role:       roleTool,
+					Content:    res.Content,
+					ToolCallID: call.ID,
+					ToolName:   call.Name,
+				})
+				if res.Image != nil && len(res.Image.Data) > 0 {
+					msgs = append(msgs, llm.Message{
+						Role:    llm.RoleUser,
+						Content: fmt.Sprintf("（下面的图片由工具 %s 返回）", call.Name),
+						Images:  []llm.Image{{MIME: res.Image.MIME, Data: res.Image.Data}},
+					})
+				}
+			}
+			if needInputAt >= 0 {
+				call := calls[needInputAt]
+				var res Result
+				if budgetErr, denied := budgetErrOf[needInputAt]; denied {
+					res = Result{IsError: true, Content: budgetErr.Error()}
+				} else {
+					// 批内下标 → 结果下标：被拒绝的调用不占 results。
+					cur := 0
+					for _, idx := range group {
+						if _, denied := budgetErrOf[idx]; denied {
+							continue
+						}
+						if idx == needInputAt {
+							res = results[cur]
+							break
+						}
+						cur++
+					}
+				}
 				emitEvent(emit, Event{Kind: EvNeedInput, ToolID: call.ID, ToolName: call.Name, Content: res.AwaitUser, Display: res.Display})
 				return nil
-			}
-
-			msgs = append(msgs, llm.Message{
-				Role:       roleTool,
-				Content:    res.Content,
-				ToolCallID: call.ID,
-				ToolName:   call.Name,
-			})
-
-			// Result.Image：tool 角色的消息带不了图片，所以作为一条独立 user 消息追加。
-			if res.Image != nil && len(res.Image.Data) > 0 {
-				msgs = append(msgs, llm.Message{
-					Role:    llm.RoleUser,
-					Content: fmt.Sprintf("（下面的图片由工具 %s 返回）", call.Name),
-					Images:  []llm.Image{{MIME: res.Image.MIME, Data: res.Image.Data}},
-				})
 			}
 		}
 	}
@@ -359,13 +496,16 @@ func drain(ctx context.Context, ch <-chan llm.Event, emit func(Event)) (string, 
 }
 
 // executeTool 查表 + 参数预处理，把一切失败都折成 is_error 结果（契约 §3.5：不回滚循环）。
-func executeTool(ctx context.Context, reg *Registry, call llm.ToolCall, ex *Exec) Result {
-	tool, ok := reg.Lookup(call.Name)
+func executeTool(ctx context.Context, source ToolSource, call llm.ToolCall, ex *Exec) Result {
+	if err := ctx.Err(); err != nil {
+		return Result{IsError: true, Content: err.Error(), Display: map[string]any{"code": "TOOL_CANCELLED", "tool": call.Name}}
+	}
+	tool, ok := source.Lookup(call.Name)
 	if !ok {
 		return Result{
 			IsError: true,
 			Content: fmt.Sprintf("未知工具 %q：当前可用工具是 %s。请改用可用工具，或直接给出最终答复。",
-				call.Name, reg.sortedNames()),
+				call.Name, availableToolNames(source)),
 			Display: map[string]any{"code": "TOOL_UNKNOWN", "tool": call.Name},
 		}
 	}

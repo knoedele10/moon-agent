@@ -100,12 +100,31 @@ func runPendingTool(
 	sendEvent func(string, any),
 	roots ...string,
 ) ([]llm.Message, *agentTraceEntry) {
-	if p == nil {
+	return runPendingToolWithEvolution(ctx, userID, root, mode, p, sendEvent, nil, roots...)
+}
+
+func runPendingToolWithEvolution(
+	ctx context.Context, userID, root, mode string, p *model.AgentPendingTool,
+	sendEvent func(string, any), evo *hermesEvolve, roots ...string,
+) ([]llm.Message, *agentTraceEntry) {
+	if p == nil || p.UserID != userID {
+		return nil, nil
+	}
+	if model.DB == nil {
+		return nil, nil
+	}
+	var conv model.Conversation
+	if err := model.DB.WithContext(ctx).Where("id = ? AND user_id = ?", p.ConversationID, userID).First(&conv).Error; err != nil {
 		return nil, nil
 	}
 	// confirmed=true 拿到的是**没有确认壳**的真工具。
 	// 深度 0：待确认调用的重放也是用户会话里的根轮次（子 agent 不走这条路）。
-	reg := agent.NewRegistry(agentToolsFor(userID, root, mode, true, 0, roots...)...)
+	policy := agentToolPolicy{UserID: userID, Root: root, Roots: roots, Kind: conv.Kind, Mode: mode, Confirmed: true}
+	if evo == nil {
+		evo = newHermesEvolve(userID)
+	}
+	tools, _ := assembleRuntimeTools(buildAgentTools(policy), policy, evo)
+	reg := agent.NewRegistry(tools...)
 	tool, ok := reg.Lookup(p.ToolName)
 	if !ok {
 		sendEvent("tool_result", gin.H{
@@ -128,13 +147,15 @@ func runPendingTool(
 
 	ex := &agent.Exec{
 		ReadRoot:  agentSkillsDir(),
-		SessionID: fmt.Sprintf("pending-%d", p.ConversationID),
+		SessionID: fmt.Sprintf("%d", p.ConversationID),
 		Root:      root,
 		Roots:     append([]string(nil), roots...),
 		// 重放的是**用户已经确认过**的调用，可能落在工作区外：
 		// fs 层要放行外部绝对路径，否则用户点了确认也会被沙箱拒掉。
-		AllowOutside: true,
+		// 但只对主账号放行：非主账号不得借确认链路去够工作区外的本机文件。
+		AllowOutside: isOwnerUser(userID),
 	}
+	evo.ObserveToolCall(call.ID, call.Name, call.Arguments)
 	res, err := tool.Execute(ctx, json.RawMessage(p.Arguments), ex)
 	if err != nil {
 		// 工具报错不回滚：折成 is_error 结果回灌，让模型自己决定重试还是换做法。
@@ -143,6 +164,7 @@ func runPendingTool(
 
 	okRun := !res.IsError
 	summary := summarizeToolResult(call.Name, res)
+	evo.ObserveToolResult(call.ID, call.Name, okRun, !okRun, summary)
 	sendEvent("tool_result", gin.H{
 		"id": call.ID, "name": call.Name, "ok": okRun,
 		"summary": summary, "detail": res.Content, "display": res.Display,

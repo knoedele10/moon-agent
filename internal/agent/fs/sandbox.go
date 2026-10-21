@@ -188,10 +188,37 @@ func resolveLinks(p string) (string, error) {
 	return resolveLinksDepth(p, 0)
 }
 
+// ntPathPrefixes 是 Windows 上可能出现在路径/链接目标里的 NT 命名空间前缀。
+// os.Readlink 对 junction 返回的是 `\\?\Global\C:\...` 或 `\??\C:\...` 这类形态。
+var ntPathPrefixes = []string{`\\?\Global\`, `\\?\UNC\`, `\\?\`, `\??\`}
+
+// normalizeNTPath 剥掉 NT 前缀，把路径还原成 filepath 能正确识别卷名的形态。
+//
+// 不做的后果（本包单测抓到过）：`\\?\Global\C:\...` 交给 filepath.VolumeName
+// 只会得到 `\\?\Global`，逐段重建时盘符 `C:` 变成普通目录名，分隔符丢失，
+// within() 因此恒为 false —— 工作区内的 junction 全被判成越界。
+func normalizeNTPath(p string) string {
+	upper := strings.ToUpper(p)
+	for _, prefix := range ntPathPrefixes {
+		// 前缀本身含混合大小写（Global / UNC），必须一并转大写再比较：
+		// 否则 `\\?\Global\E:\...` 只命中 `\\?\`，剩下的 `Global\E:` 会被当成相对路径段。
+		if !strings.HasPrefix(upper, strings.ToUpper(prefix)) {
+			continue
+		}
+		rest := p[len(prefix):]
+		if prefix == `\\?\UNC\` {
+			return `\\` + rest
+		}
+		return rest
+	}
+	return p
+}
+
 func resolveLinksDepth(p string, depth int) (string, error) {
 	if depth > maxLinkDepth {
 		return "", errors.New("符号链接层数过深")
 	}
+	p = normalizeNTPath(p)
 	vol := filepath.VolumeName(p)
 	cur := vol + string(filepath.Separator)
 	rest := strings.TrimPrefix(p[len(vol):], string(filepath.Separator))
@@ -215,7 +242,10 @@ func resolveLinksDepth(p string, depth int) (string, error) {
 			if !filepath.IsAbs(link) {
 				link = filepath.Join(cur, link)
 			}
-			resolved, rerr := resolveLinksDepth(filepath.Clean(link), depth+1)
+			// 顺序很重要：必须先剥 NT 前缀再 Clean。
+			// `\\?\Global\E:\dir` 直接交给 filepath.Clean 会得到 `\Global\E:dir`，
+			// 把 `\\?\` 前缀与盘符一起吃掉，normalizeNTPath 之后再也认不出来。
+			resolved, rerr := resolveLinksDepth(filepath.Clean(normalizeNTPath(link)), depth+1)
 			if rerr != nil {
 				return "", rerr
 			}

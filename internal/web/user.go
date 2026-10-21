@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http"
+	"os"
 	"strings"
 	"unicode/utf8"
 
@@ -44,10 +45,43 @@ func postLogin(c *gin.Context) {
 }
 
 func pageRegister(c *gin.Context) {
+	if !registerOpen() {
+		c.HTML(http.StatusForbidden, "user/login.html", gin.H{"Title": "登录", "Error": registerClosedMessage})
+		return
+	}
 	c.HTML(http.StatusOK, "user/register.html", gin.H{"Title": "注册", "Error": ""})
 }
 
+// registerClosedMessage 是注册被拒时给用户的说明。
+const registerClosedMessage = "注册已关闭：本机已有账号。如需新增账号，请在服务端设置 ALLOW_REGISTER=1 后重启。"
+
+// registerOpen 判断是否允许自助注册。
+//
+// 默认关闭：桌面端是单机应用，/register 一旦跟着公网隧道暴露出去，
+// 拿到链接的陌生人就能自助建号，进而继承 agent 的本机文件能力（参见审计 P1-3）。
+// 只有两种情况放行：
+//   - 本机还没有任何账号（首次引导必须能建号）；
+//   - 显式设置 ALLOW_REGISTER=1/true/yes/on。
+func registerOpen() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("ALLOW_REGISTER"))) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	if model.DB == nil {
+		return false
+	}
+	var n int64
+	if err := model.DB.Model(&model.User{}).Count(&n).Error; err != nil {
+		return false
+	}
+	return n == 0
+}
+
 func postRegister(c *gin.Context) {
+	if !registerOpen() {
+		c.HTML(http.StatusForbidden, "user/login.html", gin.H{"Title": "登录", "Error": registerClosedMessage})
+		return
+	}
 	username := strings.TrimSpace(c.PostForm("username"))
 	password := c.PostForm("password")
 
