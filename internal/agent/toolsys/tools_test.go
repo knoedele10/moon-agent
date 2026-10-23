@@ -40,7 +40,7 @@ func (f *fakeTool) Parameters() map[string]any {
 	return f.params
 }
 
-// Risk 实现 RiskAnnotated：返回空值时 Catalog 会退回 toolset 默认风险。
+// Risk 实现 RiskAnnotated：返回空值（非法）时 Catalog 改查 LookupMeta，不再用组默认风险。
 func (f *fakeTool) Risk() Risk { return f.risk }
 
 // Tags 实现 TagsAnnotated。

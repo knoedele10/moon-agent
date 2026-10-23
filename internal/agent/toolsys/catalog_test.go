@@ -127,18 +127,37 @@ func TestCatalogActivateAll(t *testing.T) {
 func TestCatalogRiskOverrideAndTags(t *testing.T) {
 	risky := &fakeTool{name: "delete", risk: RiskWrite}
 	tagged := &fakeTool{name: "read", risk: "", tags: []string{"查看", "打开"}}
-	c := NewCatalog(Toolset{Name: "fs", Desc: "文件", Risk: RiskRead, Tools: []agent.Tool{risky, tagged}})
+	// 组默认故意写成 write：未标注的 read 应采用元数据里的 read，而不是整组默认。
+	c := NewCatalog(Toolset{Name: "fs", Desc: "文件", Risk: RiskWrite, Tools: []agent.Tool{risky, tagged}})
 	if risk, ok := c.RiskOf("delete"); !ok || risk != RiskWrite {
 		t.Fatalf("delete 风险=%v, ok=%v，期望 write", risk, ok)
 	}
 	if risk, ok := c.RiskOf("read"); !ok || risk != RiskRead {
-		t.Fatalf("read 未标注风险时应回退组默认 read，实际 %v", risk)
+		t.Fatalf("read 未标注时应采用元数据 read，而不是组默认 write，实际 %v", risk)
 	}
 	if matches := c.Search("查看", 5); len(matches) != 1 || matches[0].Name != "read" {
 		t.Fatalf("别名检索应命中 read，实际 %v", matchNames(matches))
 	}
 	if _, ok := c.RiskOf("missing"); ok {
 		t.Fatal("未登记的工具 RiskOf 应返回 false")
+	}
+}
+
+// TestCatalogRiskAnnotatedBeatsMeta 显式标注压过元数据；表外名字用保守风险，而不是组默认 read。
+func TestCatalogRiskAnnotatedBeatsMeta(t *testing.T) {
+	c := NewCatalog(Toolset{Name: "misc", Desc: "杂项", Risk: RiskRead, Tools: []agent.Tool{
+		&fakeTool{name: "write"},                  // 元数据是 write
+		&fakeTool{name: "delete", risk: RiskRead}, // 标注故意盖过元数据的 write
+		&fakeTool{name: "custom_unlisted"},        // 表外
+	}})
+	if risk, ok := c.RiskOf("write"); !ok || risk != RiskWrite {
+		t.Fatalf("未标注的 write 应取元数据 write，实际 %v ok=%v", risk, ok)
+	}
+	if risk, ok := c.RiskOf("delete"); !ok || risk != RiskRead {
+		t.Fatalf("显式标注应盖过元数据，实际 %v ok=%v", risk, ok)
+	}
+	if risk, ok := c.RiskOf("custom_unlisted"); !ok || risk != RiskWrite {
+		t.Fatalf("表外工具应取保守风险 write，实际 %v ok=%v", risk, ok)
 	}
 }
 
