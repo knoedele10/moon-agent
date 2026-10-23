@@ -16,22 +16,6 @@ import (
 	"blog-my/internal/llm"
 )
 
-// Risk 是工具风险等级，决定 confirm 档是否拦、并行是否可以开。
-type Risk string
-
-const (
-	// RiskRead 只读：不动外部状态，可以并行执行。
-	RiskRead Risk = "read"
-	// RiskWrite 写用户文件：confirm 档需要用户确认。
-	RiskWrite Risk = "write"
-	// RiskExec 执行命令或代码：副作用不可预测。
-	RiskExec Risk = "exec"
-	// RiskNetwork 出网：结果不确定且可能泄露信息。
-	RiskNetwork Risk = "network"
-	// RiskSelf 改变自身行为（技能/记忆/人格）。
-	RiskSelf Risk = "self"
-)
-
 const (
 	// defaultSearchLimit 是 Catalog.Search 的默认条数（tool_search 缺省也是 5）。
 	defaultSearchLimit = 5
@@ -40,15 +24,6 @@ const (
 	// coreToolsetName 是常驻工具集的保留名：NewCatalog 会自动激活它。
 	coreToolsetName = "core"
 )
-
-// Valid 报告风险等级是否是约定的五档之一。
-func (r Risk) Valid() bool {
-	switch r {
-	case RiskRead, RiskWrite, RiskExec, RiskNetwork, RiskSelf:
-		return true
-	}
-	return false
-}
 
 // normalizeRisk 将空值/未知值按写入处理，避免未声明的外部副作用被误判成可并发的只读操作。
 func normalizeRisk(r Risk) Risk {
@@ -76,7 +51,7 @@ type Toolset struct {
 	Name    string       // 如 "fs"、"memory"、"evolve"
 	Desc    string       // 一句话，进提示词的工具集清单
 	Depends []string     // 依赖的其它 toolset（激活本组时会自动带上）
-	Risk    Risk         // 该组默认风险（单个工具可覆盖）
+	Risk    Risk         // 组标签（提示词/HTTP）。单工具风险见 RiskAnnotated，否则 LookupMeta
 	Tools   []agent.Tool // 组内工具，顺序即暴露给模型的顺序
 }
 
@@ -335,8 +310,10 @@ func (c *Catalog) ActivateAll() []string {
 	return c.activateLocked(c.order)
 }
 
-// RiskOf 按名字查工具风险；未登记的名字返回 false。
-// Plan 的 riskOf 参数可以直接传这个方法的闭包。
+// RiskOf 按名字查目录里的工具风险；目录里没有的名字返回 false。
+//
+// 登记时已经按「工具自己的 RiskAnnotated，否则 LookupMeta」解析过（见 riskOf）。
+// Plan 的 riskOf 参数可以直接传这个方法的闭包。未登记名字不要当成只读。
 func (c *Catalog) RiskOf(name string) (Risk, bool) {
 	if c == nil {
 		return "", false
@@ -532,11 +509,21 @@ func (c *Catalog) Len() (total, active int) {
 	return len(c.entries), len(c.activeOrder)
 }
 
-// riskOf 解析单个工具的风险：工具自己实现 RiskAnnotated 并给出合法值就覆盖组默认值。
+// riskOf 解析单个工具的风险。
+//
+// 优先级：工具自己的 RiskAnnotated（合法值）> LookupMeta。
+// 装饰器不转发 Risk()，所以必须在 Decorate 之前用原始工具解析，结果记在 Entry 上。
+// 表外名字拿到的是 LookupMeta 的保守风险（写入），不再退回工具集的整组默认值——
+// 工具集 Risk 只作为组标签（提示词 / HTTP）。fallback 只留给没有名字的工具。
 func riskOf(t agent.Tool, fallback Risk) Risk {
-	if annotated, ok := t.(RiskAnnotated); ok {
-		if risk := annotated.Risk(); risk.Valid() {
-			return risk
+	if t != nil {
+		if annotated, ok := t.(RiskAnnotated); ok {
+			if risk := annotated.Risk(); risk.Valid() {
+				return risk
+			}
+		}
+		if name := strings.TrimSpace(t.Name()); name != "" {
+			return LookupMeta(name).Risk
 		}
 	}
 	return normalizeRisk(fallback)

@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"strings"
+
+	"blog-my/internal/agent/toolsys/policy"
 )
 
 // 工具失败的安全层：错误分类 → 副作用语义 → 重试决策，以及"结果未知的副作用"拦截。
@@ -80,41 +82,31 @@ const (
 	SideEffectNonIdempotent SideEffectKind = "non_idempotent_side_effect"
 )
 
-// 只读工具白名单：重复执行没有任何后果。
-var readOnlyTools = map[string]bool{
-	"read": true, "list": true, "read_image": true,
-	"web_search": true, "web_reader": true,
-	"calculator": true, "datetime": true, "json_format": true, "sql_query": true,
-	"memory_search": true, "skill_search": true, "skill_read": true, "ask_user": true,
-	"list_subagents": true,
-}
-
-// 幂等修改：重复执行结果相同（写同样内容、按字面量替换、按名 upsert）。
-var idempotentTools = map[string]bool{
-	"write": true, "edit": true, "memory_write": true, "skill_write": true,
-}
-
-// 非幂等副作用：重复执行会产生第二次效果。
-var nonIdempotentTools = map[string]bool{
-	"move": true, "delete": true, "office_edit": true, "skill_run": true, "run_command": true,
-}
-
 // toolSideEffect 判断这次调用的副作用语义。
 //
+// 分类在 toolsys/policy（agent 不能 import toolsys，否则成环）。
 // **认不出来的工具一律按 non_idempotent_side_effect 处理**——这是失败安全默认：
 // 将来新加一个工具（尤其是 shell / python / 外部服务连接器）忘了登记，
 // 宁可它"被少重试一次"，也不能让它被自动重放。
 func toolSideEffect(name string) SideEffectKind {
-	if readOnlyTools[name] {
+	switch policy.LookupMeta(name).SideEffect {
+	case policy.SideEffectReadOnly:
 		return SideEffectReadOnly
-	}
-	if idempotentTools[name] {
+	case policy.SideEffectIdempotent:
 		return SideEffectIdempotent
-	}
-	if nonIdempotentTools[name] {
+	default:
 		return SideEffectNonIdempotent
 	}
-	return SideEffectNonIdempotent
+}
+
+// toolMutates 报告这次调用算不算「会改变世界」、做完值得验一下。
+func toolMutates(name string) bool {
+	return policy.LookupMeta(name).Mutating
+}
+
+// toolVerifies 报告这次调用能不能充当「写完之后的验证」。
+func toolVerifies(name string) bool {
+	return policy.LookupMeta(name).Verifying
 }
 
 // decideRetry 是重试决策矩阵：类别 × 副作用 → 是否重试。
@@ -210,20 +202,9 @@ func uncertainFeedback(list []uncertainEffect) string {
 // 设计参考 Cyrene 的 completionObligations：模型想收尾时，runtime 检查有没有
 // 未完成的义务，没完成就把它拦回去。它的原话是「不要假装完成」。
 //
-// 本项目的简化版：不引入工具元数据，只看「写完之后有没有验证过」。
+// 简化版：只看「写完之后有没有验证过」（mutating / verifying 来自同一张元数据表）。
 // 这是最常见的伪完成场景——模型改了文件、然后直接说「改好了」。
-
-// mutatingTools 是「会改变世界」的工具：做完之后值得验一下。
-var mutatingTools = map[string]bool{
-	"write": true, "edit": true, "move": true, "delete": true,
-	"office_edit": true, "skill_run": true, "skill_write": true, "run_command": true,
-}
-
-// verifyingTools 是能充当「验证」的工具：把结果读回来、列出来、查一下。
-// 只读工具里只有这几个算验证——搜索、计算、时间都不算。
-var verifyingTools = map[string]bool{
-	"read": true, "list": true, "read_image": true, "sql_query": true,
-}
+// 只读工具里只有 read / list / read_image / sql_query 算验证——搜索、计算、时间都不算。
 
 // needsVerification 判断「改完之后还没验」：最后一次写操作比最后一次验证更晚。
 // 用序号而不是时间：同一次 Run 里序号就是模型决策的顺序，最准确。

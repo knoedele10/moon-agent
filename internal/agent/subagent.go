@@ -350,7 +350,7 @@ func (t SubagentTool) Execute(ctx context.Context, raw json.RawMessage, ex *Exec
 
 // ListSubagentsTool 让父级模型回看自己派出去的子任务。
 //
-// 它是只读工具（登记在 safety.go 的 readOnlyTools 里）：重复调用没有任何后果，
+// 它是只读工具（登记在工具元数据里）：重复调用没有任何后果，
 // 失败也允许重试一次——这正是父级轮询子任务状态需要的语义。
 type ListSubagentsTool struct {
 	Delegator Delegator
