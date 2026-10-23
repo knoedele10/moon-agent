@@ -176,3 +176,136 @@ func TestEinoReActAskUserStopsWithoutSecondModelTurn(t *testing.T) {
 		t.Fatalf("等待用户的事件序列 = %s", got)
 	}
 }
+
+// 回归：非幂等工具超时后，同一指纹的再次调用必须被拦住，不能重放副作用。
+// decideRetry 对非幂等调用不重试，所以真实执行应停在第一次。
+func TestEinoUncertainEffectBlocksReplay(t *testing.T) {
+	const args = `{"command":"echo hi"}`
+	model := einoMockModel(t, []llm.MockTurn{
+		{ToolCalls: []llm.ToolCall{{ID: "cmd-1", Name: "run_command", Arguments: args}}},
+		{ToolCalls: []llm.ToolCall{{ID: "cmd-2", Name: "run_command", Arguments: args}}},
+		{Text: "上一步结果未知，请你确认是否已经生效。"},
+	})
+	command := &fakeTool{name: "run_command", exec: func(context.Context, json.RawMessage, *Exec) (Result, error) {
+		return Result{}, fmt.Errorf("timeout after request sent")
+	}}
+	var events []Event
+	err := Run(context.Background(), Config{Model: "mock-echo", EinoModel: model, Tools: []Tool{command}},
+		[]llm.Message{{Role: llm.RoleUser, Content: "执行命令"}}, func(ev Event) { events = append(events, ev) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if command.count() != 1 {
+		t.Fatalf("非幂等命令实际执行 %d 次，超时后的同参重放不应再执行", command.count())
+	}
+
+	var calls, results []Event
+	done := 0
+	for _, ev := range events {
+		switch ev.Kind {
+		case EvToolCall:
+			calls = append(calls, ev)
+		case EvToolResult:
+			results = append(results, ev)
+		case EvDone:
+			done++
+		}
+	}
+	if len(calls) != 2 || len(results) != 2 || done != 1 {
+		t.Fatalf("事件不完整：calls=%d results=%d done=%d 序列=%s", len(calls), len(results), done, kindSeq(events))
+	}
+	if calls[0].ToolCall == nil || calls[1].ToolCall == nil || calls[0].ToolCall.Arguments != calls[1].ToolCall.Arguments {
+		t.Fatalf("两次调用应是同一参数指纹：%+v", calls)
+	}
+	if results[0].OK || !strings.Contains(results[0].Detail, "timeout") {
+		t.Fatalf("第一次应是真实的超时失败：%+v", results[0])
+	}
+	if code, _ := results[0].Display["code"].(string); code == "NOT_EXECUTED_AFTER_UNCERTAIN" || code == "UNCERTAIN_EFFECT_BLOCKED" {
+		t.Fatalf("第一次不应被未知副作用拦截：%+v", results[0])
+	}
+	code, _ := results[1].Display["code"].(string)
+	if results[1].OK || (code != "NOT_EXECUTED_AFTER_UNCERTAIN" && code != "UNCERTAIN_EFFECT_BLOCKED") {
+		t.Fatalf("同参重放应被拦住：%+v", results[1])
+	}
+	blocked := map[string]string{
+		"NOT_EXECUTED_AFTER_UNCERTAIN": "前一个操作的结果未知，为避免重复副作用，这次调用没有执行。请先让用户确认上一步是否生效。",
+		"UNCERTAIN_EFFECT_BLOCKED":     "这次调用与之前一次「结果未知」的操作完全相同（run_command），已拒绝重复执行。请先确认上一步是否生效，不要重试。",
+	}
+	if results[1].Detail != blocked[code] || results[1].ToolName != "run_command" {
+		t.Fatalf("拦截文案与工具名不一致：%+v", results[1])
+	}
+}
+
+// 回归：Eino 路径上 write 成功后再 read 成功，必须记入验证。
+// 记账丢失时 runEino 会再注入 verificationFeedback，多烧模型轮次，并把收尾文本重复进 done。
+func TestEinoMutationThenReadCountsAsVerified(t *testing.T) {
+	const answer = "改完并读回确认了。"
+	obs := &budgetObservation{}
+	model := &observedBudgetModel{
+		ToolCallingChatModel: einoMockModel(t, []llm.MockTurn{
+			{ToolCalls: []llm.ToolCall{{ID: "w1", Name: "write", Arguments: `{"file_path":"a.txt","content":"hi"}`}}},
+			{ToolCalls: []llm.ToolCall{{ID: "r1", Name: "read", Arguments: `{"file_path":"a.txt"}`}}},
+			{Text: answer},
+		}),
+		observation: obs,
+	}
+	write := &fakeTool{name: "write", exec: func(context.Context, json.RawMessage, *Exec) (Result, error) {
+		return Result{Content: "已写入 a.txt"}, nil
+	}}
+	read := &fakeTool{name: "read", exec: func(context.Context, json.RawMessage, *Exec) (Result, error) {
+		return Result{Content: "hi"}, nil
+	}}
+	var events []Event
+	err := Run(context.Background(), Config{Model: "mock-echo", EinoModel: model, Tools: []Tool{write, read}},
+		[]llm.Message{{Role: llm.RoleUser, Content: "写入并确认"}}, func(ev Event) { events = append(events, ev) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if write.count() != 1 || read.count() != 1 {
+		t.Fatalf("write=%d read=%d，期望各执行 1 次", write.count(), read.count())
+	}
+	if len(obs.requests) != 3 {
+		t.Fatalf("模型调用 %d 次，验证记账正常时应为 3 次（丢失时会因验证提醒再跑模型）", len(obs.requests))
+	}
+	for i, msgs := range obs.requests {
+		for _, msg := range msgs {
+			if msg.Content == verificationFeedback() || strings.Contains(msg.Content, "你刚刚改动了文件") {
+				t.Fatalf("第 %d 次模型调用收到验证提醒，read 没有记入 lastVerifySeq：%s", i, msg.Content)
+			}
+		}
+	}
+	last := obs.requests[len(obs.requests)-1]
+	verified := false
+	for _, msg := range last {
+		if strings.Contains(msg.Content, "已调用核对工具") {
+			verified = true
+		}
+	}
+	if !verified {
+		t.Fatal("收尾轮未见「已调用核对工具」，lastVerifySeq 没有在 read 之后更新")
+	}
+
+	var streamed strings.Builder
+	var doneText string
+	doneN, resultN := 0, 0
+	for _, ev := range events {
+		switch ev.Kind {
+		case EvDelta:
+			streamed.WriteString(ev.Content)
+		case EvDone:
+			doneN++
+			doneText = ev.Content
+		case EvToolResult:
+			resultN++
+			if !ev.OK {
+				t.Fatalf("工具结果不应失败：%+v", ev)
+			}
+		}
+	}
+	if resultN != 2 || doneN != 1 {
+		t.Fatalf("结果/完成事件数量不对：results=%d done=%d 序列=%s", resultN, doneN, kindSeq(events))
+	}
+	if streamed.String() != answer || doneText != answer {
+		t.Fatalf("收尾被验证提醒多跑了一轮：stream=%q done=%q", streamed.String(), doneText)
+	}
+}
