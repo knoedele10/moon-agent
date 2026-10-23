@@ -69,10 +69,10 @@ func (s *runToolState) recordStep(name string, res Result) {
 	if res.IsError {
 		return
 	}
-	if mutatingTools[name] {
+	if toolMutates(name) {
 		s.lastMutationSeq = s.step
 	}
-	if verifyingTools[name] {
+	if toolVerifies(name) {
 		s.lastVerifySeq = s.step
 	}
 }
