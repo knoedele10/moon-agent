@@ -9,6 +9,7 @@ import (
 
 	"blog-my/internal/agent"
 	agentfs "blog-my/internal/agent/fs"
+	"blog-my/internal/agent/toolsys"
 )
 
 // agent 的三档自主模式。默认 confirm：风险操作先问用户，而不是默认放开。
@@ -37,26 +38,18 @@ func normalizeMode(m string) string {
 }
 
 // riskyTool 判断一个工具是否属于“会改动东西、且难以撤销”的一类。
+// 结果来自 toolsys.LookupMeta 的 Confirm，这里不再手写第二份名单。
 // 只读工具（read/list/calculator/web_search/...）不算风险，否则每个问题都要问一次，模式二会变得没法用。
+//
+// 表里的产品选择（改行为请改元数据，不要在这里加 case）：
+//   - memory_write 不确认：写记忆库不会动用户的文件，不可逆风险极低，
+//     所有档位都可以用（用户 2026-10-12 明确要求）。
+//   - skill_write / skill_improve / skill_archive / memory_forget 要确认：
+//     动的不是用户文件，但助手以后怎么做被改了。
+//   - mcp__ 前缀一律确认：外部进程的能力边界不在我们手里。
+//   - 表外名字也确认：新加的 shell / python / 连接器忘了登记时，默认先问。
 func riskyTool(name string) bool {
-	switch name {
-	// 注意：memory_write 不在名单里——写记忆库不会动用户的文件，也不可逆风险极低，
-	// 属于“所有档位都可以用”的操作（用户 2026-10-12 明确要求）。
-	case "write", "edit", "move", "delete", "office_edit", "skill_run", "run_command":
-		return true
-	// skill_write 写的是技能库而不是用户文件，但“助手以后会怎么做”被改了，
-	// 影响面不小，按风险工具处理：confirm 档先问、plan 档不给。
-	case "skill_write", "skill_improve", "skill_archive", "memory_forget":
-		return true
-	}
-	// 以后新增的 shell / python / 外部服务连接器都按风险工具处理，
-	// 避免“新加了一个危险工具但忘了加进名单”。
-	// MCP 工具是外部进程：能做什么由第三方服务器决定，能力边界不在我们手里，
-	// 因此一律按风险处理；前缀判断也自动覆盖以后新增的服务器。
-	if strings.HasPrefix(name, "mcp__") {
-		return true
-	}
-	return false
+	return toolsys.LookupMeta(name).Confirm
 }
 
 // outsideWriteTool 判断一个工具是不是「写类」——参数里带路径、会改磁盘。

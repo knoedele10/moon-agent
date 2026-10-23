@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"blog-my/internal/agent"
+	"blog-my/internal/agent/toolsys"
 )
 
 // 本文件是「工具集（toolset）」的接线层：把 buildAgentTools 产出的平铺工具表
@@ -220,27 +221,25 @@ func sortedToolNames(tools []agent.Tool) []string {
 
 // readOnlyToolNames 是允许并发执行的工具白名单（AGENT_TOOL_PARALLEL=read）。
 //
+// 名单来自 toolsys.LookupMeta 的 ParallelOK，这里不再手写第二份。
 // 判据是「没有副作用、重复执行安全」，不是「看起来像读」：
 //   - tool_search 会改目录状态（激活工具），不并发；
 //   - memory_note 会写记忆文件，不并发（哪怕它内部有锁，顺序语义也该保留）；
 //   - evolution_report 会落盘报告，不并发；
 //   - subagent / spawn_teammate / send_message 会启动新轮次，不并发；
 //   - skill_run / run_command / write 类一律不进；
+//   - ask_user 只读但会停轮，不并发；
+//   - web_search / web_reader 是网络风险，但重复执行安全，可以并发；
 //   - read_image 读的是磁盘，安全。
 //
-// 白名单而不是黑名单：新工具默认不并发，漏登记只是慢一点，不会出错。
+// 白名单而不是黑名单：表外名字 ParallelOK 为 false，漏登记只是慢一点，不会出错。
 func readOnlyToolNames() map[string]bool {
-	names := []string{
-		"read", "list", "read_image",
-		"calculator", "datetime", "json_format", "web_search", "web_reader", "sql_query",
-		"memory_search", "memory_list", "session_search",
-		"skill_search", "skill_read", "skill_list", "skill_stats", "skill_lint",
-		"read_tool_result",
-		"list_agents", "list_subagents", "team_task_list", "team_task_get",
-	}
+	names := toolsys.KnownToolNames()
 	out := make(map[string]bool, len(names))
 	for _, name := range names {
-		out[name] = true
+		if toolsys.LookupMeta(name).ParallelOK {
+			out[name] = true
+		}
 	}
 	return out
 }
