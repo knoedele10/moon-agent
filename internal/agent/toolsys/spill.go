@@ -17,8 +17,12 @@ import (
 const (
 	// defaultSpillMaxBytes 是触发落盘的内容阈值：32KB，约 8K token。
 	defaultSpillMaxBytes = 32 * 1024
-	// defaultSpillHeadRunes 是落盘后仍回传给模型的头部长度（按 rune 计）。
+	// defaultSpillHeadRunes 是落盘后回传给模型的预览预算（按 rune 计）。
+	// 超过预算时按 spillPreviewHeadPercent / spillPreviewTailPercent 切成头部与尾部，合计仍是该预算。
 	defaultSpillHeadRunes = 2000
+	// 预览预算的头尾比例：日志类结果的关键信息经常在末尾，因此保留约 40% 尾部。
+	spillPreviewHeadPercent = 60
+	spillPreviewTailPercent = 40
 	// readResultDefaultLines 是 read_tool_result 缺省的每次行数。
 	readResultDefaultLines = 200
 	// readResultMaxLines 是 read_tool_result 单次上限，防止模型一次又拉回 60KB。
@@ -34,12 +38,15 @@ var unsafeSessionChars = regexp.MustCompile(`[^A-Za-z0-9_.-]+`)
 
 // SpillPolicy 是「大结果落盘」策略。
 //
-// 超限内容写到 Dir 下的不可执行文本文件，回传内容换成「头部 + 落盘路径 + 继续读方法」，
+// 超限内容写到 Dir 下的不可执行文本文件，回传内容换成「头尾预览 + 落盘路径 + 继续读方法」，
 // 模型需要后文时用 ReadResultTool 分段读取，信息不会像纯截断那样丢掉。
 type SpillPolicy struct {
-	Dir       string // 空 → 默认数据目录/spill
-	MaxBytes  int    // 超过多少字节触发落盘；<=0 → 32KB
-	HeadRunes int    // 回传的头部长度（rune）；<=0 → 2000
+	Dir      string // 空 → 默认数据目录/spill
+	MaxBytes int    // 超过多少字节触发落盘；<=0 → 32KB
+	// HeadRunes 是回传预览的 rune 预算，不是只保留头部。
+	// <=0 时用 2000。内容超过预算时约 60% 取头部、40% 取尾部，两者之和等于预算，
+	// 中间插入省略标记；不超过预算则整段放入预览，不改写。
+	HeadRunes int
 }
 
 // normalized 补齐零值默认值。
@@ -55,7 +62,7 @@ func (p SpillPolicy) normalized() SpillPolicy {
 
 // Wrap 返回一个「结果超限自动落盘」的工具包装。
 //
-// 落盘失败不会让工具调用变红：退化成纯截断并在文案里说明原因，
+// 落盘失败不会让工具调用变红：退化成同样的头尾预览并在文案里说明原因，
 // 以免因为磁盘问题把一次正常调用报成错误。
 func (p SpillPolicy) Wrap(t agent.Tool) agent.Tool {
 	if t == nil {
@@ -85,17 +92,18 @@ func (s spillTool) Execute(ctx context.Context, raw json.RawMessage, ex *agent.E
 	}
 	dir, err := spillDir(s.policy)
 	if err != nil {
-		res.Content = spillHead(res.Content, s.policy.HeadRunes) +
+		res.Content = spillPreview(res.Content, s.policy.HeadRunes) +
 			fmt.Sprintf("\n\n【结果过长且落盘失败：%v】完整内容未保留，请缩小调用范围后重试。", err)
 		return res, nil
 	}
+	// 哈希与落盘必须用全文；预览只替换回传给模型的 Content。
 	path, err := writeSpillFile(dir, sessionOf(ex), res.Content)
 	if err != nil {
-		res.Content = spillHead(res.Content, s.policy.HeadRunes) +
+		res.Content = spillPreview(res.Content, s.policy.HeadRunes) +
 			fmt.Sprintf("\n\n【结果过长且落盘失败：%v】完整内容未保留，请缩小调用范围后重试。", err)
 		return res, nil
 	}
-	res.Content = spillHead(res.Content, s.policy.HeadRunes) + spillNotice(total, path)
+	res.Content = spillPreview(res.Content, s.policy.HeadRunes) + spillNotice(total, path)
 	if res.Display == nil {
 		res.Display = map[string]any{}
 	}
@@ -105,7 +113,7 @@ func (s spillTool) Execute(ctx context.Context, raw json.RawMessage, ex *agent.E
 	return res, nil
 }
 
-// spillNotice 是落盘后拼在头部后面的提示，必须让模型知道怎么读回后文。
+// spillNotice 是落盘后拼在预览后面的提示，必须让模型知道怎么读回后文。
 func spillNotice(total int, path string) string {
 	return fmt.Sprintf(
 		"\n\n【结果已落盘】原始结果共 %d 字节，超过单次回传上限，已完整保存到：\n%s\n"+
@@ -114,16 +122,56 @@ func spillNotice(total int, path string) string {
 		total, path, path, readResultDefaultLines)
 }
 
-// spillHead 取内容头部最多 n 个 rune。
-func spillHead(content string, n int) string {
-	if n <= 0 {
+// spillPreview 按预算生成模型可见预览。
+//
+// budget 即 HeadRunes。内容的 rune 数不超过预算时原样返回（不插入省略标记，
+// 也不把非法 UTF-8 重编码）。超过预算时头部约占 60%、尾部约占 40%，
+// 两者之和等于预算，中间用省略标记隔开，避免两段被当成连续原文。
+func spillPreview(content string, budget int) string {
+	if budget <= 0 {
 		return ""
 	}
 	runes := []rune(content)
-	if len(runes) <= n {
+	if len(runes) <= budget {
 		return content
 	}
-	return string(runes[:n])
+	headN, tailN := splitPreviewBudget(budget)
+	var b strings.Builder
+	if headN > 0 {
+		b.WriteString(string(runes[:headN]))
+	}
+	omitted := len(runes) - headN - tailN
+	b.WriteString(spillPreviewGap(omitted))
+	if tailN > 0 {
+		b.WriteString(string(runes[len(runes)-tailN:]))
+	}
+	return b.String()
+}
+
+// splitPreviewBudget 把预览预算分成头部与尾部的 rune 数，二者之和等于 budget。
+// 头部约为 60%，尾部约为 40%；budget>=2 时两边至少各 1 个 rune。
+func splitPreviewBudget(budget int) (headN, tailN int) {
+	if budget <= 0 {
+		return 0, 0
+	}
+	headN = budget * spillPreviewHeadPercent / (spillPreviewHeadPercent + spillPreviewTailPercent)
+	tailN = budget - headN
+	if budget >= 2 {
+		if headN < 1 {
+			headN = 1
+			tailN = budget - headN
+		}
+		if tailN < 1 {
+			tailN = 1
+			headN = budget - tailN
+		}
+	}
+	return headN, tailN
+}
+
+// spillPreviewGap 隔开头尾。omitted 是被省略的 rune 数。
+func spillPreviewGap(omitted int) string {
+	return fmt.Sprintf("\n\n…【中间省略 %d 个字符】…\n\n", omitted)
 }
 
 // spillDir 解析并创建落盘目录（权限 0700）。
