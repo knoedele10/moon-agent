@@ -6,6 +6,7 @@
 
 - 模型从现有端点注册表构造 Eino `ToolCallingChatModel`。DeepSeek 的 `deepseek-chat`、`deepseek-reasoner` 用原生 Eino DeepSeek 组件；需要图片输入的 `deepseek-flash` 等继续使用 Eino 的 OpenAI 兼容组件。
 - 工具通过 `internal/agent/eino.go` 的适配层进入 Eino ToolsNode。原有工具实现及其模式、工作区外路径和确认包装器仍负责权限判断。
+- 当前 Eino 引擎不启用只读工具并行；`Config.Parallel` / `AGENT_TOOL_PARALLEL=read` 只作用于旧循环（legacy）。
 - 适配层将工具调用与结果转为现有 `tool_call`、`tool_result` 事件。等待确认或 `ask_user` 时发 `need_input` 并停止本轮；助手流式输出继续发 `delta`，完成时发 `done`。
 - 模型上游在任何输出前报暂时性错误时重试一次。收到文本或工具调用分片后不重放本轮，以免重复执行工具。
 - 工具调用次数、结果未知时的副作用保护、修改后验证提醒和上下文压缩沿用 Agent 层规则。
