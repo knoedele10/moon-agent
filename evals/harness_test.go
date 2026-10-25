@@ -20,10 +20,20 @@ func TestScriptedTasks(t *testing.T) {
 		fn func(t *testing.T)
 	}{
 		{"rules-scaffold", taskRulesScaffold},
+		{"rules-layering", taskRulesLayering},
+		{"rules-verify-commands", taskRulesVerifyCommands},
 		{"sandbox-deny-shell", taskSandboxDenyShell},
+		{"sandbox-write-boundary", taskSandboxWriteBoundary},
 		{"usage-estimate", taskUsageEstimate},
+		{"usage-across-rounds", taskUsageAcrossRounds},
 		{"run-reconcile-no-replay", taskReconcileNoReplay},
+		{"run-reconcile-idempotent", taskReconcileIdempotent},
 		{"skill-meta", taskSkillMeta},
+		{"plan-whole-replacement", taskPlanWholeReplacement},
+		{"obs-trace-jsonl", taskObsTraceJSONL},
+		{"trigger-file-change", taskTriggerFileChange},
+		{"hooks-pre-tool-use", taskHooksPreToolUse},
+		{"checkpoint-restore", taskCheckpointRestore},
 	}
 	for _, task := range tasks {
 		t.Run(task.id, task.fn)

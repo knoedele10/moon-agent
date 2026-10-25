@@ -11,6 +11,7 @@ import (
 
 	"blog-my/internal/agent"
 	"blog-my/internal/agent/mcps"
+	"blog-my/internal/agent/toolkit/browser"
 
 	"github.com/gin-gonic/gin"
 )
@@ -93,6 +94,8 @@ func CloseAgentRuntime() {
 	if m != nil {
 		m.Close()
 	}
+	// 浏览器会话是进程级单例，退出时一起关掉，别留下半开的 WebSocket。
+	browser.Close()
 }
 
 func currentMCPManager() *mcps.Manager {

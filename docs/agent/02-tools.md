@@ -601,3 +601,78 @@ openai / anthropic / gemini 本来就在用这两个字段。**三个字段全�
 
 **仍然没覆盖的**：jsdom 不渲染像素，所以**视觉层面**（实际外观、间距、窄屏换行、遮挡）仍然只能靠人看。
 要真截图得在有显示环境的地方跑（本机直接开应用看一眼即可）。
+
+## 17. 2026-10-25：浏览器（CDP）、MCP HTTP、验证钩子与用量
+
+### 17.1 浏览器工具（`internal/agent/toolkit/browser`）
+
+真实实现走 Chrome DevTools Protocol，连**用户已经登录的 Chrome**，不是「抓静态 HTML 再模拟表单」。
+分层约定：静态正文 → `web_reader`；需要登录/点击/填表 → 浏览器；桌面应用 → CUA。
+
+| 工具 | 参数 | 行为 | 风险/确认 |
+| --- | --- | --- | --- |
+| `browser_open` | `url` | 导航并等 `document.readyState=complete`（最多 10s）；返回标题与地址 | network / 不确认 |
+| `browser_snapshot` | — | 标题、地址、正文摘要（4000 字）、最多 60 个可交互元素（带 `index`） | network / 不确认 |
+| `browser_click` | `index` 或 `selector` | 滚动到元素并点击；MISS 时返回可自纠提示 | network / **确认** |
+| `browser_type` | `index`/`selector`、`text`、`submit?` | 写入并派发 input/change；`submit=true` 时 `form.requestSubmit()` | network / **确认** |
+| `browser_screenshot` | `path?` | `Page.captureScreenshot` PNG，落工作区 `.moon/screenshots/`，同时把图片回灌给模型 | network / 不确认 |
+| `browser_network` | — | 最近 40 条 `Network.requestWillBeSent/responseReceived`（方法、URL、状态、类型） | network / 不确认 |
+
+安全边界：
+- 只允许 http/https；没有 `AGENT_BROWSER_ALLOW` 时**默认拒绝本机/内网**，报错文案直接给出「设置 AGENT_BROWSER_ALLOW=host 后重试」。
+- 快照不读取密码框内容；`browser_type` 对 `type=password`、`autocomplete=current-password/new-password/one-time-code/cc-number` 一律拒绝。
+- selector 通过 JSON 编码注入脚本，不拼字符串；截图路径不能跳出工作区。
+- 会话是进程级单例（一次握手，多次命令），退出时由 `CloseAgentRuntime` 关闭 WebSocket；操作按 `opMu` 串行，避免导航与点击交叉。
+
+环境变量：`AGENT_BROWSER_URL`（默认 `http://127.0.0.1:9222`）、`AGENT_BROWSER_ALLOW`（逗号分隔的域名/后缀）。
+
+测试：`internal/agent/toolkit/browser/browser_test.go` 用假 Chrome（httptest + WebSocket）覆盖导航、快照（密码脱敏）、点击、填写、截图落盘、网络事件、白名单与越界路径；
+**没有**在真实 Chrome 上跑过的像素/登录态验收，见 `docs/verify/market-backend-2026-10-25.md`。
+
+### 17.2 MCP Streamable HTTP
+
+`internal/agent/mcps/http.go` 让 MCP 不止 stdio：
+
+- 配置里只有 `url` 时走 HTTP；`command` 优先（与校验顺序一致）。
+- 每次请求 `POST`，`Accept: application/json, text/event-stream`；响应支持两种形态：整包 JSON，或 SSE（逐条 `data:`，读到匹配本次 id 的响应就停）。
+- 自动记录并回传 `Mcp-Session-Id`；通知（`notifications/*`）按 202/204 处理。
+- 传输层把响应整理成「行分隔 JSON」塞进内部缓冲，上层 `Client` 读循环与 stdio 完全一致。
+
+测试：`internal/agent/mcps/http_test.go` 覆盖 JSON 握手、SSE 工具列表（先推通知再推响应）、工具调用、非 2xx、URL 校验与传输选择。
+
+### 17.3 验证钩子：AGENTS.md 的 `moon:verify`
+
+在 `AGENTS.md` 里写：
+
+```markdown
+<!-- moon:verify
+go build ./...
+go test ./...
+-->
+```
+
+`write` / `edit` 成功后，`rules.MaybeVerify` 会按顺序跑这些命令（只允许 go/npm/npx/node/python/python3/make），失败摘要回灌给模型；
+**同一轮只跑一次**（`root + turnID` 去重），避免修不好时死循环。没有声明时完全不影响现有循环。
+
+### 17.4 生命周期钩子：`.moon/hooks.json`
+
+```json
+{ "hooks": [ { "phase": "PreToolUse", "command": ["python", ".moon/check.py"], "tools": ["write"] } ] }
+```
+
+- `PreToolUse` 退出码非 0 → 拒绝这次调用，stderr/stdout 作为拒绝原因回给模型；
+- `PostToolUse` / `Stop` 只记结果，不回滚；单条 5 秒超时；
+- 没有这个文件时所有函数都是空操作。
+
+### 17.5 用量与成本
+
+- `internal/llm/usage.go`：从各 provider 的 `ResponseMeta.Usage` 抽 input/output/cached；流式分片取最大值，跨轮相加。
+- `internal/llm/cache.go`：`AGENT_PROMPT_CACHE=0` 可关掉 Claude 的 `cache_control`；关闭时行为与未接入前一致。
+- 每轮结束写 `agent_usage` 表，并通过 SSE `usage` 事件推给前端；`GET /api/agent/usage` 提供汇总。
+- 前端在输入框工具条显示「本轮 12.3k in / 1.2k out · 缓存 8.1k · ≈$0.0123」。
+
+### 17.6 任务 journal 与强杀恢复
+
+- `internal/agent/runstore`：JSONL append-only，事件含 `run_id/session/type/status/tool/payload`；工具开始/结束由 `Exec.Journal` 写入。
+- 启动对账 `Reconcile`：只读/幂等调用未完成 → `recovered`（不重放）；未知副作用 → `needs_confirm`（等用户 ack/abandon）。
+- `GET /api/agent/runs`、`POST /api/agent/runs/:id/resolve`、`GET /api/agent/runs/:id/artifacts` 给前端任务板用。

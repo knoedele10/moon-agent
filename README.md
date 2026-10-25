@@ -1,6 +1,6 @@
 # Moon Agent（blog-my）
 
-一个以 Windows 桌面端为主的私人 AI 助手项目。GitHub 仓库名为 **moon-agent**，桌面应用当前产品名为 **blog-my**。项目由 Electron 界面、Go 服务、模型接入、Agent 工具执行和 MySQL 记忆组成，适合本地运行和继续开发。
+一个以 Windows 桌面端为主的私人 AI 助手项目。GitHub 仓库名为 **moon-agent**，桌面应用当前产品名为 **blog-my**。项目由 Electron 界面、Go 服务、模型接入、Agent 工具执行和本地记忆库组成，适合本地运行和继续开发。
 
 ## 功能一览
 
@@ -10,7 +10,12 @@
 | 流式对话 | 通过 SSE 推送文本增量、工具调用、工具结果、等待输入和完成状态；界面可展开执行详情。 |
 | Agent 执行 | 默认使用 Eino ReAct，同时保留 legacy 执行器用于回退和对照。可调用工作区文件工具、技能、子 Agent 和团队能力。 |
 | 工作区检索与计划 | `grep` 按内容找、`glob` 按文件名找（支持 `**`），自动跳过依赖/构建目录；`update_plan` 把多步任务的计划外化，每轮自动注入最新状态，对话页有计划面板。只读工具可在两个执行器里并发。`restore` 可回滚单个文件，`restore_turn` 可整组撤销最近一轮文件改动。见 [ACI 升级](docs/agent/13-aci-upgrades.md)。 |
-| 工具发现与经验学习 | 可选的按需工具发现、参数纠偏、大结果续读、MCP，以及有参数证据的技能积累、使用反馈和撤销。见 [使用指南](docs/hermes-parity/04-usage.md)。 |
+| 工具发现与经验学习 | 可选的按需工具发现、参数纠偏、大结果续读、MCP（stdio 与 Streamable HTTP），以及有参数证据的技能积累、使用反馈和撤销。见 [使用指南](docs/hermes-parity/04-usage.md)。 |
+| 浏览器操作 | 通过 CDP 连用户已登录的 Chrome：打开、可访问性快照、点击、填写、截图、看网络请求。需要登录态或 JS 渲染时用它；静态正文仍优先 `web_reader`。默认拒绝本机/内网，密码与支付字段拒填。 |
+| 本地数据库 | 默认 SQLite（`%APPDATA%\blog-my\data.db`），装完即可用；`DB_DRIVER=mysql` 切回 MySQL，并提供导出/导入。见 [首启状态](docs/api-contract.md)。 |
+| 成本与改动审阅 | 每轮显示 input/output/cached tokens 与估算成本；对话页可直接看工作区 unified diff，并按文件撤销到检查点。 |
+| 项目规则与验证 | 读取全局与多级 `AGENTS.md`（近的覆盖远的），支持 `<!-- moon:verify -->` 声明的构建/测试命令在写后自动跑一次，以及 `.moon/hooks.json` 的 PreToolUse/PostToolUse/Stop 钩子。 |
+| 任务 journal | 每次运行写 append-only JSONL；强杀重启后对账：只读/幂等调用标 `recovered`，未知副作用标 `needs_confirm` 等用户决定，**不自动重放**。 |
 | 执行权限 | `plan`、`confirm`、`auto` 模式控制规划、风险操作确认和自主执行；服务端和工具仍会校验权限。 |
 | 记忆与知识库 | 文档切块后融合向量、关键词和实体线索；自动记忆及用户画像可按需进入后续对话上下文。 |
 | 助手设定 | 用户画像与助手人格分开管理；人格配置包含性格、说话方式和做事方式等维度。 |
@@ -127,7 +132,14 @@ ollama pull qwen2.5vl:7b
 | `AGENT_EVOLVE` | 自我进化档位：`off`/`record`/`suggest`/`auto`（默认 `off`）。 |
 | `AGENT_EVOLVE_DIR` | 进化数据目录（轨迹、账本、候选）；默认用户配置目录。 |
 | `AGENT_SKILL_LINT` | 技能体检：`off`/`warn`（默认）/`block`。 |
-| `AGENT_MCP_CONFIG`、`AGENT_MCP_JSON` | MCP 服务器配置（文件路径或内联 JSON）；不配 = 不启动任何外部进程。 |
+| `AGENT_MCP_CONFIG`、`AGENT_MCP_JSON` | MCP 服务器配置（文件路径或内联 JSON）；`command` 走 stdio，只有 `url` 走 Streamable HTTP；不配 = 不启动任何外部进程、不联网。 |
+| `DB_DRIVER`、`DB_PATH` | `sqlite`（默认）/ `mysql`。显式设置优先；未设置时只要出现 `DB_HOST/DB_USER/DB_NAME/DB_PASSWORD` 任一就走 MySQL。SQLite 文件默认 `%APPDATA%\blog-my\data.db`，可用 `DB_PATH` 覆盖。 |
+| `AGENT_BROWSER_URL`、`AGENT_BROWSER_ALLOW` | 浏览器调试地址（默认 `http://127.0.0.1:9222`）与域名白名单（逗号分隔）。未配置白名单时拒绝本机/内网地址。 |
+| `AGENT_SANDBOX`、`AGENT_SANDBOX_ALLOW`、`AGENT_SANDBOX_DOMAINS`、`AGENT_SANDBOX_AUDIT` | 打开策略沙箱后：拒绝交互式 shell、限制可执行程序与出网域名，审计写 JSONL。缺省关闭时 `run_command` 仍走白名单。 |
+| `AGENT_RUN_DIR` | 任务 journal 目录；设置后每次运行写 JSONL，供强杀恢复对账与任务面板。 |
+| `AGENT_TRACE_DIR` | 设置后把模型/工具 span 按 OTel GenAI 字段写 `trace.jsonl`；不配则不产生额外开销。 |
+| `AGENT_PROMPT_CACHE` | `0` 关闭 Claude 的 `cache_control`；缺省开启。关闭时行为与未接入缓存前一致。 |
+| `MOON_GLOBAL_RULES` | 全局规则文件路径，默认 `~/.moon/AGENTS.md`。 |
 | `CONTENT_PUBLISH_INTERVAL_MINUTES` | 排期自动导出节拍（分钟，默认 `5`；`<=0` 关闭后台调度，手动触发仍可用）。 |
 | `CONTENT_EXPORT_DIR` | 成品包落盘目录（默认用户配置目录下的 `blog-my\content-publish`）。 |
 | `AGENT_WAKEUP_INTERVAL_SECONDS` | 定时唤醒检查间隔（秒，默认 `30`；`<=0` 关闭后台调度，建单接口仍可用）。 |
@@ -202,6 +214,7 @@ Remove-Item Env:DB_NAME
 - [ACI 升级：检索、计划、压缩工作集与不可信内容边界](docs/agent/13-aci-upgrades.md)
 - [Eino 执行器、预算和续行](docs/agent/08-eino-runtime.md)
 - [市面 Agent 对标与改进建议（2026-10）](docs/agent/14-market-comparison.md)
+- [对标项后端收口：验证记录（2026-10-25）](docs/verify/market-backend-2026-10-25.md)
 - [技能系统](docs/agent/04-skills.md)
 - [子 Agent 与团队](docs/agent/05-subagent-and-team.md)
 - [HTTP / SSE API 契约](docs/api-contract.md)
