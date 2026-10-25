@@ -8,7 +8,6 @@ import (
 	"blog-my/internal/model"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // 本文件是自动任务（排期到点导出）用到的数据访问方法，接在 store.go 的发布台账之上。
@@ -114,7 +113,7 @@ func (s *Store) MarkExported(p model.ContentPublication, path string) (model.Con
 	}
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		var row model.ContentPublication
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		if err := model.LockUpdate(tx).
 			Where("id = ? AND user_id = ?", p.Id, p.UserID).First(&row).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrNotFound
@@ -151,7 +150,7 @@ func (s *Store) RecordExportFailure(p model.ContentPublication, cause string, re
 	cause = truncateRunes(strings.TrimSpace(cause), 500)
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		var row model.ContentPublication
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		if err := model.LockUpdate(tx).
 			Where("id = ? AND user_id = ?", p.Id, p.UserID).First(&row).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrNotFound

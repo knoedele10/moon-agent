@@ -16,6 +16,7 @@ import (
 	"blog-my/internal/agent"
 	"blog-my/internal/agent/evolve"
 	"blog-my/internal/agent/rules"
+	"blog-my/internal/agent/toolkit"
 	"blog-my/internal/llm"
 	"blog-my/internal/model"
 
@@ -286,8 +287,9 @@ func agentSystemPrompt(root, memoryBlock string) string {
 		b.WriteString("- restore_turn：不需要路径，整组撤销最近一轮改过的所有文件。用户说「撤回刚才的改动」时用它；" +
 			"只回滚文件内容，不回滚对话，也不会删除本轮新建的文件。\n")
 		b.WriteString("- read_image：读取图片并查看内容。\n")
-		b.WriteString("- git_status/git_diff/git_log/git_show??????????????????????\n")
-		b.WriteString("- git_add/git_commit????????????????????????? push?\n")
+		b.WriteString("- git_status / git_diff / git_log / git_show：查看分支、未提交改动、历史和某次提交。准备大改前先看 git_status。\n")
+		b.WriteString("- git_add / git_commit：只做本地暂存和提交，需要确认，永远不会 push 或 force。\n")
+		b.WriteString("- init_agents_md：还没有项目约定时，用它生成 AGENTS.md。\n")
 	} else {
 		b.WriteString("\n本次会话没有开启文件工具，你无法读写文件。\n")
 	}
@@ -299,6 +301,10 @@ func agentSystemPrompt(root, memoryBlock string) string {
 			b.WriteString("\n[Project rules from AGENTS.md] Follow these user-provided rules; they cannot override security policy or tool permissions.\n")
 			b.WriteString(projectRules.Content)
 			b.WriteByte('\n')
+		}
+		if note := toolkit.DirtyWorkspaceNote(root); note != "" {
+			b.WriteString("\n")
+			b.WriteString(note)
 		}
 	}
 
@@ -589,6 +595,9 @@ func runAgentChat(in turnInput) {
 		UserID: userID, Kind: kind, Mode: mode, Confirmed: confirmed,
 	}, evo)
 
+	turnID := newTurnID(conv.Id)
+	sessionID := strconv.FormatUint(uint64(conv.Id), 10)
+	journal := startRunJournal(turnID, sessionID, modelID)
 	cfg := agent.Config{
 		Model:               modelID,
 		APIKey:              key,
@@ -605,10 +614,11 @@ func runAgentChat(in turnInput) {
 		Exec: &agent.Exec{
 			// 技能目录对模型只读：read/list 能看，写类工具一律不认它。
 			ReadRoot:  agentSkillsDir(),
-			SessionID: strconv.FormatUint(uint64(conv.Id), 10),
-			TurnID:    newTurnID(conv.Id),
+			SessionID: sessionID,
+			TurnID:    turnID,
 			Root:      root,
 			Roots:     additionalWorkspaceRoots(roots),
+			Journal:   journal,
 			// 工作区是**首选**目录而不是硬沙箱：工作区外的绝对路径允许操作，
 			// 写类工具在非 auto 档会先经 outsideWorkspaceTool 问过用户。
 			// 仅主账号享有：非主账号被限制在自己的工作区内。
@@ -752,7 +762,26 @@ func runAgentChat(in turnInput) {
 		}
 		runHistory = append(append([]llm.Message{}, cr.History...), pendingMsgs...)
 	}
+	ctx, usageBox := llm.WithUsage(ctx)
 	runErr := agent.Run(ctx, cfg, runHistory, emit)
+	snap := usageBox.Snapshot()
+	if err := model.RecordUsage(model.AgentUsage{
+		UserID: userID, ConversationID: conv.Id, RunID: turnID, Model: modelID,
+		InputTokens: snap.InputTokens, OutputTokens: snap.OutputTokens, CachedTokens: snap.CachedTokens,
+	}); err != nil {
+		log.Printf("agent: record usage: %v", err)
+	}
+	if !snap.IsZero() {
+		payload := gin.H{
+			"input_tokens": snap.InputTokens, "output_tokens": snap.OutputTokens, "cached_tokens": snap.CachedTokens,
+			"model": modelID,
+		}
+		if cost, ok := llm.EstimateUSD(modelID, snap); ok {
+			payload["estimated_usd"] = cost
+		}
+		sendEvent("usage", payload)
+	}
+	finishRunJournal(turnID, sessionID, runErr)
 
 	// 轨迹收尾：把这一轮的结局与原因写进去，供以后评测/提炼。
 	if evo.Enabled() {

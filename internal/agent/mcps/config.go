@@ -17,6 +17,10 @@ type ServerConfig struct {
 	Dir      string            `json:"dir"`
 	Env      map[string]string `json:"env"`
 	Disabled bool              `json:"disabled"`
+	// URL 非空且没有 command 时，这是一个待探测的 HTTP MCP，本进程不会把它当 stdio 拉起。
+	URL string `json:"url,omitempty"`
+	// Permission 是给用户看的权限声明：read、write 或 network。不参与执行。
+	Permission string `json:"permission,omitempty"`
 
 	// 可选的超时（秒）；0 用默认值。
 	InitTimeoutSeconds int `json:"initTimeoutSeconds"`
@@ -52,8 +56,8 @@ func ParseConfig(data []byte) (*Config, error) {
 		if s.Disabled {
 			continue
 		}
-		if strings.TrimSpace(s.Command) == "" {
-			problems = append(problems, "服务器 "+s.Name+" 缺少 command")
+		if strings.TrimSpace(s.Command) == "" && strings.TrimSpace(s.URL) == "" {
+			problems = append(problems, "服务器 "+s.Name+" 缺少 command 或 url")
 		}
 	}
 	if len(problems) > 0 {
@@ -87,7 +91,15 @@ func (s ServerConfig) CallTimeout() time.Duration {
 	return DefaultCallTimeout
 }
 
-// Enabled 返回本次是否应该启动这个服务器。
+// Enabled 返回本次是否应该启动这个 stdio 服务器。只有 URL 的条目不在这里启动。
 func (s ServerConfig) Enabled() bool {
 	return !s.Disabled && strings.TrimSpace(s.Command) != ""
+}
+
+// Transport 是 stdio 或 http。http 只做健康探测，不在本进程里建立 MCP 会话。
+func (s ServerConfig) Transport() string {
+	if strings.TrimSpace(s.Command) == "" && strings.TrimSpace(s.URL) != "" {
+		return "http"
+	}
+	return "stdio"
 }

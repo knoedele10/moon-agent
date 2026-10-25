@@ -96,6 +96,7 @@ var kindProfiles = map[string]kindProfile{
 			"skill_search": true, "skill_read": true, "skill_run": true, "skill_write": true,
 			"run_command": true,
 			"git_status":  true, "git_diff": true, "git_log": true, "git_show": true, "git_add": true, "git_commit": true,
+			"init_agents_md": true,
 			"subagent": true, "list_subagents": true, "spawn_teammate": true,
 			"send_message": true, "list_agents": true, "wait_agent": true,
 			"team_task_create": true, "team_task_list": true, "team_task_get": true, "team_task_update": true,

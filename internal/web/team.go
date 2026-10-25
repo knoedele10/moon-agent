@@ -32,7 +32,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 const (
@@ -880,7 +879,7 @@ func (s *teamService) CreateTask(ctx context.Context, parentSessionID string, in
 	err = model.DB.Transaction(func(tx *gorm.DB) error {
 		// 锁住团队会话这一行，串行化任务号分配：两个成员同时建任务不会拿到同一个 task_no。
 		var conv model.Conversation
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		if err := model.LockUpdate(tx).
 			Where("id = ? AND user_id = ?", a.ConvID, a.UserID).First(&conv).Error; err != nil {
 			return errors.New("团队会话不存在")
 		}

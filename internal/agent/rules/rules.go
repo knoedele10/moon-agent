@@ -90,8 +90,13 @@ func LoadFrom(workspace, global string, maxBytes int) (Result, error) {
 	paths = append(paths, chain...)
 
 	res := Result{}
+	remaining := maxBytes
 	for _, path := range paths {
-		doc, ok, err := readDocument(path, maxBytes)
+		if remaining <= 0 {
+			res.Truncated = true
+			break
+		}
+		doc, ok, err := readDocument(path, remaining)
 		if err != nil {
 			return Result{}, err
 		}
@@ -100,6 +105,10 @@ func LoadFrom(workspace, global string, maxBytes int) (Result, error) {
 		}
 		res.Documents = append(res.Documents, doc)
 		res.Truncated = res.Truncated || doc.Truncated
+		remaining -= len(doc.Content)
+		if remaining < 0 {
+			remaining = 0
+		}
 	}
 	if len(res.Documents) == 0 {
 		return res, nil

@@ -55,7 +55,7 @@ func (AgentTeamTask) TableName() string { return "agent_team_task" }
 // 索引名与 GORM 的默认命名（idx_<表>_<列>）保持一致：改列 tag 时不要换名字，
 // 否则这里对不上账。失败只记日志——服务能照常启动，问题会在续跑时以明确错误暴露。
 func migrateTeamSchema() {
-	if DB == nil {
+	if DB == nil || Driver() != "mysql" {
 		return
 	}
 	const (

@@ -345,6 +345,35 @@ func emptyGitOutput(out, fallback string) string {
 	return out
 }
 
+// UnifiedDiff 返回工作区未暂存与已暂存的 unified diff，供审阅接口使用。
+// 不是 git 仓库时返回错误，调用方决定怎么展示。
+func UnifiedDiff(ctx context.Context, root string) (string, error) {
+	root = strings.TrimSpace(root)
+	if root == "" {
+		return "", errors.New("工作区为空")
+	}
+	unstaged, err1 := runGit(ctx, root, "diff", "--no-ext-diff", "--no-color")
+	staged, err2 := runGit(ctx, root, "diff", "--no-ext-diff", "--no-color", "--cached")
+	if err1 != nil && err2 != nil {
+		return "", err1
+	}
+	var b strings.Builder
+	if strings.TrimSpace(unstaged) != "" {
+		b.WriteString(unstaged)
+		b.WriteByte('\n')
+	}
+	if strings.TrimSpace(staged) != "" {
+		if b.Len() > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString(staged)
+	}
+	if b.Len() == 0 {
+		return "没有检测到改动。", nil
+	}
+	return b.String(), nil
+}
+
 func truncateGitOutput(s string) string {
 	if len(s) <= gitOutputLimit {
 		return s

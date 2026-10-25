@@ -62,6 +62,12 @@ func buildAgentTools(p agentToolPolicy) []agent.Tool {
 		toolkit.DateTimeTool{},
 		toolkit.WebSearchTool{},
 		toolkit.WebReaderTool{},
+		toolkit.BrowserOpenTool{},
+		toolkit.BrowserSnapshotTool{},
+		toolkit.BrowserScreenshotTool{},
+		toolkit.BrowserNetworkTool{},
+		toolkit.BrowserClickTool{},
+		toolkit.BrowserTypeTool{},
 		toolkit.AskUserTool{},
 		toolkit.JSONTool{},
 		toolkit.SQLTool{},
@@ -96,6 +102,7 @@ func buildAgentTools(p agentToolPolicy) []agent.Tool {
 	// the existing confirm wrapper in confirm mode.
 	if strings.TrimSpace(root) != "" {
 		tools = append(tools, toolkit.GitStatusTool{}, toolkit.GitDiffTool{}, toolkit.GitLogTool{}, toolkit.GitShowTool{}, toolkit.GitAddTool{}, toolkit.GitCommitTool{})
+		tools = append(tools, initAgentsTool{})
 	}
 	// 模式二（confirm）：风险工具包一层“先问用户”。
 	// confirmed=true 表示用户刚刚确认过，这一次放行真正的工具。

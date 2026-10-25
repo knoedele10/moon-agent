@@ -28,7 +28,7 @@ func validateSkillImportDir(raw string) (string, error) {
 		return "", fmt.Errorf("请填绝对路径，例如 C:\\Users\\you\\.agents\\skills")
 	}
 	clean := filepath.Clean(p)
-	if vol := filepath.VolumeName(clean); vol != "" && clean == vol+string(filepath.Separator) {
+	if isFilesystemRoot(clean) {
 		return "", fmt.Errorf("不要用盘符根目录，请指向技能库文件夹")
 	}
 	fi, err := os.Stat(clean)
@@ -39,6 +39,14 @@ func validateSkillImportDir(raw string) (string, error) {
 		return "", fmt.Errorf("%s 不是目录", clean)
 	}
 	return clean, nil
+}
+
+// isFilesystemRoot 同时认 Windows 盘符根和 Unix 的 /。扫技能库时这两者都等于扫整块盘。
+func isFilesystemRoot(clean string) bool {
+	if vol := filepath.VolumeName(clean); vol != "" && clean == vol+string(filepath.Separator) {
+		return true
+	}
+	return clean == string(filepath.Separator) || filepath.Dir(clean) == clean
 }
 
 // importSkills 把一个目录下的 SKILL.md 批量导入当前用户（幂等，可重复跑）。

@@ -51,6 +51,8 @@ func TestLookupMetaCompatSets(t *testing.T) {
 		"list_agents":      true, "list_subagents": true, "team_task_list": true, "team_task_get": true,
 		// 2026-10-25 定时唤醒：查列表不动世界，可以和其它只读调用并发。
 		"list_wakeups": true,
+		"git_status":   true, "git_diff": true, "git_log": true, "git_show": true,
+		"browser_open": true, "browser_snapshot": true, "browser_screenshot": true, "browser_network": true,
 	}
 	wantConfirm := map[string]bool{
 		"write": true, "edit": true, "move": true, "delete": true, "office_edit": true, "restore": true, "restore_turn": true,
@@ -58,6 +60,9 @@ func TestLookupMetaCompatSets(t *testing.T) {
 		"skill_write": true, "skill_improve": true, "skill_archive": true, "memory_forget": true,
 		// 设定未来的自主轮次会改变助手行为，confirm 档先问一句。
 		"schedule_wakeup": true,
+		"git_add":         true, "git_commit": true,
+		"init_agents_md":  true,
+		"browser_click":   true, "browser_type": true,
 	}
 	wantIdempotent := map[string]bool{
 		"write": true, "edit": true, "memory_write": true, "skill_write": true,
@@ -67,13 +72,16 @@ func TestLookupMetaCompatSets(t *testing.T) {
 		"update_plan": true,
 		// 恢复到同一检查点两次，结果相同。
 		"restore": true, "restore_turn": true,
+		"git_add": true, "init_agents_md": true,
 	}
 	wantMutating := map[string]bool{
 		"write": true, "edit": true, "move": true, "delete": true, "restore": true, "restore_turn": true,
 		"office_edit": true, "skill_run": true, "skill_write": true, "run_command": true,
+		"git_add": true, "git_commit": true, "init_agents_md": true,
 	}
 	wantVerifying := map[string]bool{
 		"read": true, "list": true, "read_image": true, "sql_query": true,
+		"git_status": true, "git_diff": true,
 	}
 
 	gotParallel := map[string]bool{}

@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 
 	"blog-my/internal/llm"
+	"blog-my/internal/obs"
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
@@ -344,20 +345,35 @@ func schemaMessagesToLLM(msgs []*schema.Message) []llm.Message {
 func scanEinoOutput(state *einoRunState, ctx context.Context, reader *schema.StreamReader[*schema.Message]) (bool, error) {
 	state.resetModelText()
 	defer reader.Close()
+	var round llm.Usage
+	defer func() { llm.AddUsage(ctx, round) }()
+	modelName := ""
+	if state != nil {
+		modelName = state.cfg.Model
+	}
+	endSpan := obs.Start("chat", map[string]any{
+		"gen_ai.operation.name": "chat",
+		"gen_ai.request.model":  modelName,
+	})
+	failed := false
+	defer func() { endSpan(failed) }()
 	for {
 		msg, err := reader.Recv()
 		if ctxErr := ctx.Err(); ctxErr != nil {
+			failed = true
 			return false, ctxErr
 		}
 		if errors.Is(err, io.EOF) {
 			return false, nil
 		}
 		if err != nil {
+			failed = true
 			return false, err
 		}
 		if msg == nil {
 			continue
 		}
+		round = llm.MaxUsage(round, llm.UsageFromMessage(msg))
 		if msg.Content != "" && (msg.Role == "" || msg.Role == schema.Assistant) {
 			state.recordModelText(msg.Content)
 			state.send(Event{Kind: EvDelta, Content: msg.Content})
@@ -495,6 +511,7 @@ func runEino(ctx context.Context, cfg Config, history []llm.Message, emit func(E
 			feedback = verificationFeedback()
 		}
 		if feedback == "" {
+			finishRun(ctx, ex)
 			state.send(Event{Kind: EvDone, Content: allText.String()})
 			return nil
 		}
@@ -502,6 +519,7 @@ func runEino(ctx context.Context, cfg Config, history []llm.Message, emit func(E
 			&schema.Message{Role: schema.Assistant, Content: passText.String()},
 			&schema.Message{Role: schema.System, Content: feedback})
 	}
+	finishRun(ctx, ex)
 	state.send(Event{Kind: EvDone, Content: allText.String()})
 	return nil
 }

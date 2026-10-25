@@ -28,8 +28,9 @@ const (
 	toolsetAgent  = "agent"  // 子 agent 委派
 	toolsetTeam   = "team"   // 团队成员与共享任务板
 	toolsetEvolve = "evolve" // 自我进化：轨迹/账本/结构化记忆/固化
-	toolsetMCP    = "mcp"    // 显式配置的外部工具服务
-	toolsetMisc   = "misc"   // 未归类
+	toolsetMCP     = "mcp"     // 显式配置的外部工具服务
+	toolsetBrowser = "browser" // 浏览器（静态快照 / 本机页面）
+	toolsetMisc    = "misc"    // 未归类
 )
 
 // toolsetOf 把一个工具名归到工具集。规则集中在这里，新增工具时只改一处。
@@ -47,8 +48,10 @@ func toolsetOf(name string) string {
 	case "skill_search", "skill_read", "skill_write", "skill_run", "soul_evolve",
 		"skill_list", "skill_stats", "skill_lint", "skill_improve", "skill_archive":
 		return toolsetSkill
-	case "run_command", "git_status", "git_diff", "git_log", "git_show", "git_add", "git_commit":
+	case "run_command", "git_status", "git_diff", "git_log", "git_show", "git_add", "git_commit", "init_agents_md":
 		return toolsetExec
+	case "browser_open", "browser_snapshot", "browser_screenshot", "browser_network", "browser_click", "browser_type":
+		return toolsetBrowser
 	case "subagent", "list_subagents", "schedule_wakeup", "list_wakeups", "cancel_wakeup":
 		return toolsetAgent
 	case "spawn_teammate", "send_message", "list_agents", "wait_agent",
@@ -62,7 +65,7 @@ func toolsetOf(name string) string {
 
 // toolsetNames 返回所有已知工具集名（稳定顺序，供文档与 HTTP 展示）。
 func toolsetNames() []string {
-	return []string{toolsetCore, toolsetFS, toolsetMemory, toolsetSkill, toolsetExec, toolsetAgent, toolsetTeam, toolsetEvolve, toolsetMCP}
+	return []string{toolsetCore, toolsetFS, toolsetMemory, toolsetSkill, toolsetExec, toolsetAgent, toolsetTeam, toolsetEvolve, toolsetMCP, toolsetBrowser}
 }
 
 // parseToolsetList 解析 AGENT_TOOLSETS：逗号/空格分隔，大小写不敏感，去重。

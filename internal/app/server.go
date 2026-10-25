@@ -32,6 +32,8 @@ func Run(ctx context.Context) error {
 	if err := model.InitDB(); err != nil {
 		return err
 	}
+	// 上次没写完的 run 只改 journal，不重放写文件。
+	web.ReconcileRuns()
 	if db, err := model.DB.DB(); err == nil {
 		defer db.Close()
 	}

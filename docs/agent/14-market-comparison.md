@@ -259,4 +259,27 @@ A2A / AG-UI 这类跨 agent、agent-前端协议，对单机个人产品暂时�
 | 计划/权限/回滚 | `internal/agent/plan.go`、`internal/web/agent_confirm.go`、`internal/agent/fs/checkpoint.go` |
 | 记忆与技能进化 | `internal/rag`、`internal/agent/skill`、`internal/agent/evolve` |
 | 上下文工程 | `internal/agent/tool_state.go`、`toolsys/spill.go`、`docs/agent/08-eino-runtime.md` |
-| 待补的四个包 | `internal/agent/rules`、`internal/agent/toolkit/git`、`internal/agent/runstore`、`internal/agent/sandbox` |
+| 规则 / Git / journal / 沙箱策略 | `internal/agent/rules`、`internal/agent/toolkit/git.go`、`internal/agent/runstore`、`internal/agent/sandbox` |
+
+## 8. 实现状态（2026-10-25）
+
+对照第 4 节。GPT 的未提交改动保留为 `598c164`。下表的「现在」是其后补上的后端。
+
+| 项 | GPT 之前 | 现在 | 关键文件 | 还没做 |
+| --- | --- | --- | --- | --- |
+| P0-1 SQLite 默认 | 未开始（只有 MySQL） | 后端完成 | `internal/model/driver.go`、`sqlite.go`、`export.go`、`lock.go`；`GET/POST /api/agent/data/export|import`；`GET /api/setup/status` | 首次启动向导界面。已有环境只要 `DB_HOST` 等非空且未写 `DB_DRIVER`，仍走 MySQL |
+| P0-2 AGENTS.md | 部分：向上查找、注入、单测 | 完成预算共享、`/init`、验证命令解析 | `internal/agent/rules`、`init_agents_md`、`POST /api/agent/rules/init` | 规则不能改权限，这是提示词约定，不是沙箱强制 |
+| P0-3 Git + diff + 验证 | 部分：status/diff/log/show/add/commit，无 push | 脏工作区提醒、write/edit 后跑一次 verify、diff 与单文件恢复 API | `internal/agent/toolkit/git.go`、`dirty.go`、`rules/verify.go`、`GET /api/agent/diff`、`POST /api/agent/restore` | diff 审阅面板。恢复要带会话 id，才能找到对应检查点 |
+| P0-4 用量与缓存 | 未开始 | 完成记账、SSE `usage`、Claude `cache_control`、已知模型估价 | `internal/llm/usage.go`、`cache.go`、`internal/model/usage.go`、`GET /api/agent/usage` | 输入框旁的用量条。缓存开关默认只作用于 Claude |
+| P1-5 run journal | 部分：JSONL 读写，未接线 | 启动对账、工具效果写入、不重放、确认/放弃 | `internal/agent/runstore/reconcile.go`、`internal/web/runs.go`、`internal/app/server.go` | 后台任务面板界面 |
+| P1-6 OS 沙箱 | 未开始 | 策略门 + 审计 JSONL。`AGENT_SANDBOX=1` 时替换命令白名单，并拒绝 cmd/powershell | `internal/agent/sandbox`、`internal/web/run_command.go` | MXC、Landlock、WSL、AppContainer。关着开关时仍是白名单 |
+| P1-7 浏览器 | 未开始 | 静态抓取 + 内存 DOM：open/snapshot/click/type/screenshot/network。密码框拒绝输入 | `internal/agent/toolkit/browser.go` | Chrome / CDP / 已登录浏览器。截图返回可访问性文本 |
+| P1-8 评测与 trace | 未开始 | `AGENT_TRACE_DIR` 才写 JSONL span；`evals/` 有脚本任务 | `internal/obs`、`evals/harness_test.go` | 20~30 条真模型任务、瀑布图、发版 smoke |
+| P2 MCP | 未开始（原有 stdio） | URL、权限声明、`GET /api/agent/mcp/health` 探测 | `internal/agent/mcps/config.go`、`probe.go` | Streamable HTTP 会话、市场、OAuth |
+| P2 技能元数据 | 未开始 | `version` / `source` / `allowed-tools`，不改 `ParseMarkdown` | `internal/agent/skill/meta.go` | 技能市场与导入导出 |
+| P2 产物 | 未开始 | journal 里带路径的工具结果可列出 | `GET /api/agent/runs/:id/artifacts` | 预览和一键打开 |
+| P2 钩子 | 未开始 | `.moon/hooks.json` 的 PreToolUse / PostToolUse / Stop。没有文件则不改变行为 | `internal/agent/hooks` | 格式化类钩子的产品界面 |
+| P2 记忆来源 | 时间衰减原本已有 | `memory_write` 可选 `source`，写进正文开头 | `internal/rag/memory_tool.go` | 冲突合并、图记忆 |
+| P2 文件触发 | 未开始 | 快照对比 API，`auto_run` 恒为 false | `internal/agent/trigger`、`GET /api/agent/triggers/files` | 不自动开跑，避免变成无人值守 |
+
+明确留下的：首启向导、用量条、diff 面板、操作系统级沙箱、CDP 浏览器、MCP 全双工会话、多端、macOS、语音。这些要么是界面，要么依赖当前构建里没有的系统能力。文件变化只报告，不启动 agent。

@@ -81,6 +81,8 @@ type Exec struct {
 	// 写类工具（write/edit/move/delete/office_edit）一律不看它——技能目录对模型是只读的。
 	ReadRoot string
 	Signal   context.Context
+	// Journal 可选。非空时循环把工具开始/结束写进 run journal，供重启后对账。
+	Journal func(kind string, payload any)
 }
 
 // Registry 是工具注册表：既给循环提供「按名字查工具」，也给模型提供工具定义清单。

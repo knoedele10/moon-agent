@@ -252,7 +252,7 @@ func (s *Store) SaveDraftBody(userID string, id uint, body, summary, by string) 
 		return d, err
 	}
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		if err := model.LockUpdate(tx).
 			Where("id = ? AND user_id = ?", id, userID).First(&d).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrNotFound
@@ -288,7 +288,7 @@ func (s *Store) SetDraftStatus(userID string, id uint, status string) (model.Con
 		return d, err
 	}
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		if err := model.LockUpdate(tx).
 			Where("id = ? AND user_id = ?", id, userID).First(&d).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrNotFound
@@ -448,7 +448,7 @@ func (s *Store) UpdatePublication(userID string, id uint, status, url, cause str
 		return p, err
 	}
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		if err := model.LockUpdate(tx).
 			Where("id = ? AND user_id = ?", id, userID).First(&p).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrNotFound

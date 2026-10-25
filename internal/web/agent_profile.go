@@ -153,8 +153,11 @@ func incrementProfileTurns(userID string) (int, error) {
 	if model.DB == nil || strings.TrimSpace(userID) == "" {
 		return 0, errors.New("画像计数数据库或用户 ID 为空")
 	}
-	if err := model.DB.Exec("INSERT INTO agent_setting (user_id, profile_turns) VALUES (?, 1) "+
-		"ON DUPLICATE KEY UPDATE profile_turns = profile_turns + 1", userID).Error; err != nil {
+	stmt := "INSERT INTO agent_setting (user_id, profile_turns) VALUES (?, 1) ON DUPLICATE KEY UPDATE profile_turns = profile_turns + 1"
+	if model.Driver() == "sqlite" {
+		stmt = "INSERT INTO agent_setting (user_id, profile_turns) VALUES (?, 1) ON CONFLICT(user_id) DO UPDATE SET profile_turns = profile_turns + 1"
+	}
+	if err := model.DB.Exec(stmt, userID).Error; err != nil {
 		return 0, err
 	}
 	var setting model.AgentSetting

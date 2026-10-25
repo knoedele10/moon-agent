@@ -213,4 +213,15 @@ var byName = map[string]Meta{
 	"schedule_wakeup": known(RiskSelf, false, true, SideEffectNonIdempotent, false, false),
 	"cancel_wakeup":   known(RiskSelf, false, false, SideEffectIdempotent, false, false),
 	"list_wakeups":    known(RiskRead, true, false, SideEffectReadOnly, false, false),
+
+	// 生成 AGENTS.md 会写工作区文件；文件已存在时拒绝覆盖，重复调用结果相同。
+	"init_agents_md": known(RiskWrite, false, true, SideEffectIdempotent, true, false),
+
+	// 浏览器：打开/快照/截图/网络日志只读可并发；点击和输入会改变页面，confirm 档先问。
+	"browser_open":       known(RiskNetwork, true, false, SideEffectReadOnly, false, false),
+	"browser_snapshot":   known(RiskNetwork, true, false, SideEffectReadOnly, false, false),
+	"browser_screenshot": known(RiskNetwork, true, false, SideEffectReadOnly, false, false),
+	"browser_network":    known(RiskNetwork, true, false, SideEffectReadOnly, false, false),
+	"browser_click":      known(RiskNetwork, false, true, SideEffectNonIdempotent, false, false),
+	"browser_type":       known(RiskNetwork, false, true, SideEffectNonIdempotent, false, false),
 }
