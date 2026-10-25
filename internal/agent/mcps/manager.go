@@ -49,7 +49,8 @@ func (m *Manager) starter() func(ctx context.Context, cfg ServerConfig) (*Client
 	if m.start != nil {
 		return m.start
 	}
-	return StartStdio
+	// 有 command 走 stdio，只有 url 走 Streamable HTTP。
+	return Start
 }
 
 // LoadConfigFile 读配置文件；文件不存在时返回 (nil, nil)，让「没配 = 不启用」成立。

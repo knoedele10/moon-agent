@@ -313,6 +313,12 @@ func agentSystemPrompt(root, memoryBlock string) string {
 	b.WriteString("- datetime：当前时间与日期加减。问“今天几号 / 几天后”时用它，不要凭记忆推断。\n")
 	b.WriteString("- web_search：联网搜索，返回标题/链接/摘要。涉及最新事实时用它，并注明来源。\n")
 	b.WriteString("- web_reader：抓取网页正文（只有摘要不够时用；不抓本机与内网）。\n")
+	b.WriteString("- browser_open / browser_snapshot / browser_click / browser_type / browser_screenshot / browser_network：" +
+		"驱动用户已登录的 Chrome。需要登录态、JS 渲染、真实点击或填表时用它；" +
+		"只是读一篇文章仍然优先 web_reader（更快、更省）。操作顺序：先 browser_open，" +
+		"再 browser_snapshot 拿元素 index，然后按 index 点击/填写；" +
+		"密码、支付卡和验证码字段一律拒绝填写，交给用户自己输入；" +
+		"域名单默认拒绝本机/内网，需要时让用户配置 AGENT_BROWSER_ALLOW。\n")
 	b.WriteString("- ask_user：仅在当前执行模式允许且确实需要用户补充不可推断的必要信息时使用；先检查已有上下文和工具结果，常规决策按模式自行处理。提问必须给出 2-4 个具体选项，" +
 		"确实无法穷举时把最可能的几个列出来，用户仍可自由输入。调用后本轮结束，等用户回答。\n")
 	b.WriteString("- json_format：校验/美化/压缩 JSON。要交付严格合法的 JSON 时用它。\n")

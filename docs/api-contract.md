@@ -718,3 +718,63 @@ data: {"id":"call_abc","name":"read","ok":true,"summary":"读取 a.txt（12 行�
 - `DELETE /api/conversations/{id}` 删除会话。
 - `POST /api/keys` / `DELETE /api/keys/{id}` 密钥增删。
 - `POST /login` / `POST /register` / `POST /logout`。
+
+---
+
+## 16. 2026-10-25 新增：用量 / 任务 journal / 改动审阅 / 规则 / MCP 健康 / 文件触发
+
+这一组都是「本地优先 / 长任务」的配套接口，全部要求登录态。
+
+### 16.1 `GET /api/agent/usage` —— token 用量汇总
+
+查询参数：`conversation_id`（可选，不传 = 当前用户全部）。
+
+```json
+{ "input_tokens": 12345, "output_tokens": 678, "cached_tokens": 9000, "requests": 12 }
+```
+
+数据来自 `agent_usage` 表；没有用量的轮次不落行。SSE 的 `usage` 事件带同一轮的
+`input_tokens / output_tokens / cached_tokens / model / estimated_usd?`。
+
+### 16.2 任务 journal
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/agent/runs` | `{runs:[{run_id,session_id,status,started_at,updated_at,path}]}` |
+| POST | `/api/agent/runs/{id}/resolve` | body `{"action":"ack"\|"abandon"}`；返回 `{ok,status,replay:false}`。**永远不会自动重放工具** |
+| GET | `/api/agent/runs/{id}/artifacts` | `{artifacts:[{tool,path,ok}]}`，来自 journal 的 `tool_finished` |
+
+状态机：`running / waiting / done / failed / aborted / recovered / needs_confirm`。
+
+### 16.3 改动审阅
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/agent/diff` | `{root,dirty,note,diff,diff_error?}`；`diff` 是工作区 unified diff |
+| POST | `/api/agent/restore` | body `{"path":"src/a.go","session_id":"..."}`；按文件恢复到最近检查点，返回 `{content,is_error,display}` |
+
+对话页的「改动」面板：拉 `/api/agent/diff` → 解析 `diff --git a/x b/x` 列文件 → 逐文件调用 restore。
+撤销复用现有 checkpoint，不新建回滚机制。
+
+### 16.4 项目规则
+
+`POST /api/agent/rules/init`，body `{"force":false}` → `{path,created}`。
+扫描语言/构建/测试命令，生成初版 `AGENTS.md`（含 `<!-- moon:verify ... -->`）。
+
+### 16.5 数据导出 / 导入
+
+`GET /api/agent/data/export` 下载 JSON；`POST /api/agent/data/import` 上传并返回
+`{imported_conversations}`。用于 SQLite ↔ MySQL 迁移与换机。
+
+### 16.6 MCP 与文件触发
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/agent/mcp/health` | 各 MCP 服务器的连接状态与错误；URL 型服务器做探测 |
+| GET | `/api/agent/triggers/files` | 与上一次快照相比较，返回变化文件列表 |
+
+### 16.7 首启状态
+
+`GET /api/setup/status` → `{driver,sqlite_path,has_workspace,workspace,permission_mode,ready}`。
+`driver` 由 `DB_DRIVER` 决定：显式 `sqlite|mysql` 优先；未设置时，只要出现
+`DB_HOST/DB_USER/DB_NAME/DB_PASSWORD` 任一就走 MySQL，否则默认 SQLite。

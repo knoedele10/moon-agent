@@ -51,7 +51,15 @@
     planPanel: document.getElementById('plan-panel'),
     planSteps: document.getElementById('plan-steps'),
     planProgress: document.getElementById('plan-progress'),
-    planToggle: document.getElementById('plan-toggle')
+    planToggle: document.getElementById('plan-toggle'),
+    usageChip: document.getElementById('usage-chip'),
+    reviewToggle: document.getElementById('review-toggle'),
+    reviewPanel: document.getElementById('review-panel'),
+    reviewFiles: document.getElementById('review-files'),
+    reviewSummary: document.getElementById('review-summary'),
+    reviewDiff: document.getElementById('review-diff'),
+    reviewRefresh: document.getElementById('review-refresh'),
+    reviewClose: document.getElementById('review-close')
   };
 
   var stickBottom = true;
@@ -1511,6 +1519,8 @@
     notifyTaskCard();
     clearTeamCard(); // 新对话没有团队数据，别把上一个会话的成员留在卡片上
     clearPlan(); // 计划属于会话：新对话不能沿用上一个会话的步骤
+    clearUsage(); // 用量同样属于会话
+    closeReview();
     els.input.focus();
   }
 
@@ -2008,6 +2018,136 @@
     els.planPanel.classList.toggle('is-collapsed', !!collapsed);
     els.planToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
     els.planToggle.setAttribute('aria-label', collapsed ? '展开任务计划' : '收起任务计划');
+  }
+
+  // ---- 本轮用量：后端在 done 之前推一条 usage 事件；价格是估算，仅供参考。----
+  function formatTokens(n) {
+    var v = Number(n) || 0;
+    if (v >= 1000000) return (v / 1000000).toFixed(1) + 'M';
+    if (v >= 1000) return (v / 1000).toFixed(1) + 'k';
+    return String(v);
+  }
+
+  function showUsage(usage) {
+    if (!els.usageChip || !usage) return;
+    var parts = ['本轮 ' + formatTokens(usage.input_tokens) + ' in / ' + formatTokens(usage.output_tokens) + ' out'];
+    if (Number(usage.cached_tokens) > 0) parts.push('缓存 ' + formatTokens(usage.cached_tokens));
+    if (typeof usage.estimated_usd === 'number' && isFinite(usage.estimated_usd)) {
+      parts.push('≈$' + usage.estimated_usd.toFixed(4));
+    }
+    els.usageChip.textContent = parts.join(' · ');
+    els.usageChip.hidden = false;
+    els.usageChip.title = usage.model ? ('模型：' + usage.model) : '';
+  }
+
+  function clearUsage() {
+    if (!els.usageChip) return;
+    els.usageChip.hidden = true;
+    els.usageChip.textContent = '';
+    els.usageChip.title = '';
+  }
+
+  // ---- 本轮改动：GET /api/agent/diff 拿 unified diff，按文件撤销走 /api/agent/restore。----
+  function diffFiles(diff) {
+    var seen = {};
+    var out = [];
+    String(diff || '').split('\n').forEach(function (line) {
+      var m = /^diff --git a\/(.+?) b\/(.+)$/.exec(line);
+      if (!m) return;
+      var path = m[2] || m[1];
+      if (!path || seen[path]) return;
+      seen[path] = true;
+      out.push(path);
+    });
+    return out;
+  }
+
+  function renderReview(body) {
+    if (!els.reviewFiles || !els.reviewSummary) return;
+    var diff = body && typeof body.diff === 'string' ? body.diff : '';
+    els.reviewSummary.textContent = body && body.dirty
+      ? (body.note ? body.note.replace(/\s+/g, ' ').trim() : '工作区有未提交改动')
+      : '工作区干净';
+    els.reviewFiles.textContent = '';
+    var files = diffFiles(diff);
+    if (!files.length) {
+      var empty = document.createElement('li');
+      empty.className = 'review-empty';
+      empty.textContent = diff ? '改动无法按文件拆分（可能是二进制或未跟踪文件）。' : '没有可展示的改动。';
+      els.reviewFiles.appendChild(empty);
+    }
+    files.forEach(function (path) {
+      var li = document.createElement('li');
+      li.className = 'review-file';
+      var name = document.createElement('span');
+      name.className = 'review-file-path';
+      name.textContent = path;
+      var undo = document.createElement('button');
+      undo.type = 'button';
+      undo.className = 'review-undo';
+      undo.textContent = '撤销此文件';
+      undo.setAttribute('data-path', path);
+      undo.addEventListener('click', function () { restoreReviewFile(path, undo); });
+      li.appendChild(name);
+      li.appendChild(undo);
+      els.reviewFiles.appendChild(li);
+    });
+    if (els.reviewDiff) {
+      els.reviewDiff.textContent = diff;
+      els.reviewDiff.hidden = !diff;
+    }
+  }
+
+  async function refreshReview() {
+    if (!els.reviewPanel) return;
+    if (els.reviewFiles) {
+      els.reviewFiles.textContent = '';
+      var loading = document.createElement('li');
+      loading.className = 'review-empty';
+      loading.textContent = '正在读取改动…';
+      els.reviewFiles.appendChild(loading);
+    }
+    try {
+      var body = await apiJSON('/api/agent/diff');
+      renderReview(body || {});
+    } catch (e) {
+      if (els.reviewFiles) {
+        els.reviewFiles.textContent = '';
+        var failed = document.createElement('li');
+        failed.className = 'review-empty is-error';
+        failed.textContent = '读取改动失败：' + (e.message || '未知错误');
+        els.reviewFiles.appendChild(failed);
+      }
+    }
+  }
+
+  async function restoreReviewFile(path, button) {
+    if (!path) return;
+    if (button) { button.disabled = true; button.textContent = '撤销中…'; }
+    try {
+      var res = await api('/api/agent/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: path, session_id: state.currentId == null ? '' : String(state.currentId) })
+      });
+      var body = await res.json().catch(function () { return {}; });
+      if (!res.ok || body.is_error) throw new Error(body.error || body.content || '撤销失败');
+      toast('已撤销 ' + path);
+      await refreshReview();
+    } catch (e) {
+      toast('撤销失败：' + (e.message || '未知错误'));
+      if (button) { button.disabled = false; button.textContent = '撤销此文件'; }
+    }
+  }
+
+  function openReview() {
+    if (!els.reviewPanel) return;
+    els.reviewPanel.hidden = false;
+    refreshReview();
+  }
+
+  function closeReview() {
+    if (els.reviewPanel) els.reviewPanel.hidden = true;
   }
 
   function renderToolEvent(container, kind, data) {
@@ -2830,6 +2970,8 @@
       } else if (event === 'subagent') {
         var subagent = safeParse(data);
         if (subagent) onTool('subagent', subagent);
+      } else if (event === 'usage') {
+        showUsage(safeParse(data));
       } else if (event === 'done') {
         finished = true;
         onDone(safeParse(data) || {});
@@ -3694,6 +3836,9 @@
       setPlanCollapsed(!els.planPanel.classList.contains('is-collapsed'));
     });
   }
+  if (els.reviewToggle) els.reviewToggle.addEventListener('click', openReview);
+  if (els.reviewRefresh) els.reviewRefresh.addEventListener('click', refreshReview);
+  if (els.reviewClose) els.reviewClose.addEventListener('click', closeReview);
 
   // 契约 §7：密钥弹层。入口是右上角按钮；关掉后把 hash 收回当前视图，
   // 否则停在 #/keys 上刷新页面会又弹一次，用户会觉得关不掉。
