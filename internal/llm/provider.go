@@ -84,6 +84,8 @@ type Event struct {
 	// ToolCall 仅在 EventToolCall 时非空。
 	ToolCall *ToolCall
 	Err      error
+	// Usage 只在 EventDone 上携带这一轮的 token 账；供应商没返回时为 nil。
+	Usage *Usage
 }
 
 var (
@@ -185,7 +187,7 @@ func (r *Registry) NewToolCallingModel(ctx context.Context, modelID, apiKey stri
 	if !ok {
 		return nil, ErrToolsUnsupported
 	}
-	return tc, nil
+	return maybeCache(ep.Backend, tc), nil
 }
 
 // toSchemaMessages 把本包的轻量消息映射为 eino schema.Message。
@@ -280,7 +282,7 @@ func (r *Registry) Generate(ctx context.Context, modelID, apiKey string, req Cha
 	if err != nil {
 		return "", err
 	}
-	msg, err := cm.Generate(ctx, toSchemaMessages(req.Messages))
+	msg, err := cm.Generate(ctx, toSchemaMessages(req.Messages), CacheOptions(ep.Backend)...)
 	if err != nil {
 		return "", err
 	}
@@ -323,7 +325,7 @@ func (r *Registry) Stream(ctx context.Context, modelID, apiKey string, req ChatR
 		return nil, err
 	}
 
-	reader, err := cm.Stream(ctx, toSchemaMessages(req.Messages))
+	reader, err := cm.Stream(ctx, toSchemaMessages(req.Messages), CacheOptions(ep.Backend)...)
 	if err != nil {
 		return nil, err
 	}
@@ -340,6 +342,7 @@ func (r *Registry) Stream(ctx context.Context, modelID, apiKey string, req ChatR
 		defer close(ch)
 		defer reader.Close()
 		acc := &toolCallAccumulator{}
+		var round Usage
 		for {
 			msg, err := reader.Recv()
 			if err != nil {
@@ -352,13 +355,19 @@ func (r *Registry) Stream(ctx context.Context, modelID, apiKey string, req ChatR
 							return
 						}
 					}
-					sendEvent(ctx, ch, Event{Type: EventDone})
+					done := Event{Type: EventDone}
+					if !round.IsZero() {
+						u := round
+						done.Usage = &u
+					}
+					sendEvent(ctx, ch, done)
 				} else {
 					// 中途出错：只发 EventError，不发已经攒了半截的工具调用。
 					sendEvent(ctx, ch, Event{Type: EventError, Err: err})
 				}
 				return
 			}
+			round = MaxUsage(round, UsageFromMessage(msg))
 			if msg.Content != "" {
 				if !sendEvent(ctx, ch, Event{Type: EventDelta, Content: msg.Content}) {
 					return

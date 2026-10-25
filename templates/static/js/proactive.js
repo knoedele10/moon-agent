@@ -86,6 +86,15 @@
     if (!box) return;
     box.textContent = '';
     box.hidden = false;
+    // 输入框会长高（textarea 自动撑开），固定 bottom 一定会被盖住；
+    // 每次显示时按 composer 顶边把横幅抬到它上面（用 innerHeight - top，
+    // 不能只用 height：composer 下面还压着活动目录那一行）。
+    var composer = document.querySelector('.composer');
+    if (composer) {
+      var top = composer.getBoundingClientRect().top;
+      var offset = Math.max(24, Math.round(window.innerHeight - top) + 12);
+      box.style.bottom = offset + 'px';
+    }
 
     var main = document.createElement('button');
     main.type = 'button';

@@ -11,10 +11,13 @@ import (
 
 // Item 是一条已解析好的技能，Source 保留它来自哪个文件（便于溯源与重复导入）。
 type Item struct {
-	Name        string
-	Description string
-	Body        string
-	Source      string
+	Name         string
+	Description  string
+	Body         string
+	Source       string
+	Version      string
+	Origin       string
+	AllowedTools []string
 }
 
 // ScanOptions 控制目录扫描。默认值（零值）就是“给技能库用”的那套：
@@ -98,6 +101,7 @@ func ScanDir(root string, opt ScanOptions) (ScanReport, error) {
 			return nil
 		}
 		name, desc, body := ParseMarkdown(string(raw))
+		meta := ParseMeta(string(raw))
 		if strings.TrimSpace(name) == "" {
 			// frontmatter 里没有 name 时用目录名兜底：技能名是模型找技能的钥匙，
 			// 不能让它变成空串。
@@ -111,7 +115,10 @@ func ScanDir(root string, opt ScanOptions) (ScanReport, error) {
 			rel = path
 		}
 		cands = append(cands, cand{
-			item:  Item{Name: name, Description: desc, Body: body, Source: path},
+			item: Item{
+				Name: name, Description: desc, Body: body, Source: path,
+				Version: meta.Version, Origin: meta.Source, AllowedTools: meta.AllowedTools,
+			},
 			depth: strings.Count(rel, string(filepath.Separator)),
 		})
 		return nil

@@ -116,22 +116,22 @@ func TestAgentToolsRespectMode(t *testing.T) {
 	root := t.TempDir()
 
 	// plan 模式只留四类：记忆工具 + 只读的技能工具（查说明书，不碰磁盘）
-	// + 只能写 .md 的 write（计划存档是默认操作）。
+	// + 只能写 .md 的 write（计划存档是默认操作）+ update_plan（计划状态本身）。
 	plan := agentToolsFor("u1", root, ModePlan, false, subagentMaxDepth())
-	if len(plan) != 5 {
-		t.Fatalf("plan 模式应当注册 5 个工具（memory_search/memory_write/skill_search/skill_read/write），实际 %d 个", len(plan))
+	if len(plan) != 6 {
+		t.Fatalf("plan 模式应当注册 6 个工具（memory_search/memory_write/skill_search/skill_read/update_plan/write），实际 %d 个", len(plan))
 	}
 	for _, tl := range plan {
 		switch tl.Name() {
-		case "memory_search", "memory_write", "skill_search", "skill_read", "write":
+		case "memory_search", "memory_write", "skill_search", "skill_read", "update_plan", "write":
 		default:
 			t.Fatalf("plan 模式不该注册 %s", tl.Name())
 		}
 	}
 
-	// 没配工作区时连计划存档都写不了，只剩记忆与技能这两组只读工具。
-	if got := agentToolsFor("u1", "", ModePlan, false, subagentMaxDepth()); len(got) != 4 {
-		t.Fatalf("无工作区时 plan 模式应当只剩 4 个只读工具（记忆 2 + 技能 2），实际 %d 个", len(got))
+	// 没配工作区时连计划存档都写不了，只剩记忆、技能与计划状态。
+	if got := agentToolsFor("u1", "", ModePlan, false, subagentMaxDepth()); len(got) != 5 {
+		t.Fatalf("无工作区时 plan 模式应当只剩 5 个不碰磁盘的工具（记忆 2 + 技能 2 + update_plan），实际 %d 个", len(got))
 	}
 
 	auto := agentToolsFor("u1", root, ModeAuto, false, subagentMaxDepth())

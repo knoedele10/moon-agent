@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -35,11 +36,17 @@ const toolOutputCapDefault = 16000
 
 // toolOutputCap 读 AGENT_TOOL_OUTPUT_CAP；非法/<=0 用默认值。
 func toolOutputCap() int {
-	n, err := strconv.Atoi(strings.TrimSpace(os.Getenv("AGENT_TOOL_OUTPUT_CAP")))
-	if err != nil || n <= 0 {
-		return toolOutputCapDefault
+	if n, err := strconv.Atoi(strings.TrimSpace(os.Getenv("AGENT_TOOL_OUTPUT_CAP"))); err == nil && n > 0 {
+		return n
 	}
-	return n
+	// 知道模型窗口时，单条工具结果不超过窗口的 10%：一条结果就吃掉半个上下文，
+	// 后面几轮必然被压缩，反而丢掉更重要的任务状态。
+	if window, err := strconv.Atoi(strings.TrimSpace(os.Getenv("AGENT_CONTEXT_TOKENS"))); err == nil && window > 0 {
+		if limit := window / 10; limit > 0 {
+			return limit
+		}
+	}
+	return toolOutputCapDefault
 }
 
 // capToolOutput 在工具出口把过长的输出砍掉，并**明确告诉模型被砍了**。
@@ -113,11 +120,134 @@ const midLoopCompactTokensDefault = 24000
 const midLoopKeepTail = 6
 
 func midLoopCompactTokens() int {
-	n, err := strconv.Atoi(strings.TrimSpace(os.Getenv("AGENT_MIDLOOP_COMPACT_TOKENS")))
-	if err != nil || n <= 0 {
-		return midLoopCompactTokensDefault
+	if n, err := strconv.Atoi(strings.TrimSpace(os.Getenv("AGENT_MIDLOOP_COMPACT_TOKENS"))); err == nil && n > 0 {
+		return n
 	}
-	return n
+	// 知道模型窗口时按窗口的 60% 触发：固定 24000 对小窗口模型太晚、对大窗口太早。
+	// 60% 与 Anthropic 上下文工程建议的软阈值一致，给工具结果和回复留出余量。
+	if window, err := strconv.Atoi(strings.TrimSpace(os.Getenv("AGENT_CONTEXT_TOKENS"))); err == nil && window > 0 {
+		return window * 3 / 5
+	}
+	return midLoopCompactTokensDefault
+}
+
+// ---------------------------------------------------------------------------
+// 工作集（压缩时保留的确定性事实）
+// ---------------------------------------------------------------------------
+
+const (
+	// workingSetMaxFiles / workingSetMaxCommands 限制工作集块的长度：
+	// 它每轮都跟着摘要进上下文，太长就失去「压缩」的意义。
+	workingSetMaxFiles    = 12
+	workingSetMaxCommands = 6
+)
+
+// compactionWorkingSet 是从被压缩历史里**确定性**提取的工作集。
+//
+// 为什么不能只靠模型摘要：摘要会丢路径、改数字，而「我刚才改过哪些文件」恰恰是
+// 压缩后最不能错的信息。这里从 tool_call 参数里直接抽，不猜、不编。
+type compactionWorkingSet struct {
+	Files    []string
+	Commands []string
+}
+
+// collectWorkingSet 扫描被丢弃的消息，提取文件路径与执行过的命令。
+//
+// 只认几个通用参数名，不按工具名硬编码业务语义：新工具用 file_path/path 就自动被收录，
+// 不认识的参数只是不收录，不会误报。顺序按首次出现，保证压缩结果稳定可测。
+func collectWorkingSet(msgs []llm.Message) compactionWorkingSet {
+	var ws compactionWorkingSet
+	seenFile := make(map[string]bool)
+	seenCmd := make(map[string]bool)
+	for _, m := range msgs {
+		if m.Role != llm.RoleAssistant {
+			continue
+		}
+		for _, tc := range m.ToolCalls {
+			var args map[string]any
+			if json.Unmarshal([]byte(strings.TrimSpace(tc.Arguments)), &args) != nil {
+				continue
+			}
+			for _, key := range []string{"file_path", "path", "dir_path", "file", "target", "source"} {
+				raw, ok := args[key].(string)
+				if !ok {
+					continue
+				}
+				p := strings.TrimSpace(strings.ReplaceAll(raw, "\\", "/"))
+				if p == "" || p == "." || p == "./" || seenFile[p] {
+					continue
+				}
+				seenFile[p] = true
+				if len(ws.Files) < workingSetMaxFiles {
+					ws.Files = append(ws.Files, p)
+				}
+			}
+			if tc.Name == "run_command" {
+				if cmd := describeCommand(args); cmd != "" && !seenCmd[cmd] {
+					seenCmd[cmd] = true
+					if len(ws.Commands) < workingSetMaxCommands {
+						ws.Commands = append(ws.Commands, cmd)
+					}
+				}
+			}
+		}
+	}
+	return ws
+}
+
+// describeCommand 把 run_command 的参数压成一行可读命令。
+func describeCommand(args map[string]any) string {
+	steps, ok := args["commands"].([]any)
+	if !ok || len(steps) == 0 {
+		return ""
+	}
+	var parts []string
+	for _, raw := range steps {
+		step, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		program, _ := step["program"].(string)
+		if strings.TrimSpace(program) == "" {
+			continue
+		}
+		piece := strings.TrimSpace(program)
+		if list, ok := step["args"].([]any); ok {
+			for _, a := range list {
+				if s, ok := a.(string); ok && strings.TrimSpace(s) != "" {
+					piece += " " + strings.TrimSpace(s)
+				}
+			}
+		}
+		parts = append(parts, piece)
+	}
+	return clipRunes(strings.Join(parts, " && "), 160)
+}
+
+// block 渲染成注入摘要末尾的确定性事实块；空工作集返回空串。
+func (w compactionWorkingSet) block() string {
+	if len(w.Files) == 0 && len(w.Commands) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("\n【压缩时保留的工作集（由工具调用参数直接提取，不是模型复述）】\n")
+	if len(w.Files) > 0 {
+		b.WriteString("读过/改过/搜索过的路径（原始内容已丢弃；需要细节请重新 read，不要凭记忆假设当前内容）：\n")
+		for _, f := range w.Files {
+			b.WriteString("- ")
+			b.WriteString(f)
+			b.WriteByte('\n')
+		}
+	}
+	if len(w.Commands) > 0 {
+		b.WriteString("执行过的命令：\n")
+		for _, c := range w.Commands {
+			b.WriteString("- ")
+			b.WriteString(c)
+			b.WriteByte('\n')
+		}
+	}
+	return b.String()
 }
 
 // estimateTokens 粗略估算一段文本的 token 数。
@@ -199,13 +329,16 @@ func midLoopCompact(ctx context.Context, stream StreamFunc, model, key string, m
 		// 放弃意味着这一轮可能直接爆窗，那更糟。
 		summary = clipRunes(body, 4000)
 	}
+	// 确定性工作集与模型摘要并列：摘要负责「发生了什么」，工作集负责「碰过哪些路径」。
+	// 后者从 tool_call 参数直接提取，模型改写或漏写都不会影响它。
+	ws := collectWorkingSet(msgs[1:cut])
 
 	out := make([]llm.Message, 0, len(msgs)-cut+2)
 	out = append(out, msgs[0])
 	out = append(out, llm.Message{
 		Role: llm.RoleAssistant,
-		Content: "【本轮早前步骤的摘要】以下是本次任务里更早的工具执行记录，已压缩；" +
-			"需要细节时请重新调用对应工具，不要凭这段摘要臆断。\n" + summary,
+		Content: fmt.Sprintf("【本轮早前步骤的摘要】以下是本次任务里更早的 %d 条消息，已压缩；"+
+			"需要细节时请重新调用对应工具，不要凭这段摘要臆断。\n%s%s", cut-1, summary, ws.block()),
 	})
 	out = append(out, msgs[cut:]...)
 	return out
@@ -220,7 +353,8 @@ func summarizeForLoop(ctx context.Context, stream StreamFunc, model, key, body s
 		Model: model,
 		Messages: []llm.Message{
 			{Role: llm.RoleSystem, Content: "你在压缩一段 Agent 执行记录。保留：用户目标、已经做过的工具操作及其确定性结果（路径/命令/退出码/错误）、" +
-				"尚未解决的问题。丢弃：寒暄、重复内容、已被后续步骤取代的中间态。用中文，条目式，600 字以内。"},
+				"尚未解决的问题、下一步要做什么。丢弃：寒暄、重复内容、已被后续步骤取代的中间态。" +
+				"不要编造文件内容或命令结果；不确定的写「不确定」。用中文，条目式，600 字以内。"},
 			{Role: llm.RoleUser, Content: body},
 		},
 	})

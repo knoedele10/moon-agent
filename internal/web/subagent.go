@@ -396,6 +396,7 @@ func (r *subagentRunner) executeChild(ctx context.Context, req agent.SubagentReq
 			// SessionID 用**子会话 id**：agent/fs 的观察表按 SessionID 存，
 			// 复用父会话 id 会让父子的文件读写互相踩锁。
 			SessionID: strconv.FormatUint(uint64(childID), 10),
+			TurnID:    fmt.Sprintf("sub-%d-%d", childID, time.Now().UnixNano()),
 			Root:      req.Root,
 			Roots:     append([]string(nil), req.Roots...),
 			ReadRoot:  agentSkillsDir(),

@@ -43,27 +43,45 @@ func TestLookupMetaMCPPrefix(t *testing.T) {
 // 只读并发比旧 safety 只读名单多出来的名字，副作用也是 read_only（两边合成一张表）。
 func TestLookupMetaCompatSets(t *testing.T) {
 	wantParallel := map[string]bool{
-		"read": true, "list": true, "read_image": true,
+		"read": true, "list": true, "read_image": true, "grep": true, "glob": true,
 		"calculator": true, "datetime": true, "json_format": true, "web_search": true, "web_reader": true, "sql_query": true,
 		"memory_search": true, "memory_list": true, "session_search": true,
 		"skill_search": true, "skill_read": true, "skill_list": true, "skill_stats": true, "skill_lint": true,
 		"read_tool_result": true,
 		"list_agents":      true, "list_subagents": true, "team_task_list": true, "team_task_get": true,
+		// 2026-10-25 定时唤醒：查列表不动世界，可以和其它只读调用并发。
+		"list_wakeups": true,
+		"git_status":   true, "git_diff": true, "git_log": true, "git_show": true,
+		"browser_open": true, "browser_snapshot": true, "browser_screenshot": true, "browser_network": true,
 	}
 	wantConfirm := map[string]bool{
-		"write": true, "edit": true, "move": true, "delete": true, "office_edit": true,
+		"write": true, "edit": true, "move": true, "delete": true, "office_edit": true, "restore": true, "restore_turn": true,
 		"skill_run": true, "run_command": true,
 		"skill_write": true, "skill_improve": true, "skill_archive": true, "memory_forget": true,
+		// 设定未来的自主轮次会改变助手行为，confirm 档先问一句。
+		"schedule_wakeup": true,
+		"git_add":         true, "git_commit": true,
+		"init_agents_md":  true,
+		"browser_click":   true, "browser_type": true,
 	}
 	wantIdempotent := map[string]bool{
 		"write": true, "edit": true, "memory_write": true, "skill_write": true,
+		// 取消一条已经取消/不存在的唤醒效果相同，重复执行安全。
+		"cancel_wakeup": true,
+		// 计划是整份替换：同样的计划提交两次，结果相同。
+		"update_plan": true,
+		// 恢复到同一检查点两次，结果相同。
+		"restore": true, "restore_turn": true,
+		"git_add": true, "init_agents_md": true,
 	}
 	wantMutating := map[string]bool{
-		"write": true, "edit": true, "move": true, "delete": true,
+		"write": true, "edit": true, "move": true, "delete": true, "restore": true, "restore_turn": true,
 		"office_edit": true, "skill_run": true, "skill_write": true, "run_command": true,
+		"git_add": true, "git_commit": true, "init_agents_md": true,
 	}
 	wantVerifying := map[string]bool{
 		"read": true, "list": true, "read_image": true, "sql_query": true,
+		"git_status": true, "git_diff": true,
 	}
 
 	gotParallel := map[string]bool{}

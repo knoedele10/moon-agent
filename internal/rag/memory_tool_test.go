@@ -222,6 +222,21 @@ func TestMemoryWriteExecuteOK(t *testing.T) {
 	}
 }
 
+func TestMemoryWriteCitesSource(t *testing.T) {
+	w := &fakeWriter{res: Result{DocumentID: 3, Kind: "text", Title: "来源", ChunkCount: 1}}
+	tool := NewMemoryWriteTool(w, "u1")
+	_, err := tool.Execute(context.Background(), mustArgs(t, map[string]any{
+		"text":   "用户每周一写周报",
+		"source": "notes/week.md",
+	}), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(w.gotText, "[来源: notes/week.md]\n用户每周一写周报") {
+		t.Fatalf("来源应写进正文，实际 %q", w.gotText)
+	}
+}
+
 // 重复写入（内容 sha256 命中）→ 明确告诉模型"已经存在"，而不是假装又记了一遍。
 func TestMemoryWriteExecuteDuplicated(t *testing.T) {
 	w := &fakeWriter{res: Result{DocumentID: 7, Kind: "text", Title: "旧记忆", ChunkCount: 1, Duplicated: true}}

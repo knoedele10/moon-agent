@@ -141,6 +141,10 @@ func (t *MemoryWriteTool) Parameters() map[string]any {
 				"items":       map[string]any{"type": "string"},
 				"description": "可选标签，便于以后归类与检索，例如 [偏好, 饮食]",
 			},
+			"source": map[string]any{
+				"type":        "string",
+				"description": "可选来源，例如文件路径、网页或用户原话。会写进记忆正文开头，便于以后引用。",
+			},
 		},
 		"required":             []string{"text"},
 		"additionalProperties": false,
@@ -148,8 +152,9 @@ func (t *MemoryWriteTool) Parameters() map[string]any {
 }
 
 type memoryWriteArgs struct {
-	Text string   `json:"text"`
-	Tags []string `json:"tags"`
+	Text   string   `json:"text"`
+	Tags   []string `json:"tags"`
+	Source string   `json:"source"`
 }
 
 // Execute 实现 agent.Tool。
@@ -158,8 +163,8 @@ func (t *MemoryWriteTool) Execute(ctx context.Context, args json.RawMessage, _ *
 	if err := decodeToolArgs(args, &in); err != nil {
 		return agent.Result{Display: memoryErrorDisplay("MEMORY_BAD_ARGS")}, err
 	}
-	text := strings.TrimSpace(in.Text)
-	if text == "" {
+	text := citeMemorySource(strings.TrimSpace(in.Text), in.Source)
+	if strings.TrimSpace(in.Text) == "" {
 		return agent.Result{Display: memoryErrorDisplay("MEMORY_EMPTY_TEXT")},
 			errors.New("text 不能为空：请给出要记住的内容")
 	}
@@ -198,6 +203,17 @@ func decodeToolArgs(args json.RawMessage, v any) error {
 		return fmt.Errorf("参数不是合法 JSON：%v", err)
 	}
 	return nil
+}
+
+func citeMemorySource(text, source string) string {
+	source = strings.Join(strings.Fields(source), " ")
+	if source == "" {
+		return text
+	}
+	if len([]rune(source)) > 200 {
+		source = string([]rune(source)[:200])
+	}
+	return "[来源: " + source + "]\n" + text
 }
 
 func memoryErrorDisplay(code string) map[string]any {

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"blog-my/internal/agent"
 	"blog-my/internal/llm"
 	"blog-my/internal/model"
 
@@ -225,6 +226,8 @@ func deleteConversation(c *gin.Context) {
 
 	model.DB.Where("conversation_id = ?", conv.Id).Delete(&model.Message{})
 	model.DB.Delete(&conv)
+	// 计划只活在进程内：会话删了就顺手清掉，避免同名 id 复用时串到新会话。
+	agent.ClearPlan(strconv.FormatUint(uint64(conv.Id), 10))
 	c.Status(http.StatusNoContent)
 }
 

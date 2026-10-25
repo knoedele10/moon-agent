@@ -78,7 +78,7 @@ func (t sessionSearchTool) Execute(ctx context.Context, raw json.RawMessage, _ *
 		Joins("JOIN conversation AS c ON c.id = m.conversation_id").
 		Where("c.user_id = ? AND m.role IN ?", t.userID, []string{"user", "assistant"})
 	if args.Query != "" {
-		q = q.Where("LOCATE(?, m.content) > 0", args.Query)
+		q = q.Where(sessionLocateSQL()+" > 0", args.Query)
 	}
 	if args.ConversationID != 0 {
 		q = q.Where("c.id = ?", args.ConversationID)
@@ -89,7 +89,7 @@ func (t sessionSearchTool) Execute(ctx context.Context, raw json.RawMessage, _ *
 	var hits []sessionSearchHit
 	// 在数据库内截出命中位置附近原文，避免把整份长消息装入内存和上下文。
 	err := q.Select("m.id AS message_id, c.id AS conversation_id, c.title, m.role, "+
-		"SUBSTRING(m.content, GREATEST(1, LOCATE(?, m.content) - 180), 1200) AS content, m.created_at", args.Query).
+		sessionSnippetSQL()+" AS content, m.created_at", args.Query).
 		Order("m.id DESC").Limit(args.Limit + 1).Scan(&hits).Error
 	if err != nil {
 		return agent.Result{IsError: true, Content: "历史检索失败，请稍后重试。"}, nil
@@ -114,4 +114,18 @@ func (t sessionSearchTool) Execute(ctx context.Context, raw json.RawMessage, _ *
 		return agent.Result{}, fmt.Errorf("整理历史检索结果失败：%w", err)
 	}
 	return agent.Result{Content: string(data), Display: map[string]any{"matches": len(hits), "has_more": hasMore}}, nil
+}
+
+func sessionLocateSQL() string {
+	if model.Driver() == "sqlite" {
+		return "instr(m.content, ?)"
+	}
+	return "LOCATE(?, m.content)"
+}
+
+func sessionSnippetSQL() string {
+	if model.Driver() == "sqlite" {
+		return "substr(m.content, max(1, instr(m.content, ?) - 180), 1200)"
+	}
+	return "SUBSTRING(m.content, GREATEST(1, LOCATE(?, m.content) - 180), 1200)"
 }

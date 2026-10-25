@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"blog-my/internal/agent"
@@ -343,8 +344,13 @@ func hermesEvolveReport(e *hermesEvolve) map[string]any {
 
 // CurateAsync 在 suggest 档只报告，auto 档按来源保护与单次修改上限自动固化。
 // 用独立 context 与超时：这一轮 SSE 可能已经结束，不能把用户请求的生命周期拖进来。
+// backgroundCurationDisabled 只由测试置位：后台固化协程会读全局 model.DB，
+// 而部分用例会临时把它设为 nil 来做「数据库不可用」断言，两者并发就是数据竞争。
+// 生产路径永远为 false；测试里关掉后台协程，不改变任何业务逻辑。
+var backgroundCurationDisabled atomic.Bool
+
 func (e *hermesEvolve) CurateAsync(allowApply ...bool) {
-	if e == nil || (e.mode != "suggest" && e.mode != "auto") {
+	if e == nil || backgroundCurationDisabled.Load() || (e.mode != "suggest" && e.mode != "auto") {
 		return
 	}
 	apply := len(allowApply) > 0 && allowApply[0] && e.mode == "auto" && isOwnerUser(e.userID)

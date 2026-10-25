@@ -40,14 +40,14 @@ type ContentAsset struct {
 // 历史正文在 ContentDraftVersion 里，每次保存都追加一条版本，回滚也是追加
 // （把旧正文重新写成新版本）—— 这样版本链只增不改，永远不会丢内容。
 type ContentDraft struct {
-	Id      uint   `gorm:"column:id;primaryKey;autoIncrement"`
-	UserID  string `gorm:"column:user_id;size:36;not null;index:idx_content_draft_user_status,priority:1;index:idx_content_draft_user_updated,priority:1"`
-	Title   string `gorm:"column:title;size:255;not null"`
-	Topic   string `gorm:"column:topic;size:255"`
-	BodyMd  string `gorm:"column:body_md;type:mediumtext;not null"`
-	Status  string `gorm:"column:status;size:16;not null;index:idx_content_draft_user_status,priority:2"` // idea/draft/review/final/scheduled/published/archived
-	Tags    string `gorm:"column:tags;size:512"`
-	DueAt   *time.Time `gorm:"column:due_at"`
+	Id     uint       `gorm:"column:id;primaryKey;autoIncrement"`
+	UserID string     `gorm:"column:user_id;size:36;not null;index:idx_content_draft_user_status,priority:1;index:idx_content_draft_user_updated,priority:1"`
+	Title  string     `gorm:"column:title;size:255;not null"`
+	Topic  string     `gorm:"column:topic;size:255"`
+	BodyMd string     `gorm:"column:body_md;type:mediumtext;not null"`
+	Status string     `gorm:"column:status;size:16;not null;index:idx_content_draft_user_status,priority:2"` // idea/draft/review/final/scheduled/published/archived
+	Tags   string     `gorm:"column:tags;size:512"`
+	DueAt  *time.Time `gorm:"column:due_at"`
 	// CurrentVersion 与版本表里的最大版本号一致；用列存一份是为了列表页不用 join。
 	CurrentVersion int       `gorm:"column:current_version;not null;default:0"`
 	CreatedAt      time.Time `gorm:"column:created_at"`
@@ -97,12 +97,16 @@ type ContentPublication struct {
 	PlannedAt    *time.Time `gorm:"column:planned_at;index:idx_content_pub_user_planned,priority:2"`
 	PublishedAt  *time.Time `gorm:"column:published_at"`
 	Url          string     `gorm:"column:url;size:1024"`
-	Status       string     `gorm:"column:status;size:16;not null;index:idx_content_pub_user_channel,priority:3"` // planned/published/failed/withdrawn
+	Status       string     `gorm:"column:status;size:16;not null;index:idx_content_pub_user_channel,priority:3"` // planned/exported/published/failed/withdrawn
 	Error        string     `gorm:"column:error;size:512"`
 	Retries      int        `gorm:"column:retries;not null;default:0"`
-	Metrics      string     `gorm:"column:metrics;type:text"` // JSON：阅读/点赞/收藏/涨粉
-	CreatedAt    time.Time  `gorm:"column:created_at"`
-	UpdatedAt    time.Time  `gorm:"column:updated_at"`
+	// NextAttemptAt 同时承担两件事：失败后的退避时间，以及自动任务领取时的租约。
+	// worker 先把这里推到 now+lease 再干活，进程中途崩了也能等租约到期后重新捡起，
+	// 不需要额外的「处理中」状态，也不会把同一条排期导出两遍。
+	NextAttemptAt *time.Time `gorm:"column:next_attempt_at"`
+	Metrics       string     `gorm:"column:metrics;type:text"` // JSON：阅读/点赞/收藏/涨粉
+	CreatedAt     time.Time  `gorm:"column:created_at"`
+	UpdatedAt     time.Time  `gorm:"column:updated_at"`
 }
 
 func (ContentAsset) TableName() string        { return "content_asset" }

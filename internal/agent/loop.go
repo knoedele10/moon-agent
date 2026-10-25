@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"blog-my/internal/llm"
+	"blog-my/internal/obs"
 
 	einomodel "github.com/cloudwego/eino/components/model"
 )
@@ -195,8 +196,9 @@ func Run(ctx context.Context, cfg Config, history []llm.Message, emit func(Event
 		// 只取一次的话模型永远看不到新激活的工具。静态注册表下这一步是常量开销。
 		defs = source.Defs()
 		req := llm.ChatRequest{
-			Model:       cfg.Model,
-			Messages:    msgs,
+			Model: cfg.Model,
+			// 计划是瞬态状态：每轮从 store 重新渲染，不写进 msgs。
+			Messages:    withPlanContext(msgs, ex.SessionID),
 			Temperature: cfg.Temperature,
 			MaxTokens:   cfg.MaxTokens,
 			Tools:       defs,
@@ -226,6 +228,7 @@ func Run(ctx context.Context, cfg Config, history []llm.Message, emit func(Event
 				msgs = append(msgs, llm.Message{Role: llm.RoleSystem, Content: verificationFeedback()})
 				continue
 			}
+			finishRun(ctx, ex)
 			emitEvent(emit, Event{Kind: EvDone, Content: text})
 			return nil
 		}
@@ -433,6 +436,10 @@ func Run(ctx context.Context, cfg Config, history []llm.Message, emit func(Event
 // “工具刚执行完就报错”，因为工具结果还需要再发给模型整理。这里只在尚未收到任何
 // 文本或 tool_call 时重试一次；已有输出就不重试，避免重复显示文本或重复执行工具。
 func modelRound(ctx context.Context, stream StreamFunc, modelID, apiKey string, req llm.ChatRequest, emit func(Event)) (string, []llm.ToolCall, error) {
+	endSpan := obs.Start("chat", map[string]any{
+		"gen_ai.operation.name": "chat",
+		"gen_ai.request.model":  modelID,
+	})
 	for attempt := 0; attempt < 2; attempt++ {
 		ch, err := stream(ctx, modelID, apiKey, req)
 		text := ""
@@ -441,15 +448,19 @@ func modelRound(ctx context.Context, stream StreamFunc, modelID, apiKey string, 
 			text, calls, err = drain(ctx, ch, emit)
 		}
 		if err == nil {
+			endSpan(false)
 			return text, calls, nil
 		}
 		if ctx.Err() != nil || attempt > 0 || text != "" || len(calls) > 0 || !retryableModelError(err) {
+			endSpan(true)
 			return text, calls, err
 		}
 		if err := waitModelRetry(ctx); err != nil {
+			endSpan(true)
 			return text, calls, err
 		}
 	}
+	endSpan(true)
 	return "", nil, errors.New("agent: 模型重试流程异常结束")
 }
 
@@ -489,6 +500,9 @@ func drain(ctx context.Context, ch <-chan llm.Event, emit func(Event)) (string, 
 				}
 				return text.String(), calls, ev.Err
 			case llm.EventDone:
+				if ev.Usage != nil {
+					llm.AddUsage(ctx, *ev.Usage)
+				}
 				return text.String(), calls, nil
 			}
 		}
@@ -522,11 +536,19 @@ func executeTool(ctx context.Context, source ToolSource, call llm.ToolCall, ex *
 			Display: map[string]any{"code": "TOOL_BAD_ARGS", "tool": call.Name},
 		}
 	}
+	if blocked, ok := beforeTool(ctx, ex, call); !ok {
+		return blocked
+	}
+	endSpan := obs.Start("execute_tool", map[string]any{
+		"gen_ai.operation.name": "execute_tool",
+		"gen_ai.tool.name":      call.Name,
+	})
 	res := callTool(ctx, tool, args, ex)
+	endSpan(res.IsError)
 	// 统一出口截断（见 guard.go）：放在这里是为了覆盖**所有**调用方
 	// （主循环、待确认工具的直接执行……），不依赖每个工具自觉。
 	res.Content = capToolOutput(call.Name, res.Content)
-	return res
+	return afterTool(ctx, ex, call, res)
 }
 
 // callTool 调一次工具，并用 recover 兜住工具内部的 panic：

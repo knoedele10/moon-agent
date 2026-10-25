@@ -11,6 +11,7 @@ import (
 	"blog-my/internal/llm"
 
 	einomodel "github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/schema"
 )
 
 func einoMockModel(t *testing.T, turns []llm.MockTurn) einomodel.ToolCallingChatModel {
@@ -307,5 +308,104 @@ func TestEinoMutationThenReadCountsAsVerified(t *testing.T) {
 	}
 	if streamed.String() != answer || doneText != answer {
 		t.Fatalf("收尾被验证提醒多跑了一轮：stream=%q done=%q", streamed.String(), doneText)
+	}
+}
+
+// Eino 路径的只读并发：三个 120ms 的只读调用应当重叠执行，而不是串行 360ms。
+func TestEinoParallelReadOnlyIsFaster(t *testing.T) {
+	const perTool = 120 * time.Millisecond
+	model := einoMockModel(t, []llm.MockTurn{
+		{ToolCalls: []llm.ToolCall{
+			{ID: "1", Name: "read_a"}, {ID: "2", Name: "read_b"}, {ID: "3", Name: "read_c"},
+		}},
+		{Text: "三个都读完了。"},
+	})
+	tools := []Tool{sleepTool("read_a", perTool), sleepTool("read_b", perTool), sleepTool("read_c", perTool)}
+	var results int
+	start := time.Now()
+	err := Run(context.Background(), Config{
+		Model: "mock-echo", EinoModel: model, Tools: tools,
+		Parallel: true, ParallelMax: 3,
+		ParallelTools: map[string]bool{"read_a": true, "read_b": true, "read_c": true},
+	}, []llm.Message{{Role: llm.RoleUser, Content: "并行读三个"}}, func(ev Event) {
+		if ev.Kind == EvToolResult {
+			results++
+		}
+	})
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("Run 失败：%v", err)
+	}
+	if results != 3 {
+		t.Fatalf("应收到 3 个工具结果，实际 %d", results)
+	}
+	if elapsed >= 3*perTool-time.Duration(float64(perTool)*0.35) {
+		t.Fatalf("Eino 只读并发没有生效：耗时 %v（串行下限 %v）", elapsed, 3*perTool)
+	}
+}
+
+// 写工具必须独占：它和只读调用在同一批里也不能重叠，否则 read 可能读到写前内容。
+func TestEinoParallelWriteExcludesReads(t *testing.T) {
+	const perTool = 120 * time.Millisecond
+	model := einoMockModel(t, []llm.MockTurn{
+		{ToolCalls: []llm.ToolCall{
+			{ID: "w1", Name: "write"}, {ID: "r1", Name: "read"},
+		}},
+		{Text: "写入并读回。"},
+	})
+	write := sleepTool("write", perTool)
+	read := sleepTool("read", perTool)
+	start := time.Now()
+	err := Run(context.Background(), Config{
+		Model: "mock-echo", EinoModel: model, Tools: []Tool{write, read},
+		Parallel: true, ParallelMax: 2,
+		ParallelTools: map[string]bool{"read": true},
+	}, []llm.Message{{Role: llm.RoleUser, Content: "写入并读回"}}, func(Event) {})
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("Run 失败：%v", err)
+	}
+	if elapsed < 2*perTool-20*time.Millisecond {
+		t.Fatalf("写工具与只读调用不应重叠：耗时 %v，串行下限 %v", elapsed, 2*perTool)
+	}
+}
+
+// Eino 的 MessageRewriter 每轮都要注入最新计划；旧的瞬态计划块必须被剔除，
+// 否则长任务里会一份份堆进上下文。
+func TestEinoRewriteInjectsLatestPlanOnly(t *testing.T) {
+	ResetPlans()
+	defer ResetPlans()
+	if _, err := UpdatePlan("sess-plan", Plan{Steps: []PlanStep{
+		{Step: "读代码", Status: PlanCompleted},
+		{Step: "改实现", Status: PlanInProgress},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	state := &einoRunState{ex: &Exec{SessionID: "sess-plan"}, images: map[string]*ImagePart{}}
+	in := []*schema.Message{
+		{Role: schema.System, Content: "sys"},
+		{Role: schema.System, Content: planBlockPrefix + "\n旧计划：不该出现"},
+	}
+	out := state.rewrite(context.Background(), in)
+
+	blocks := 0
+	joined := ""
+	for _, m := range out {
+		if m == nil {
+			continue
+		}
+		joined += m.Content
+		if planInjected(m.Content) {
+			blocks++
+			if !strings.Contains(m.Content, "改实现") {
+				t.Fatalf("注入的应是新计划：%q", m.Content)
+			}
+		}
+	}
+	if blocks != 1 {
+		t.Fatalf("计划块应恰好一份，实际 %d；输出：%s", blocks, joined)
+	}
+	if strings.Contains(joined, "旧计划：不该出现") {
+		t.Fatal("旧的瞬态计划块必须被剔除")
 	}
 }

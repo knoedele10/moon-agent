@@ -31,6 +31,78 @@ func TestReadNumberedLines(t *testing.T) {
 	}
 }
 
+func TestReadTextWindow(t *testing.T) {
+	root := t.TempDir()
+	p := filepath.Join(root, "a.txt")
+	mustWriteFile(t, p, "l1\nl2\nl3\nl4\nl5\n")
+
+	text, shown, truncated, err := readTextWindow(p, 2, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text != "2\tl2\n3\tl3\n" || shown != 2 || !truncated {
+		t.Fatalf("窗口读取不对：text=%q shown=%d truncated=%v", text, shown, truncated)
+	}
+
+	text, shown, truncated, err = readTextWindow(p, 1, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if shown != 5 || truncated {
+		t.Fatalf("读完整个文件时不应标截断：shown=%d truncated=%v", shown, truncated)
+	}
+	if !strings.Contains(text, "5\tl5") {
+		t.Fatalf("最后一行丢了：%q", text)
+	}
+
+	if _, shown, _, err = readTextWindow(p, 99, 2); err != nil || shown != 0 {
+		t.Fatalf("offset 超出末尾应返回空窗口：shown=%d err=%v", shown, err)
+	}
+}
+
+// 超过 maxFullReadBytes 的文本必须走流式窗口，而不是整文件读进内存。
+func TestReadLargeFileUsesStreamingWindow(t *testing.T) {
+	root := t.TempDir()
+	p := filepath.Join(root, "big.log")
+	f, err := os.Create(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := strings.Repeat("x", 100) + "\n"
+	// 略大于 8MB 阈值。
+	for written := 0; written <= maxFullReadBytes; written += len(line) {
+		if _, err := f.WriteString(line); err != nil {
+			f.Close()
+			t.Fatal(err)
+		}
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	ex := execFor(t, root)
+	res, err := call(ReadTool{}, ex, map[string]any{"file_path": "big.log", "offset": 2, "limit": 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.Content, "2\t"+strings.Repeat("x", 100)) {
+		t.Fatalf("应读到第 2 行：%q", res.Content[:minInt(len(res.Content), 120)])
+	}
+	if !strings.Contains(res.Content, "offset=4") {
+		t.Fatalf("应提示用 offset 继续：%q", res.Content[:minInt(len(res.Content), 200)])
+	}
+	if got := res.Display["streamed"]; got != true {
+		t.Fatalf("大文件应标记 streamed，实际 %v", got)
+	}
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func TestReadOffsetLimit(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "a.txt"), "l1\nl2\nl3\nl4\nl5\n")
@@ -337,6 +409,63 @@ func TestEditValidation(t *testing.T) {
 	mustCode(t, err, CodeInvalidArgs)
 }
 
+// edit 成功后自动回显修改区域：模型不必再多花一次 read 才能确认结果。
+func TestEditRedisplaysChangedRegion(t *testing.T) {
+	root := t.TempDir()
+	var b strings.Builder
+	for i := 1; i <= 10; i++ {
+		fmt.Fprintf(&b, "line %d\n", i)
+	}
+	p := filepath.Join(root, "a.txt")
+	mustWriteFile(t, p, b.String())
+	ex := execFor(t, root)
+	if _, err := call(ReadTool{}, ex, map[string]any{"file_path": "a.txt"}); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := call(EditTool{}, ex, map[string]any{"file_path": "a.txt", "old_string": "line 5", "new_string": "LINE FIVE"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.Content, "修改区域") || !strings.Contains(res.Content, "文件共 10 行") {
+		t.Fatalf("应回显修改区域与总行数：%q", res.Content)
+	}
+	for _, want := range []string{"4\tline 4", "5\tLINE FIVE", "6\tline 6"} {
+		if !strings.Contains(res.Content, want) {
+			t.Errorf("回显缺少 %q：\n%s", want, res.Content)
+		}
+	}
+	if strings.Contains(res.Content, "1\tline 1") {
+		t.Errorf("不应回显无关的远处行：\n%s", res.Content)
+	}
+	if got := res.Display["changed_lines"]; got != "5-5" {
+		t.Errorf("changed_lines 应为 5-5，实际 %v", got)
+	}
+}
+
+// 删除整行时 new_string 为空，也要能定位并回显。
+func TestEditRedisplayHandlesDeletion(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "a.txt"), "a\nb\nc\n")
+	ex := execFor(t, root)
+	if _, err := call(ReadTool{}, ex, map[string]any{"file_path": "a.txt"}); err != nil {
+		t.Fatal(err)
+	}
+	res, err := call(EditTool{}, ex, map[string]any{"file_path": "a.txt", "old_string": "b\n", "new_string": ""})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.Content, "修改区域") || !strings.Contains(res.Content, "1\ta") || !strings.Contains(res.Content, "2\tc") {
+		t.Fatalf("删除后应回显附近内容：%q", res.Content)
+	}
+	if got := res.Display["changed_lines"]; got != "2-2" {
+		t.Errorf("changed_lines 应为 2-2，实际 %v", got)
+	}
+	if got := readFile(t, filepath.Join(root, "a.txt")); got != "a\nc\n" {
+		t.Fatalf("删除结果不对：%q", got)
+	}
+}
+
 func TestEditAmbiguousAndReplaceAll(t *testing.T) {
 	root := t.TempDir()
 	p := filepath.Join(root, "a.txt")
@@ -502,6 +631,32 @@ func TestListSecondaryWorkspaceAlias(t *testing.T) {
 	}
 	if !strings.Contains(res.Content, "secondary.txt") || strings.Contains(res.Content, "primary.txt") {
 		t.Fatalf("secondary workspace listing is incorrect: %q", res.Content)
+	}
+}
+
+// 大目录用 offset 分页，返回 next_offset 供下一轮继续。
+func TestListPagination(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"a.txt", "b.txt", "c.txt", "d.txt"} {
+		mustWriteFile(t, filepath.Join(root, name), "x")
+	}
+	ex := execFor(t, root)
+
+	res, err := call(ListTool{}, ex, map[string]any{"limit": 2, "offset": 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(res.Content, "a.txt") {
+		t.Fatalf("offset=1 应跳过第一项：%q", res.Content)
+	}
+	if !strings.Contains(res.Content, "b.txt") || !strings.Contains(res.Content, "c.txt") {
+		t.Fatalf("第二页应包含 b/c：%q", res.Content)
+	}
+	if !strings.Contains(res.Content, "offset=3") {
+		t.Fatalf("应给出 next offset：%q", res.Content)
+	}
+	if res.Display["next_offset"] != 3 {
+		t.Fatalf("next_offset 应为 3，实际 %v", res.Display["next_offset"])
 	}
 }
 

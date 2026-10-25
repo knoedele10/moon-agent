@@ -127,6 +127,8 @@ func runPendingToolWithEvolution(
 	reg := agent.NewRegistry(tools...)
 	tool, ok := reg.Lookup(p.ToolName)
 	if !ok {
+		emitToolActivityResult(sendEvent, p.ToolID, p.ToolName, time.Time{}, time.Now(), false, false,
+			"工具已不可用（工作区或技能可能已变）", "", nil)
 		sendEvent("tool_result", gin.H{
 			"id": p.ToolID, "name": p.ToolName, "ok": false,
 			"summary": "工具已不可用（工作区或技能可能已变）",
@@ -141,6 +143,8 @@ func runPendingToolWithEvolution(
 	if strings.TrimSpace(call.ID) == "" {
 		call.ID = fmt.Sprintf("call_%d_%d", p.ConversationID, time.Now().UnixNano())
 	}
+	started := time.Now()
+	emitToolActivityStart(sendEvent, call.ID, call.Name, toolCallArguments(call.Arguments), started)
 	sendEvent("tool_call", gin.H{
 		"id": call.ID, "name": call.Name, "arguments": toolCallArguments(call.Arguments),
 	})
@@ -148,6 +152,7 @@ func runPendingToolWithEvolution(
 	ex := &agent.Exec{
 		ReadRoot:  agentSkillsDir(),
 		SessionID: fmt.Sprintf("%d", p.ConversationID),
+		TurnID:    newTurnID(p.ConversationID),
 		Root:      root,
 		Roots:     append([]string(nil), roots...),
 		// 重放的是**用户已经确认过**的调用，可能落在工作区外：
@@ -165,6 +170,7 @@ func runPendingToolWithEvolution(
 	okRun := !res.IsError
 	summary := summarizeToolResult(call.Name, res)
 	evo.ObserveToolResult(call.ID, call.Name, okRun, !okRun, summary)
+	emitToolActivityResult(sendEvent, call.ID, call.Name, started, time.Now(), okRun, false, summary, res.Content, res.Display)
 	sendEvent("tool_result", gin.H{
 		"id": call.ID, "name": call.Name, "ok": okRun,
 		"summary": summary, "detail": res.Content, "display": res.Display,

@@ -67,7 +67,13 @@
     });
     window.addEventListener('resize', close);
     // 捕获滚动：输入框那排工具条本身不滚动，但整页 / 消息区会滚。
-    document.addEventListener('scroll', close, true);
+    // 注意浮层自己也是可滚动的（模型列表 20+ 项），在列表里滚动不能当成「点外面」：
+    // 以前这里无条件 close，滚一下浮层就关掉，后面的模型永远选不到。
+    document.addEventListener('scroll', function (ev) {
+      var t = ev.target;
+      if (openState && POP && (t === POP || (t && POP.contains && POP.contains(t)))) return;
+      close();
+    }, true);
     return POP;
   }
 
@@ -130,6 +136,8 @@
     renderOptions();
     POP.hidden = false;
     position(handle.button);
+    // 打开时把当前选中项滚进可视区：模型列表很长，选中的那个常常在下面。
+    highlight();
     handle.button.setAttribute('aria-expanded', 'true');
     handle.button.classList.add('is-open');
   }

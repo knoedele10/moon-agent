@@ -107,6 +107,7 @@ func TestHermesEvolutionAutoActuallyCurates(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	enableBackgroundCurationForTest(t)
 	e.CurateAsync(true)
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
@@ -123,6 +124,7 @@ func TestHermesEvolutionAutoRequiresTurnPermission(t *testing.T) {
 	t.Setenv("AGENT_EVOLVE_DIR", t.TempDir())
 	e := newHermesEvolve("restricted-user")
 	e.store = &isolatedEvolveStore{items: make(map[string]evolve.SkillItem)}
+	enableBackgroundCurationForTest(t)
 	e.CurateAsync()
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {

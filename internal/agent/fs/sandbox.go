@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -24,6 +25,16 @@ func Resolve(root, p string) (string, error) {
 	}
 	if strings.TrimSpace(p) == "" {
 		return "", &Error{Code: CodeInvalidArgs, Reason: "file_path 不能为空"}
+	}
+	// 模型会交出 Windows 路径。在 Linux 上 `..\` 和 `C:\` 不是分隔符，
+	// 若不先认出来，穿越写法会变成工作区里的普通文件名。
+	if runtime.GOOS != "windows" {
+		if err := denyWindowsPathOnUnix(p); err != nil {
+			return "", err
+		}
+		if strings.Contains(p, `\`) && strings.Contains(p, "..") {
+			p = strings.ReplaceAll(p, `\`, `/`)
+		}
 	}
 
 	rootAbs, err := filepath.Abs(root)
@@ -191,6 +202,18 @@ func resolveLinks(p string) (string, error) {
 // ntPathPrefixes 是 Windows 上可能出现在路径/链接目标里的 NT 命名空间前缀。
 // os.Readlink 对 junction 返回的是 `\\?\Global\C:\...` 或 `\??\C:\...` 这类形态。
 var ntPathPrefixes = []string{`\\?\Global\`, `\\?\UNC\`, `\\?\`, `\??\`}
+
+// denyWindowsPathOnUnix 拒绝盘符、UNC 和 NT 前缀。这些路径在 POSIX 上不是绝对路径，
+// 但它们也永远不在当前工作区里。
+func denyWindowsPathOnUnix(p string) error {
+	if strings.HasPrefix(p, `\\`) || strings.HasPrefix(p, `//?/`) || strings.HasPrefix(p, `//??/`) {
+		return &Error{Code: CodeSandboxDenied}
+	}
+	if len(p) >= 3 && ((p[0] >= 'A' && p[0] <= 'Z') || (p[0] >= 'a' && p[0] <= 'z')) && p[1] == ':' && (p[2] == '\\' || p[2] == '/') {
+		return &Error{Code: CodeSandboxDenied}
+	}
+	return nil
+}
 
 // normalizeNTPath 剥掉 NT 前缀，把路径还原成 filepath 能正确识别卷名的形态。
 //

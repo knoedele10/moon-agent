@@ -40,6 +40,9 @@ func buildAgentTools(p agentToolPolicy) []agent.Tool {
 	// edit / move / delete / read_image 一律不给。
 	if normalizeMode(mode) == ModePlan {
 		tools := kbMemoryTools(userID)
+		// 计划模式的核心产物就是计划本身：给它 update_plan，但只允许改这份进程内状态，
+		// 不会碰用户文件（真正存档仍走只允许 .md 的 write）。
+		tools = append(tools, planTool{})
 		// 技能工具是只读的（搜索/阅读说明书），所有档位都给。
 		tools = append(tools, skillTools(userID)...)
 		if strings.TrimSpace(root) != "" {
@@ -53,19 +56,31 @@ func buildAgentTools(p agentToolPolicy) []agent.Tool {
 	var tools []agent.Tool
 
 	// 通用工具：不碰磁盘、不需要工作区，任何会话都给。
+	// update_plan 是纯进程内状态，同样不需要工作区；Kind 过滤会决定聊天模式是否保留它。
 	tools = append(tools,
 		toolkit.CalculatorTool{},
 		toolkit.DateTimeTool{},
 		toolkit.WebSearchTool{},
 		toolkit.WebReaderTool{},
+		toolkit.BrowserOpenTool{},
+		toolkit.BrowserSnapshotTool{},
+		toolkit.BrowserScreenshotTool{},
+		toolkit.BrowserNetworkTool{},
+		toolkit.BrowserClickTool{},
+		toolkit.BrowserTypeTool{},
 		toolkit.AskUserTool{},
 		toolkit.JSONTool{},
 		toolkit.SQLTool{},
+		planTool{},
 	)
 
 	// 文件工具只在有工作区时注册——没有就一个都不给，模型也就无从写盘。
+	// 检索（grep/glob）与读写同属工作区能力：只读、走同一套沙箱，但能让模型先定位再打开，
+	// 而不是靠猜文件名或把目录整片读一遍。
 	if strings.TrimSpace(root) != "" {
 		tools = append(tools, agentfs.ToolsWithMutation()...)
+		tools = append(tools, agentfs.SearchTools()...)
+		tools = append(tools, agentfs.RecoveryTools()...)
 	}
 
 	tools = append(tools, kbMemoryTools(userID)...)
@@ -81,6 +96,13 @@ func buildAgentTools(p agentToolPolicy) []agent.Tool {
 	// confirm 档会走主会话确认，plan 档不会注册。工具自身还会校验 cwd 与命令白名单。
 	if strings.TrimSpace(root) != "" {
 		tools = append(tools, runCommandTools()...)
+	}
+	// Git operations stay inside the active workspace and use argv directly.
+	// git_add/git_commit are marked risky in toolsys and therefore pass through
+	// the existing confirm wrapper in confirm mode.
+	if strings.TrimSpace(root) != "" {
+		tools = append(tools, toolkit.GitStatusTool{}, toolkit.GitDiffTool{}, toolkit.GitLogTool{}, toolkit.GitShowTool{}, toolkit.GitAddTool{}, toolkit.GitCommitTool{})
+		tools = append(tools, initAgentsTool{})
 	}
 	// 模式二（confirm）：风险工具包一层“先问用户”。
 	// confirmed=true 表示用户刚刚确认过，这一次放行真正的工具。
@@ -123,6 +145,13 @@ func buildAgentTools(p agentToolPolicy) []agent.Tool {
 	if depth < subagentMaxDepth() {
 		tools = append(tools, agent.SpawnTeammateTool{Service: team, Mode: mode, Root: root, Roots: append([]string(nil), p.Roots...)})
 	}
+	// 定时唤醒：用户说「明早 9 点提醒我」，或 agent 自己安排「晚点再检查」。
+	// 建单在 confirm 档会先问一句（见 toolsys 元数据），取消与列表不问。
+	tools = append(tools,
+		scheduleWakeupTool{userID: userID},
+		listWakeupsTool{userID: userID},
+		cancelWakeupTool{userID: userID},
+	)
 	return finalizeAgentTools(tools, p)
 }
 

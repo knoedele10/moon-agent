@@ -356,6 +356,20 @@ data: {"id":"call_abc","name":"read","ok":true,"summary":"读取 a.txt（12 行�
 | `detail` | string | `tool_result`：完整结果（前端折叠展示）；工具失败时这里是**给模型看的错误说明** |
 | `display` | object | `tool_result`：结构化摘要（可选，用于卡片渲染） |
 
+#### 11.3.1 生命周期事件：`activity` 🔶
+
+启用工具循环时，服务端会在兼容的 `tool_call` / `tool_result` 之外发送一组
+`activity` 帧，供前端显示真实的阶段、状态和耗时。旧客户端可以忽略这个事件。
+
+```json
+{"type":"tool_call","phase":"tool_call","status":"running","id":"call_abc","name":"read","started_at":"2026-10-24T12:00:00Z"}
+{"type":"tool_result","phase":"tool_result","status":"completed","id":"call_abc","name":"read","ok":true,"summary":"读取完成","duration_ms":1250}
+```
+
+`status` 取值包括 `running`、`completed`、`waiting`、`failed`、`paused`；错误阶段使用
+`type=error`、`phase=error`，并携带 `summary` / `detail`。`started_at`、`finished_at` 使用 RFC3339，
+`duration_ms` 是整数毫秒。`id` 与对应工具调用保持一致，前端应更新同一张卡片，不能重复渲染。
+
 #### 11.4 事件顺序与不变量 🔶
 
 1. 每次工具调用：先 `tool_call`，执行完后**必有**一条同 id 的 `tool_result`（**成对**）。
@@ -363,6 +377,7 @@ data: {"id":"call_abc","name":"read","ok":true,"summary":"读取 a.txt（12 行�
 3. `delta` 仍然实时发；一轮里可以出现 `delta` 与 `tool_call` 交替（模型边说边调）。
 4. 正常结束发 `done`；触顶（12 轮 / 24 次）与取消/出错发 `error`，**触顶文案必须说明是哪种触顶**。
 5. `read_image` 产出的图片**不出现在 SSE 里**：它在服务端作为一条 user 消息回灌给模型。
+6. `activity` 与旧工具事件成对出现；它只丰富生命周期信息，不改变模型可见的工具结果和历史落库格式。
 
 #### 11.5 记忆自动注入 🔶
 
@@ -425,6 +440,23 @@ data: {"id":"call_abc","name":"read","ok":true,"summary":"读取 a.txt（12 行�
 - 失败 `400`：`{"error":"请填绝对路径，例如 D:\\my-workspace"}`
 
 前端入口在对话页的「记忆」面板内（工作区卡片）。
+
+### `GET /api/agent/plan` —— 当前会话任务计划（2026-10-25 新增）
+
+计划由 agent 的 `update_plan` 工具写入，只存在于进程内（重启清空），不落库。
+
+- 鉴权：需登录；`conversation_id` 必须是当前用户的会话，否则 `404`。
+- 查询参数：`conversation_id`（必填，正整数）。
+- 响应 `200`（有计划）：
+```json
+{ "explanation": "拆成三步", "updated_at": "2026-10-25T01:00:00+08:00",
+  "steps": [ { "step": "读代码", "status": "completed" },
+             { "step": "改实现", "status": "in_progress" },
+             { "step": "跑测试", "status": "pending" } ] }
+```
+- 无计划时同样 `200`：`{"steps":[],"explanation":""}`，前端据此隐藏面板。
+- `status` 取值：`pending` / `in_progress` / `completed` / `blocked`。
+- `400`：`conversation_id` 不合法；`500`：数据库未初始化。
 
 ---
 
@@ -577,6 +609,108 @@ data: {"id":"call_abc","name":"read","ok":true,"summary":"读取 a.txt（12 行�
 - 给了 `model` 时本接口会**两次**调用模型：一次"理解任务"改写查询、一次重排（各约 1 秒）。
 
 ---
+
+### 14. 自媒体排期自动导出（2026-10-24 新增）
+
+后台任务：每 5 分钟（可配）扫一次 `content_publication`，把 `planned` 且 `planned_at` 已到点的排期渲染成
+「可直接粘贴」的 Markdown 成品包落盘，并把台账推进到 `exported`。**不代替用户发平台**（各平台无公开写接口
+且有风控），所以不会写 `published_at`，也不会有线上链接；人贴完再手动 `exported → published` 回填 url。
+
+失败会按 `1min,2min,4min…`（上限 1h）退避重试，累计 `CONTENT_PUBLISH_MAX_ATTEMPTS`（默认 3）次仍失败则落到
+`failed`，等人工处理。租约用 `content_publication.next_attempt_at` 承载，进程中途崩溃后租约到期会自动重捡。
+
+#### 14.1 `GET /api/content/jobs` —— 调度状态（**永远 200**）
+
+- 鉴权：需登录。
+- 无查询参数；`due_count` 与 `recent` 都只含**当前用户**的数据（跨用户不可见）。
+- 响应 `200`：
+```json
+{
+  "mode": "export",
+  "enabled": true,
+  "configured": true,
+  "interval_seconds": 300,
+  "export_dir": "<用户配置目录>\\blog-my\\content-publish",
+  "due_count": 2,
+  "last_run_at": "2026-10-24T22:55:00-04:00",
+  "last_error": "",
+  "recent": [
+    { "publication_id": 12, "draft_id": 7, "channel": "wechat", "status": "exported",
+      "path": "E:\\blog-my\\artifacts\\content-publish\\u1\\pub-12-wechat-周报.md",
+      "attempts": 1, "at": "2026-10-24T22:55:00-04:00", "duration_ms": 3 }
+  ]
+}
+```
+- `enabled`：后台调度是否在跑（`CONTENT_PUBLISH_INTERVAL_MINUTES<=0` 时为 false，但手动触发仍可用）。
+- `configured`：数据层是否可用；false 时另有 `reason`，`due_count=0`、`recent=[]`。
+- `recent` 是**内存**里的最近处理记录（最多 200 条，重启清空）；台账本身持久化在数据库。
+- `last_error`：最近一轮扫描级错误（单条导出失败不算，记在 `recent[].error` 与台账 `error` 里）。
+
+#### 14.2 `POST /api/content/jobs/run` —— 立刻跑一轮
+
+- 鉴权：需登录；**只处理当前用户的到期排期**。
+- 请求体：无。
+- 响应 `200`：
+```json
+{ "started_at": "2026-10-24T22:56:00-04:00", "finished_at": "2026-10-24T22:56:00-04:00",
+  "due": 1, "exported": 1, "failed": 0, "skipped": 0, "busy": false,
+  "items": [ { "publication_id": 12, "draft_id": 7, "channel": "wechat",
+    "status": "exported", "path": "…\\pub-12-wechat-周报.md", "attempts": 1,
+    "at": "2026-10-24T22:56:00-04:00", "duration_ms": 2 } ] }
+```
+- `409`：上一轮还没跑完，返回同样的结构且 `busy=true`（不排队）。
+- `503` `{ "error": "数据库未初始化，自动任务不可用" }`。
+- `skipped`：扫描后被其它 worker 领走，或状态已被人工改动。
+
+---
+
+### 15. 定时唤醒（2026-10-25 新增）
+
+到点让 agent 在指定会话里自己跑一轮（`headless=true`），结果作为普通 assistant 消息落库。
+设计、状态机与安全阀见 [agent/12-wakeup.md](agent/12-wakeup.md)。
+
+#### 15.1 `POST /api/wakeups` —— 建一条唤醒
+
+- 鉴权：需登录；会话必须属于当前用户。
+- 请求体：
+```json
+{ "conversation_id": 12, "run_at": "2026-10-25T09:00:00+08:00",
+  "prompt": "检查昨晚的构建结果，失败就把失败用例列出来", "title": "检查构建" }
+```
+| 字段 | 必填 | 规则 |
+|---|---|---|
+| `conversation_id` | 是 | 必须存在且属于当前用户，否则 `404` |
+| `run_at` | 是 | RFC3339（带时区）；也接受 `2006-01-02 15:04` 等本地写法。至少领先 15 秒、最多一年 |
+| `prompt` | 是 | 到点后交给 agent 的说明；上限 4000 字 |
+| `title` | 否 | 列表标题；留空取 `prompt` 前 40 字 |
+
+- 响应 `201`：
+```json
+{ "Id": 7, "UserID": "…", "ConversationID": 12, "Title": "检查构建",
+  "Prompt": "…", "RunAt": "2026-10-25T01:00:00Z", "Status": "pending",
+  "Attempts": 0, "Error": "", "NextAttemptAt": null, "FiredAt": null,
+  "CreatedBy": "user", "CreatedAt": "…", "UpdatedAt": "…" }
+```
+- `400` 时间/文案不合法；`409` 这个会话已经挂了 5 条 pending。
+
+#### 15.2 `GET /api/wakeups` —— 列表
+
+- 查询：`conversation_id`（可选）、`status`（`pending`/`done`/`failed`/`canceled`）、`limit`（默认 20，上限 100）。
+- 响应 `200`：`{ "running": true, "items": [ … ] }`；只返回当前用户的数据。
+  `running` 表示后台调度是否启动（`AGENT_WAKEUP_INTERVAL_SECONDS<=0` 时为 false，但建单仍然可用）。
+
+#### 15.3 `DELETE /api/wakeups/{id}` —— 取消
+
+- 只对 `pending` 生效；`200` 返回取消后的记录。
+- `404` 不存在（含跨用户）；`409` 已经 done/failed/canceled，不能再取消。
+
+#### 15.4 调度语义（读接口时可能用得上）
+
+- 每 `AGENT_WAKEUP_INTERVAL_SECONDS`（默认 30）扫一次；
+- 会话正忙：推后 2 分钟，不计失败次数；
+- 同会话限流（30 秒一次 / 一小时 6 次）：推后 5 分钟；
+- 失败：1 分钟起翻倍、上限 1 小时，默认 3 次后落 `failed`；
+- `fired_at` 是实际执行时间，可能晚于 `run_at`（会话忙或服务当时没开）。
 
 ## 待实现（Day 16–20）
 - `POST /api/conversations` 新建会话。

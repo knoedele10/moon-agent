@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -10,6 +11,8 @@ import (
 
 	"blog-my/internal/agent"
 	"blog-my/internal/agent/mcps"
+
+	"github.com/gin-gonic/gin"
 )
 
 // MCP 接线：把外部 MCP 服务器暴露的工具接进工具目录。
@@ -117,8 +120,61 @@ func mcpStatus() []mcps.ServerStatus {
 	return m.Status()
 }
 
+// getMCPHealth 列出已配置的 MCP，并对带 url 的条目做一次 HTTP 探测。
+// 不启动 stdio 进程。完整的 Streamable HTTP 会话不在这里建立。
+func getMCPHealth(c *gin.Context) {
+	inline, path, ok := mcpConfigSource()
+	var cfg *mcps.Config
+	var cfgErr error
+	if ok {
+		if inline != nil {
+			cfg, cfgErr = mcps.ParseConfig(inline)
+		} else {
+			cfg, cfgErr = mcps.LoadConfigFile(path)
+		}
+	}
+	connected := map[string]mcps.ServerStatus{}
+	for _, st := range mcpStatus() {
+		connected[st.Name] = st
+	}
+	type row struct {
+		Name       string `json:"name"`
+		Transport  string `json:"transport"`
+		Permission string `json:"permission,omitempty"`
+		Connected  bool   `json:"connected"`
+		HTTPStatus int    `json:"http_status,omitempty"`
+		Error      string `json:"error,omitempty"`
+	}
+	var rows []row
+	if cfg != nil {
+		for _, srv := range cfg.Servers {
+			item := row{Name: srv.Name, Transport: srv.Transport(), Permission: strings.TrimSpace(srv.Permission)}
+			if st, hit := connected[srv.Name]; hit {
+				item.Connected = st.Connected
+				item.Error = st.Error
+			}
+			if srv.Transport() == "http" {
+				code, err := mcps.ProbeHTTP(c.Request.Context(), srv.URL)
+				item.HTTPStatus = code
+				if err != nil {
+					item.Error = err.Error()
+				}
+			}
+			rows = append(rows, item)
+		}
+	}
+	if rows == nil {
+		rows = []row{}
+	}
+	payload := gin.H{"configured": ok, "servers": rows}
+	if cfgErr != nil {
+		payload["error"] = cfgErr.Error()
+	}
+	c.JSON(http.StatusOK, payload)
+}
+
 // mcpSummary 是状态接口用的一行摘要（未配置时为空串）。
-// 与 mcpStatus 一样**不触发连接**：状态接口不该起进程。
+// 与 mcpStatus 一样不触发连接：状态接口不该起进程。
 func mcpSummary() string {
 	m := currentMCPManager()
 	if m == nil {

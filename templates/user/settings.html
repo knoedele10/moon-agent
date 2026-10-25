@@ -31,6 +31,12 @@
             <a class="settings-nav-item" href="#sec-keys"><span>02</span>已保存密钥</a>
             <a class="settings-nav-item" href="#sec-roots"><span>03</span>模式目录</a>
             <a class="settings-nav-item" href="#sec-soul"><span>04</span>助手偏好</a>
+            <p class="settings-nav-label settings-nav-label-sub">资源</p>
+            <a class="settings-nav-item" href="/#taskboard">任务看板</a>
+            <a class="settings-nav-item" href="/#skills">技能</a>
+            <a class="settings-nav-item" href="/#assistants">助手</a>
+            <a class="settings-nav-item" href="/#prompts">提示词</a>
+            <a class="settings-nav-item" href="/#models">模型</a>
             <a class="settings-nav-item settings-nav-back" href="/">返回对话</a>
         </nav>
         <div class="settings-content">
@@ -146,6 +152,47 @@
             </div>
             <button type="button" class="btn" id="soul-save">保存偏好</button>
             <p class="kb-note" id="soul-note" role="status" aria-live="polite"></p>
+        </section>
+
+        <!-- 资源入口：任务看板 / 技能 / 助手 / 提示词 / 模型本来在侧栏，
+             现在统一收进设置，侧栏只留「对话」和「实验」。
+             这些页面共用对话工作台，所以链接回到对话页再切视图，不另开一套页面。 -->
+        <section class="card" id="sec-resources">
+            <div class="settings-card-heading compact">
+                <span class="settings-card-icon" aria-hidden="true">◎</span>
+                <div>
+                    <p class="card-tag">RESOURCES</p>
+                    <h2>资源与工具</h2>
+                    <p class="card-sub">点开后会回到对话窗口并直接切到对应视图。</p>
+                </div>
+            </div>
+            <div class="settings-resource-list">
+                <a class="settings-resource" href="/#taskboard">
+                    <span class="settings-resource-name">任务看板</span>
+                    <span class="settings-resource-desc">当前会话的计划、工具轨迹与 agent 团队</span>
+                    <span class="settings-resource-arrow" aria-hidden="true">→</span>
+                </a>
+                <a class="settings-resource" href="/#skills">
+                    <span class="settings-resource-name">技能</span>
+                    <span class="settings-resource-desc">可复用的任务说明，对话时自动挑选最相关的几条</span>
+                    <span class="settings-resource-arrow" aria-hidden="true">→</span>
+                </a>
+                <a class="settings-resource" href="/#assistants">
+                    <span class="settings-resource-name">助手</span>
+                    <span class="settings-resource-desc">自定义人格、默认模型、档位与工作区</span>
+                    <span class="settings-resource-arrow" aria-hidden="true">→</span>
+                </a>
+                <a class="settings-resource" href="/#prompts">
+                    <span class="settings-resource-name">提示词</span>
+                    <span class="settings-resource-desc">把常用指令存成模板，随时调用</span>
+                    <span class="settings-resource-arrow" aria-hidden="true">→</span>
+                </a>
+                <a class="settings-resource" href="/#models">
+                    <span class="settings-resource-name">模型</span>
+                    <span class="settings-resource-desc">各厂商端点、可用模型与连接状态</span>
+                    <span class="settings-resource-arrow" aria-hidden="true">→</span>
+                </a>
+            </div>
         </section>
         </div>
     </main>

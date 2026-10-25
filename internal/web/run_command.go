@@ -14,6 +14,7 @@ import (
 
 	"blog-my/internal/agent"
 	agentfs "blog-my/internal/agent/fs"
+	"blog-my/internal/agent/sandbox"
 )
 
 const (
@@ -82,8 +83,19 @@ func (runCommandTool) Execute(ctx context.Context, raw json.RawMessage, ex *agen
 	if err != nil {
 		return agent.Result{Content: "工作目录无效：" + err.Error(), IsError: true}, nil
 	}
+	useSandbox := sandbox.Enabled()
+	policy := sandbox.FromWorkspace(ex.Root, ex.Roots)
+	if useSandbox {
+		if err := policy.CheckWrite(workingDir); err != nil {
+			return agent.Result{Content: err.Error(), IsError: true}, nil
+		}
+	}
 	for i, step := range a.Commands {
-		if _, err := resolveAllowedProgram(step.Program); err != nil {
+		if useSandbox {
+			if err := policy.CheckExec(step.Program); err != nil {
+				return agent.Result{Content: fmt.Sprintf("第 %d 步命令无效：%v", i+1, err), IsError: true}, nil
+			}
+		} else if _, err := resolveAllowedProgram(step.Program); err != nil {
 			return agent.Result{Content: fmt.Sprintf("第 %d 步命令无效：%v", i+1, err), IsError: true}, nil
 		}
 		for _, arg := range step.Args {
@@ -111,7 +123,14 @@ func (runCommandTool) Execute(ctx context.Context, raw json.RawMessage, ex *agen
 		if runCtx.Err() != nil {
 			return commandFailure(output.String(), fmt.Sprintf("总超时（>%s）已终止后续命令。", timeout), true)
 		}
-		program, _ := resolveAllowedProgram(step.Program)
+		program := step.Program
+		if useSandbox {
+			if resolved, lookErr := exec.LookPath(step.Program); lookErr == nil {
+				program = resolved
+			}
+		} else {
+			program, _ = resolveAllowedProgram(step.Program)
+		}
 		fmt.Fprintf(&output, "$ %s %s\n", step.Program, strings.Join(step.Args, " "))
 		cmd := commandProcess(runCtx, program, step.Args)
 		cmd.Dir = workingDir

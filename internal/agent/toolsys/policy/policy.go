@@ -138,19 +138,28 @@ var byName = map[string]Meta{
 	"datetime":    known(RiskRead, true, false, SideEffectReadOnly, false, false),
 	"json_format": known(RiskRead, true, false, SideEffectReadOnly, false, false),
 	"ask_user":    known(RiskRead, false, false, SideEffectReadOnly, false, false),
+	// 计划只存在于进程内，不动用户文件、不出网；整体替换是幂等的。
+	"update_plan": known(RiskSelf, false, false, SideEffectIdempotent, false, false),
 	"web_search":  known(RiskNetwork, true, false, SideEffectReadOnly, false, false),
 	"web_reader":  known(RiskNetwork, true, false, SideEffectReadOnly, false, false),
 	"sql_query":   known(RiskRead, true, false, SideEffectReadOnly, false, true),
 
 	// 工作区文件。读类风险是 read，不再沿用 fs 组的整组 write。
-	"read":        known(RiskRead, true, false, SideEffectReadOnly, false, true),
-	"list":        known(RiskRead, true, false, SideEffectReadOnly, false, true),
-	"read_image":  known(RiskRead, true, false, SideEffectReadOnly, false, true),
-	"write":       known(RiskWrite, false, true, SideEffectIdempotent, true, false),
-	"edit":        known(RiskWrite, false, true, SideEffectIdempotent, true, false),
-	"move":        known(RiskWrite, false, true, SideEffectNonIdempotent, true, false),
-	"delete":      known(RiskWrite, false, true, SideEffectNonIdempotent, true, false),
-	"office_edit": known(RiskWrite, false, true, SideEffectNonIdempotent, true, false),
+	"read":       known(RiskRead, true, false, SideEffectReadOnly, false, true),
+	"list":       known(RiskRead, true, false, SideEffectReadOnly, false, true),
+	"read_image": known(RiskRead, true, false, SideEffectReadOnly, false, true),
+	// 检索只读、可并发；但它不冒充「写完之后的验证」：
+	// 搜到某段文字存在，不等于目标文件整体正确。
+	"grep":   known(RiskRead, true, false, SideEffectReadOnly, false, false),
+	"glob":   known(RiskRead, true, false, SideEffectReadOnly, false, false),
+	"write":  known(RiskWrite, false, true, SideEffectIdempotent, true, false),
+	"edit":   known(RiskWrite, false, true, SideEffectIdempotent, true, false),
+	"move":   known(RiskWrite, false, true, SideEffectNonIdempotent, true, false),
+	"delete": known(RiskWrite, false, true, SideEffectNonIdempotent, true, false),
+	// 恢复到同一检查点两次结果相同；但它确实改世界，confirm 档先问、成功后值得读回。
+	"restore":      known(RiskWrite, false, true, SideEffectIdempotent, true, false),
+	"restore_turn": known(RiskWrite, false, true, SideEffectIdempotent, true, false),
+	"office_edit":  known(RiskWrite, false, true, SideEffectNonIdempotent, true, false),
 
 	// 记忆。memory_write 见文件头的产品说明。
 	"memory_search":  known(RiskRead, true, false, SideEffectReadOnly, false, false),
@@ -173,6 +182,12 @@ var byName = map[string]Meta{
 	"soul_evolve":   known(RiskSelf, false, false, SideEffectNonIdempotent, false, false),
 
 	"run_command": known(RiskExec, false, true, SideEffectNonIdempotent, true, false),
+	"git_status":  known(RiskRead, true, false, SideEffectReadOnly, false, true),
+	"git_diff":    known(RiskRead, true, false, SideEffectReadOnly, false, true),
+	"git_log":     known(RiskRead, true, false, SideEffectReadOnly, false, false),
+	"git_show":    known(RiskRead, true, false, SideEffectReadOnly, false, false),
+	"git_add":     known(RiskWrite, false, true, SideEffectIdempotent, true, false),
+	"git_commit":  known(RiskWrite, false, true, SideEffectNonIdempotent, true, false),
 
 	// 子任务。list 只读可重试；派活重复会再起一个任务。
 	"subagent":       known(RiskExec, false, false, SideEffectNonIdempotent, false, false),
@@ -192,4 +207,21 @@ var byName = map[string]Meta{
 	"tool_search":      known(RiskSelf, false, false, SideEffectNonIdempotent, false, false),
 	"read_tool_result": known(RiskRead, true, false, SideEffectReadOnly, false, false),
 	"evolution_report": known(RiskSelf, false, false, SideEffectNonIdempotent, false, false),
+
+	// 定时唤醒：设定一次未来的自主轮次属于「改自身行为」，confirm 档先问一句；
+	// 取消与列表不动别人，不问。重复设定会排两条，所以不是幂等写。
+	"schedule_wakeup": known(RiskSelf, false, true, SideEffectNonIdempotent, false, false),
+	"cancel_wakeup":   known(RiskSelf, false, false, SideEffectIdempotent, false, false),
+	"list_wakeups":    known(RiskRead, true, false, SideEffectReadOnly, false, false),
+
+	// 生成 AGENTS.md 会写工作区文件；文件已存在时拒绝覆盖，重复调用结果相同。
+	"init_agents_md": known(RiskWrite, false, true, SideEffectIdempotent, true, false),
+
+	// 浏览器：打开/快照/截图/网络日志只读可并发；点击和输入会改变页面，confirm 档先问。
+	"browser_open":       known(RiskNetwork, true, false, SideEffectReadOnly, false, false),
+	"browser_snapshot":   known(RiskNetwork, true, false, SideEffectReadOnly, false, false),
+	"browser_screenshot": known(RiskNetwork, true, false, SideEffectReadOnly, false, false),
+	"browser_network":    known(RiskNetwork, true, false, SideEffectReadOnly, false, false),
+	"browser_click":      known(RiskNetwork, false, true, SideEffectNonIdempotent, false, false),
+	"browser_type":       known(RiskNetwork, false, true, SideEffectNonIdempotent, false, false),
 }

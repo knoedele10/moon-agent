@@ -22,6 +22,17 @@ func env(key, fallback string) string {
 
 // InitDB initializes persistence; callers decide how to report startup errors.
 func InitDB() error {
+	driver, err := SelectDriver()
+	if err != nil {
+		return err
+	}
+	if driver == "sqlite" {
+		return initSQLite()
+	}
+	return initMySQL()
+}
+
+func initMySQL() error {
 	host := env("DB_HOST", "127.0.0.1")
 	port := env("DB_PORT", "3306")
 	user := env("DB_USER", "root")
@@ -51,7 +62,13 @@ func InitDB() error {
 		return fmt.Errorf("connect database %q: %w", name, err)
 	}
 
-	if err := DB.AutoMigrate(&User{}, &UserKey{}, &Conversation{}, &Message{}, &KBDocument{}, &KBChunk{}, &AgentSetting{}, &KBMemoryEvent{}, &AgentSkill{}, &AgentPendingTool{}, &AgentAssistant{}, &AgentPrompt{}, &AgentProactiveState{}, &AgentProactiveMessage{}, &AgentSubagentRun{}, &AgentTeamTask{}); err != nil {
+	if err := DB.AutoMigrate(&User{}, &UserKey{}, &Conversation{}, &Message{}, &KBDocument{}, &KBChunk{}, &AgentSetting{}, &KBMemoryEvent{}, &AgentSkill{}, &AgentPendingTool{}, &AgentAssistant{}, &AgentPrompt{}, &AgentProactiveState{}, &AgentProactiveMessage{}, &AgentSubagentRun{}, &AgentTeamTask{},
+		// 自媒体内容库（素材/稿件/版本/关联/发布台账）：只增表，不改既有表语义。
+		&ContentAsset{}, &ContentDraft{}, &ContentDraftVersion{}, &ContentDraftAsset{}, &ContentPublication{},
+		// 定时唤醒（到点让 agent 在该会话里跑一轮）：同样只增表。
+		&AgentWakeup{},
+		// token 账：按轮写入，会话接口再汇总。
+		&AgentUsage{}); err != nil {
 		if sqlDB, closeErr := DB.DB(); closeErr == nil {
 			_ = sqlDB.Close()
 		}
@@ -94,7 +111,7 @@ func reclaimRunningSubagents() {
 // (user_id, sha256) 复合索引承担；AutoMigrate 只建不删，所以老索引必须在这里显式清掉，
 // 否则老库上这个 bug 依旧存在。索引本来就不存在时 MySQL 报 1091，属正常情况。
 func dropLegacySHAIndex() {
-	if DB == nil {
+	if DB == nil || Driver() != "mysql" {
 		return
 	}
 	// 先查存在性再删：直接 DROP 一个不存在的索引会让 MySQL 报 1091，

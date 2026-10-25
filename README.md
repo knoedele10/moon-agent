@@ -9,11 +9,14 @@
 | 多模型对话 | 内置 DeepSeek、OpenAI、Grok（xAI）、Moonshot、通义千问、智谱、Claude、Gemini、文心和 Ollama 端点。云端模型需要自己的 API Key。 |
 | 流式对话 | 通过 SSE 推送文本增量、工具调用、工具结果、等待输入和完成状态；界面可展开执行详情。 |
 | Agent 执行 | 默认使用 Eino ReAct，同时保留 legacy 执行器用于回退和对照。可调用工作区文件工具、技能、子 Agent 和团队能力。 |
+| 工作区检索与计划 | `grep` 按内容找、`glob` 按文件名找（支持 `**`），自动跳过依赖/构建目录；`update_plan` 把多步任务的计划外化，每轮自动注入最新状态，对话页有计划面板。只读工具可在两个执行器里并发。`restore` 可回滚单个文件，`restore_turn` 可整组撤销最近一轮文件改动。见 [ACI 升级](docs/agent/13-aci-upgrades.md)。 |
 | 工具发现与经验学习 | 可选的按需工具发现、参数纠偏、大结果续读、MCP，以及有参数证据的技能积累、使用反馈和撤销。见 [使用指南](docs/hermes-parity/04-usage.md)。 |
 | 执行权限 | `plan`、`confirm`、`auto` 模式控制规划、风险操作确认和自主执行；服务端和工具仍会校验权限。 |
 | 记忆与知识库 | 文档切块后融合向量、关键词和实体线索；自动记忆及用户画像可按需进入后续对话上下文。 |
 | 助手设定 | 用户画像与助手人格分开管理；人格配置包含性格、说话方式和做事方式等维度。 |
 | 多工作区 | 一个会话可选择多个活动目录；文件工具仍按工作区和执行模式限制访问范围。 |
+| 内容自动任务 | 自媒体排期到点自动导出 Markdown 成品包并推进发布台账（`exported`），失败指数退避重试；只导出，不代发平台。 |
+| 定时唤醒 | 用户或 agent 指定「某时间在某会话做某事」，到点后台跑一轮并把结果落回该会话；可查看、可取消。 |
 | 电脑操作（可选） | `cua/` 提供 Python CUA sidecar，需要单独安装依赖或构建。 |
 
 项目不提供托管推理服务，也不包含模型凭证。Ollama 可用于本地对话或知识库嵌入；需自行安装所需模型并承担本地推理资源开销。
@@ -114,13 +117,20 @@ ollama pull qwen2.5vl:7b
 | `AGENT_MAX_DEPTH`、`AGENT_MAX_CHILDREN` | 子 Agent 最大委派深度和并发数量。 |
 | `AGENT_TOOLSETS` | 只暴露指定工具集（逗号分隔，如 `fs,memory`）；不配 = 全量，与改造前一致。 |
 | `AGENT_TOOL_DISCLOSURE` | `search` = 只给核心工具 + `tool_search`，其余按需激活；默认 `off`。 |
-| `AGENT_TOOL_PARALLEL` | `read` = 同一轮里连续的只读调用并发执行（写/执行类仍串行）；默认关闭。 |
+| `AGENT_TOOL_PARALLEL` | `read` = 同一轮里连续的只读调用并发执行（写/执行类仍串行），legacy 与 eino 都生效；默认关闭。 |
 | `AGENT_TOOL_PARALLEL_MAX` | 只读并发度，默认 4。 |
 | `AGENT_TOOL_SPILL_BYTES` | 工具结果超过该字节数就落盘，只把头部 + 路径回灌给模型；`read_tool_result` 分段读。 |
+| `AGENT_CHECKPOINT_DIR` | 文件检查点目录（默认用户缓存目录下的 `blog-my/checkpoints`）。`write/edit/move/delete` 前自动留副本，`restore` 恢复单个文件、`restore_turn` 整组撤销最近一轮。 |
+| `AGENT_CONTEXT_TOKENS` | 模型上下文窗口（估算值）。设置后：单条工具结果上限取窗口 10%，中段压缩在窗口 60% 触发。 |
+| `AGENT_MIDLOOP_COMPACT_TOKENS` | 显式覆盖中段压缩阈值（估算 token）；不配时用窗口 60% 或默认 24000。 |
+| `AGENT_TOOL_OUTPUT_CAP` | 显式覆盖单条工具结果字符上限；不配时用窗口 10% 或默认 16000。 |
 | `AGENT_EVOLVE` | 自我进化档位：`off`/`record`/`suggest`/`auto`（默认 `off`）。 |
 | `AGENT_EVOLVE_DIR` | 进化数据目录（轨迹、账本、候选）；默认用户配置目录。 |
 | `AGENT_SKILL_LINT` | 技能体检：`off`/`warn`（默认）/`block`。 |
 | `AGENT_MCP_CONFIG`、`AGENT_MCP_JSON` | MCP 服务器配置（文件路径或内联 JSON）；不配 = 不启动任何外部进程。 |
+| `CONTENT_PUBLISH_INTERVAL_MINUTES` | 排期自动导出节拍（分钟，默认 `5`；`<=0` 关闭后台调度，手动触发仍可用）。 |
+| `CONTENT_EXPORT_DIR` | 成品包落盘目录（默认用户配置目录下的 `blog-my\content-publish`）。 |
+| `AGENT_WAKEUP_INTERVAL_SECONDS` | 定时唤醒检查间隔（秒，默认 `30`；`<=0` 关闭后台调度，建单接口仍可用）。 |
 
 `confirm` 模式会在需要确认的操作前等待用户；`auto` 允许 Agent 自行处理常规决策，但缺少必要信息或遇到权限限制时仍可能暂停。预算续行不保证模型一定完成任务，请以界面中的执行记录和最终状态为准。
 
@@ -189,10 +199,14 @@ Remove-Item Env:DB_NAME
 - [项目架构与数据流](docs/architecture.md)
 - [Agent 使用、执行模式和工作区权限](docs/agent/03-usage.md)
 - [工具清单与行为约束](docs/agent/02-tools.md)
+- [ACI 升级：检索、计划、压缩工作集与不可信内容边界](docs/agent/13-aci-upgrades.md)
 - [Eino 执行器、预算和续行](docs/agent/08-eino-runtime.md)
+- [市面 Agent 对标与改进建议（2026-10）](docs/agent/14-market-comparison.md)
 - [技能系统](docs/agent/04-skills.md)
 - [子 Agent 与团队](docs/agent/05-subagent-and-team.md)
 - [HTTP / SSE API 契约](docs/api-contract.md)
+- [自媒体稿件 / 素材 / 发布与排期自动导出](docs/content/需求分析-自媒体稿件素材发布.md)
+- [定时唤醒：到点让 agent 自己跑一轮](docs/agent/12-wakeup.md)
 - [数据库结构说明](db/schema.md)
 - [本轮目录整理与验证记录](docs/verify/refactoring-2026-10-19.md)
 - [应用布局 ADR](docs/adr/0001-application-layout.md)

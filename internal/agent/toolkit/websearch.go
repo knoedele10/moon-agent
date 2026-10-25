@@ -162,8 +162,8 @@ func (WebSearchTool) Execute(ctx context.Context, raw json.RawMessage, ex *agent
 			fmt.Fprintf(&b, "\n%d. %s\n   %s\n   %s\n", i+1, r.Title, r.URL, r.Snippet)
 		}
 		return agent.Result{
-			Content: b.String(),
-			Display: map[string]any{"query": query, "count": len(results), "engine": eng.name},
+			Content: wrapUntrustedContent("搜索结果", eng.name, b.String()),
+			Display: map[string]any{"query": query, "count": len(results), "engine": eng.name, "untrusted": true},
 		}, nil
 	}
 
