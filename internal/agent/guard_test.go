@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -39,6 +41,22 @@ func TestEstimateMessagesTokensCountsToolCalls(t *testing.T) {
 	}}
 	if estimateMessagesTokens(withCall) <= estimateMessagesTokens(plain) {
 		t.Fatal("带 tool_calls 的消息应当估得更多")
+	}
+}
+
+func TestToolOutputCapFollowsContextWindow(t *testing.T) {
+	t.Setenv("AGENT_TOOL_OUTPUT_CAP", "")
+	t.Setenv("AGENT_CONTEXT_TOKENS", "")
+	if got := toolOutputCap(); got != toolOutputCapDefault {
+		t.Fatalf("默认上限变了：%d", got)
+	}
+	t.Setenv("AGENT_CONTEXT_TOKENS", "200000")
+	if got := toolOutputCap(); got != 20000 {
+		t.Fatalf("应按窗口 10%% 取上限，实际 %d", got)
+	}
+	t.Setenv("AGENT_TOOL_OUTPUT_CAP", "900")
+	if got := toolOutputCap(); got != 900 {
+		t.Fatalf("显式上限应优先，实际 %d", got)
 	}
 }
 
@@ -144,6 +162,109 @@ func TestRunTimeoutEnv(t *testing.T) {
 	t.Setenv("AGENT_RUN_TIMEOUT_SEC", "30")
 	if got := runTimeout().Seconds(); got != 30 {
 		t.Fatalf("want 30s, got %v", got)
+	}
+}
+
+// 工作集必须从 tool_call 参数直接提取：模型摘要可能丢路径，这里不能丢。
+func TestCollectWorkingSet(t *testing.T) {
+	msgs := []llm.Message{
+		{Role: llm.RoleUser, Content: "改一下登录页"},
+		{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{
+			{ID: "1", Name: "read", Arguments: `{"file_path":"internal/web/agent.go"}`},
+			{ID: "2", Name: "grep", Arguments: `{"pattern":"login","path":"internal/"}`},
+		}},
+		{Role: roleTool, Content: "结果", ToolCallID: "1"},
+		{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{
+			{ID: "3", Name: "edit", Arguments: `{"file_path":"internal\\web\\agent.go","old_string":"a","new_string":"b"}`},
+			{ID: "4", Name: "run_command", Arguments: `{"cwd":".","commands":[{"program":"npm","args":["run","build"]}]}`},
+		}},
+		{Role: roleTool, Content: "ok", ToolCallID: "3"},
+		{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{
+			{ID: "5", Name: "read", Arguments: `{"file_path":"."}`},
+			{ID: "6", Name: "read", Arguments: `not json`},
+		}},
+	}
+	ws := collectWorkingSet(msgs)
+	// 反斜杠路径要归一成 /，重复路径只留一次，"." 不算工作集。
+	wantFiles := []string{"internal/web/agent.go", "internal/"}
+	if len(ws.Files) != len(wantFiles) {
+		t.Fatalf("files = %v, want %v", ws.Files, wantFiles)
+	}
+	for i, want := range wantFiles {
+		if ws.Files[i] != want {
+			t.Errorf("files[%d] = %q, want %q", i, ws.Files[i], want)
+		}
+	}
+	if len(ws.Commands) != 1 || ws.Commands[0] != "npm run build" {
+		t.Fatalf("commands = %v, want [npm run build]", ws.Commands)
+	}
+	if block := ws.block(); !strings.Contains(block, "不要凭记忆") {
+		t.Fatalf("工作集块要提醒重新 read：%q", block)
+	}
+}
+
+func TestCollectWorkingSetCapsEntries(t *testing.T) {
+	var calls []llm.ToolCall
+	for i := 0; i < workingSetMaxFiles+5; i++ {
+		calls = append(calls, llm.ToolCall{ID: "x", Name: "read", Arguments: fmt.Sprintf(`{"file_path":"f%d.go"}`, i)})
+	}
+	ws := collectWorkingSet([]llm.Message{{Role: llm.RoleAssistant, ToolCalls: calls}})
+	if len(ws.Files) != workingSetMaxFiles {
+		t.Fatalf("工作集应封顶 %d，实际 %d", workingSetMaxFiles, len(ws.Files))
+	}
+}
+
+// 压缩后必须同时保留：模型摘要 + 确定性工作集 + 「重新 read」的提醒。
+func TestMidLoopCompactKeepsWorkingSet(t *testing.T) {
+	msgs := []llm.Message{
+		{Role: llm.RoleSystem, Content: "sys"},
+		{Role: llm.RoleUser, Content: "把登录页修好"},
+		{Role: llm.RoleAssistant, Content: "先看看代码", ToolCalls: []llm.ToolCall{
+			{ID: "c1", Name: "read", Arguments: `{"file_path":"login.go"}`},
+		}},
+		{Role: roleTool, Content: "package login", ToolCallID: "c1"},
+		{Role: llm.RoleAssistant, Content: "再改一处", ToolCalls: []llm.ToolCall{
+			{ID: "c2", Name: "edit", Arguments: `{"file_path":"login.go","old_string":"x","new_string":"y"}`},
+		}},
+		{Role: roleTool, Content: "Edited", ToolCallID: "c2"},
+		{Role: llm.RoleUser, Content: "继续"},
+		{Role: llm.RoleAssistant, Content: "好"},
+	}
+	stream := func(ctx context.Context, model, key string, req llm.ChatRequest) (<-chan llm.Event, error) {
+		ch := make(chan llm.Event, 2)
+		ch <- llm.Event{Type: llm.EventDelta, Content: "用户想修登录页；已读并改过 login.go。"}
+		ch <- llm.Event{Type: llm.EventDone}
+		close(ch)
+		return ch, nil
+	}
+	got := midLoopCompact(context.Background(), stream, "m", "k", msgs, 2)
+	if len(got) >= len(msgs) {
+		t.Fatalf("应当压缩掉中间消息：%d -> %d", len(msgs), len(got))
+	}
+	joined := ""
+	for _, m := range got {
+		joined += m.Content
+	}
+	for _, want := range []string{"用户想修登录页", "login.go", "压缩时保留的工作集", "重新 read"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("压缩结果缺少 %q：\n%s", want, joined)
+		}
+	}
+}
+
+func TestMidLoopCompactTokensEnv(t *testing.T) {
+	t.Setenv("AGENT_MIDLOOP_COMPACT_TOKENS", "")
+	t.Setenv("AGENT_CONTEXT_TOKENS", "")
+	if got := midLoopCompactTokens(); got != midLoopCompactTokensDefault {
+		t.Fatalf("默认阈值变了：%d", got)
+	}
+	t.Setenv("AGENT_CONTEXT_TOKENS", "100000")
+	if got := midLoopCompactTokens(); got != 60000 {
+		t.Fatalf("应按窗口 60%% 触发，实际 %d", got)
+	}
+	t.Setenv("AGENT_MIDLOOP_COMPACT_TOKENS", "1234")
+	if got := midLoopCompactTokens(); got != 1234 {
+		t.Fatalf("显式阈值应优先，实际 %d", got)
 	}
 }
 

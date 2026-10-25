@@ -38,9 +38,12 @@ async function until(check) {
   for (let i = 0; i < 150; i++) { if (check()) return; await pause(10); }
   throw Error('Timeout waiting for UI state');
 }
+// 会话列表按「最近打开/更新时间」倒序，不再保证 id 顺序；按标题取按钮，
+// 让这个用例只验证分页/缓存/竞态，不被排序策略变化误伤。
+const convButton = title => Array.from(doc.querySelectorAll('.conv-item')).find(node => node.textContent.includes(title));
 (async () => {
   await until(() => doc.querySelectorAll('.conv-item').length === 3);
-  doc.querySelector('.conv-item').click();
+  convButton('会话 1').click();
   await until(() => doc.querySelectorAll('.msg').length === 60);
   assert.equal(doc.querySelector('.msg').getAttribute('data-message-id'), '126');
   assert.ok(seen.includes('/api/conversations/1/messages?limit=60'));
@@ -51,15 +54,15 @@ async function until(check) {
   assert.equal(doc.querySelector('.history-older'), null);
   assert.equal(doc.querySelector('.msg').getAttribute('data-message-id'), '1');
   assert.equal(new Set([...doc.querySelectorAll('.msg')].map(node => node.dataset.messageId)).size, 185);
-  doc.querySelectorAll('.conv-item')[1].click();
+  convButton('会话 2').click();
   await until(() => releaseSlow);
-  doc.querySelectorAll('.conv-item')[2].click();
+  convButton('会话 3').click();
   await until(() => doc.querySelectorAll('.msg').length === 60);
   releaseSlow();
   await pause(40);
   assert.equal(doc.querySelector('.conv-item.active').textContent.includes('会话 3'), true);
   assert.equal(doc.querySelectorAll('.msg').length, 60);
-  doc.querySelectorAll('.conv-item')[0].click();
+  convButton('会话 1').click();
   await until(() => doc.querySelectorAll('.msg').length === 185);
   assert.equal(doc.querySelector('.history-older'), null);
 

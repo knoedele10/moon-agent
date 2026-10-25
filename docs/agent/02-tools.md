@@ -5,6 +5,10 @@
 >
 > **实现状态（14:50:41）**：六个工具**已落地**（`agent/fs/tools.go`、`rag/memory_tool.go`），`/api/chat` 的 `tools` 字段**已接线**（`web/chat.go:125, 207-210`），
 > `go build`/`go vet`/`go test ./...` 与 CUA 门禁**全通过**。**但六个工具仍未被真实请求触发过** —— 见 §11。
+>
+> **2026-10-25 增补**：新增 `grep`、`glob`（工作区检索）与 `update_plan`（任务计划），
+> `edit` 改为成功后自动回显修改区域，`list` 增加 `offset` 分页，`read` 对超过 8MB 的文本走流式窗口。
+> 设计与验证详见 [13-aci-upgrades.md](13-aci-upgrades.md)；下面 §1 的工具表已同步新增行。
 
 ---
 
@@ -16,12 +20,18 @@
 | `write` | `agent/fs/tools.go:220` | 创建或覆盖整个文件 | **改文件系统** | — |
 | `edit` | `agent/fs/tools.go:300` | 字面量替换 | **改文件系统** | — |
 | `read_image` | `agent/fs/tools.go:409` | 读图片交给模型看 | 记录观察 | ✅ `Result.Image` |
+| `list` | `agent/fs/tools.go` | 列目录（`limit`/`offset` 分页） | 只读 | — |
+| `grep` | `agent/fs/search.go` | 按正则/字面量搜索文件内容，返回 `路径:行号: 内容` | 只读 | — |
+| `glob` | `agent/fs/search.go` | 按通配符找文件（支持 `**`） | 只读 | — |
+| `restore` | `agent/fs/checkpoint.go` | 恢复到最近一次修改前的文件检查点 | **改文件系统** | — |
+| `restore_turn` | `agent/fs/checkpoint.go` | 整组撤销最近一轮改过的所有文件 | **改文件系统** | — |
+| `update_plan` | `agent/plan.go` + `web/agent_plan_tool.go` | 更新本会话任务计划，每轮瞬态注入 | 仅进程内状态 | — |
 | `memory_search` | `rag/memory_tool.go:47` | 检索长期记忆 | 只读 | — |
 | `memory_write` | `rag/memory_tool.go:123` | 写入一条记忆 | **写记忆库** | — |
 | `skill_search` | `web/skill.go:275` | 按关键词搜已启用技能 | 只读 | — |
 | `skill_read` | `web/skill.go:342` | 读取技能完整正文 | 只读 | — |
 
-构造入口：`agentfs.Tools()`（`agent/fs/tools.go:21`，返回四个 fs 工具）、`rag.NewMemoryTools(backend, userID)`（`rag/memory_tool.go:30`）、`skillTools(userID)`（`web/skill.go:388`，返回两个技能工具）。
+构造入口：`agentfs.Tools()`（`agent/fs/tools.go`，返回四个基础 fs 工具）、`agentfs.ToolsWithMutation()`（含 list/move/delete）、`agentfs.SearchTools()`（grep/glob）、`agentfs.RecoveryTools()`（restore）、`rag.NewMemoryTools(backend, userID)`（`rag/memory_tool.go:30`）、`skillTools(userID)`（`web/skill.go:388`，返回两个技能工具）、`planTool{}`（`web/agent_plan_tool.go`）。
 **工具名即模型可见名**（`Name()` 直接进 `llm.ToolDef.Name`）。
 
 ---

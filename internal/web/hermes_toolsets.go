@@ -1,7 +1,6 @@
 package web
 
 import (
-	"log"
 	"os"
 	"sort"
 	"strconv"
@@ -39,18 +38,18 @@ func toolsetOf(name string) string {
 		return toolsetMCP
 	}
 	switch name {
-	case "calculator", "datetime", "json_format", "ask_user", "web_search", "web_reader", "sql_query":
+	case "calculator", "datetime", "json_format", "ask_user", "web_search", "web_reader", "sql_query", "update_plan":
 		return toolsetCore
-	case "read", "write", "edit", "read_image", "list", "delete", "move", "office_edit":
+	case "read", "write", "edit", "read_image", "list", "delete", "move", "office_edit", "grep", "glob", "restore", "restore_turn":
 		return toolsetFS
 	case "memory_search", "memory_write", "session_search":
 		return toolsetMemory
 	case "skill_search", "skill_read", "skill_write", "skill_run", "soul_evolve",
 		"skill_list", "skill_stats", "skill_lint", "skill_improve", "skill_archive":
 		return toolsetSkill
-	case "run_command":
+	case "run_command", "git_status", "git_diff", "git_log", "git_show", "git_add", "git_commit":
 		return toolsetExec
-	case "subagent", "list_subagents":
+	case "subagent", "list_subagents", "schedule_wakeup", "list_wakeups", "cancel_wakeup":
 		return toolsetAgent
 	case "spawn_teammate", "send_message", "list_agents", "wait_agent",
 		"team_task_create", "team_task_list", "team_task_get", "team_task_update":
@@ -163,28 +162,17 @@ func parallelMode() string {
 
 // parallelEffective 返回**实际生效**的并发档位。
 //
-// AGENT_TOOL_PARALLEL=read 只在 legacy 循环里实现（internal/agent/loop.go 的
-// planCallGroups/runReadOnlyBatch）；eino 执行器（默认）内部强制串行，
-// einoToolAdapter 共享同一份 runToolState，硬开并发会竞态。
+// 两个执行器都支持只读并发：
+//   - legacy：planCallGroups 把连续只读调用切批，按输入顺序回放事件；
+//   - eino（默认）：工具节点起 goroutine，callGated 的读写锁保证「只读共享、写独占」。
 //
-// 所以「配了」不等于「开了」：状态接口必须回显实际值，否则用户配完看到
-// "read" 会以为并发已生效（审计官 2026-10-21 报的最后一个 P1）。
+// 保留这个函数是为了让状态接口区分「配置值」与「生效值」；当前两者一致，
+// 但不要再把引擎判断写死在这里——上一版就是因为写死 eino=off 而与实现脱节。
 func parallelEffective() string {
 	if parallelMode() != "read" {
 		return "off"
 	}
-	if agentUsesEino() {
-		return "off"
-	}
 	return "read"
-}
-
-// warnIfParallelIneffective 在启动日志里把「配了但不生效」说清楚。
-// 只提醒一次、不阻断启动：并发是优化项，不是正确性开关。
-func warnIfParallelIneffective() {
-	if parallelMode() == "read" && parallelEffective() == "off" {
-		log.Printf("[agent] AGENT_TOOL_PARALLEL=read 在当前执行器（%s）下不生效：只读并发只由 legacy 循环实现；确实需要请设 AGENT_ENGINE=legacy。", agentEngineName())
-	}
 }
 
 // evolveMode：off | record | suggest | auto（默认 off）。

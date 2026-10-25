@@ -44,7 +44,14 @@
     assistantSelect: document.getElementById('assistant-select'),
     kindSelect: document.getElementById('kind-select'),
     modeSelect: document.getElementById('mode-select'),
-    wsCurrent: document.getElementById('ws-current')
+    wsCurrent: document.getElementById('ws-current'),
+    runSettingsToggle: document.getElementById('run-settings-toggle'),
+    composerSettings: document.getElementById('composer-settings'),
+    emptyExamples: document.getElementById('empty-examples'),
+    planPanel: document.getElementById('plan-panel'),
+    planSteps: document.getElementById('plan-steps'),
+    planProgress: document.getElementById('plan-progress'),
+    planToggle: document.getElementById('plan-toggle')
   };
 
   var stickBottom = true;
@@ -58,9 +65,20 @@
   var HISTORY_DOM_CACHE_LIMIT = 2;
   var conversationButtons = new Map();
   var activeConversationButton = null;
+  var conversationMeta = {};
+  try { conversationMeta = JSON.parse(localStorage.getItem('blogmy:conversation-meta') || '{}') || {}; } catch (e) { conversationMeta = {}; }
+  function saveConversationMeta() {
+    try { localStorage.setItem('blogmy:conversation-meta', JSON.stringify(conversationMeta)); } catch (e) {}
+  }
+  function conversationMetaFor(id) {
+    var key = String(id);
+    if (!conversationMeta[key]) conversationMeta[key] = { pinned: false, unread: false, openedAt: 0 };
+    return conversationMeta[key];
+  }
   var historyPage = { id: null, before: 0, hasMore: false, busy: false };
   var historyLoadSequence = 0;
   var jsonRequests = new Map();
+  var conversationPoll = null;
   function pollVisible() { return state.view === 'chat'; }
   function startPoll(fn, interval) {
     return window.APP_RUNTIME ? window.APP_RUNTIME.every(fn, interval, pollVisible) : setInterval(fn, interval);
@@ -143,6 +161,9 @@
       busy: state.streaming,
       workspace: taskState.workspace
     });
+    if (window.TASKBOARD && typeof window.TASKBOARD.refresh === 'function') {
+      window.TASKBOARD.refresh();
+    }
   }
 
   // 空状态与「招呼 + 输入框居中」是同一件事的两面：.app 上挂 is-empty，
@@ -218,9 +239,16 @@
   }
 
   function setStreaming(active) {
+    var wasStreaming = state.streaming;
     state.streaming = active;
     updateOlderButton();
     updateStopButton(active);
+    if (els.messages) els.messages.setAttribute('aria-busy', active ? 'true' : 'false');
+    if (els.thread) els.thread.setAttribute('aria-busy', active ? 'true' : 'false');
+    var activityStatus = document.getElementById('activity-status');
+    if (activityStatus && (active || wasStreaming)) {
+      activityStatus.textContent = active ? '正在生成回复，请稍候' : '回复生成已结束';
+    }
     if (els.thread) {
       els.thread.classList.toggle('is-streaming', active);
       els.messages.classList.toggle('is-streaming', active);
@@ -828,6 +856,117 @@
     writeChatParams(null, emptyParams());
   }
 
+  // 子会话折叠状态：按父会话 id 记，刷新后保持。搜索时一律展开，避免匹配项被藏起来。
+  var CONV_COLLAPSED_KEY = 'blogmy:conv-collapsed';
+  var collapsedConvParents = (function () {
+    try {
+      var raw = JSON.parse(window.localStorage.getItem(CONV_COLLAPSED_KEY) || '[]');
+      return new Set((Array.isArray(raw) ? raw : []).map(Number).filter(function (n) { return n > 0; }));
+    } catch (e) {
+      return new Set();
+    }
+  })();
+
+  function saveCollapsedConvParents() {
+    try {
+      window.localStorage.setItem(CONV_COLLAPSED_KEY, JSON.stringify(Array.from(collapsedConvParents)));
+    } catch (e) {
+      // 隐私模式忽略。
+    }
+  }
+
+  // 会话排序：置顶优先，其次按最近打开/更新时间。
+  function sortConversations(rows) {
+    rows.sort(function (a, b) {
+      var am = conversationMetaFor(a.id);
+      var bm = conversationMetaFor(b.id);
+      if (!!am.pinned !== !!bm.pinned) return am.pinned ? -1 : 1;
+      return (Number(bm.openedAt) || Number(b.updated_at) || Number(b.id) || 0) - (Number(am.openedAt) || Number(a.updated_at) || Number(a.id) || 0);
+    });
+    return rows;
+  }
+
+  function convRowEl(conv, opts) {
+    opts = opts || {};
+    var row = document.createElement('div');
+    var meta = conversationMetaFor(conv.id);
+    row.className = 'conv-row' + (meta.pinned ? ' is-pinned' : '') + (meta.unread ? ' is-unread' : '') +
+      (opts.hasChildren ? ' has-children' : '') + (opts.collapsed ? ' is-collapsed' : '');
+
+    var isChild = !!conv.parent_id;
+    var parentTitle = conv.parent_title || '';
+    if (isChild && !parentTitle) {
+      var parent = state.conversations.filter(function (c) {
+        return c.id === conv.parent_id;
+      })[0];
+      parentTitle = (parent && parent.title) || '';
+    }
+
+    // 有子会话的行才给折叠箭头；它和标题同一行，但用绝对定位放在原来圆点的位置，
+    // 这样父行与普通行的标题仍然左对齐。
+    if (opts.hasChildren && !opts.filtering) {
+      var toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'conv-toggle';
+      toggle.setAttribute('aria-expanded', opts.collapsed ? 'false' : 'true');
+      toggle.setAttribute('aria-label', (opts.collapsed ? '展开' : '收起') + '子会话：' + (conv.title || '新对话'));
+      toggle.title = opts.collapsed ? '展开子会话' : '收起子会话';
+      toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>';
+      row.appendChild(toggle);
+    }
+
+    var item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'conv-item' + (conv.id === state.currentId ? ' active' : '') + (isChild ? ' is-child' : '');
+    item.setAttribute('aria-label', (conv.title || '新对话') + (isChild ? '，子会话' : ''));
+    item.title = isChild ? ('子会话 · 父会话：' + (parentTitle || '未知')) : (conv.title || '新对话');
+    if (conv.id === state.currentId) item.setAttribute('aria-current', 'true');
+    conversationButtons.set(conv.id, item);
+    if (conv.id === state.currentId) activeConversationButton = item;
+
+    if (isChild) {
+      var childBadge = document.createElement('span');
+      childBadge.className = 'conv-child-badge';
+      childBadge.textContent = '子';
+      item.appendChild(childBadge);
+    }
+
+    var title = document.createElement('span');
+    title.className = 'conv-title';
+    title.textContent = conv.title || '新对话';
+    item.appendChild(title);
+    if (meta.unread) {
+      var unread = document.createElement('span');
+      unread.className = 'conv-unread-dot';
+      unread.setAttribute('aria-label', '有新消息');
+      item.appendChild(unread);
+    }
+    item.addEventListener('click', function () {
+      openConversation(conv.id);
+    });
+    row.appendChild(item);
+
+    var actions = document.createElement('div');
+    actions.className = 'conv-actions';
+    actions.appendChild(convActionButton(meta.pinned ? '★' : '☆', meta.pinned ? '取消置顶会话' : '置顶会话', meta.pinned ? '取消置顶「' + (conv.title || '新对话') + '」' : '置顶「' + (conv.title || '新对话') + '」', function () {
+      meta.pinned = !meta.pinned;
+      saveConversationMeta();
+      renderConvList();
+    }, meta.pinned ? 'is-pinned' : ''));
+    actions.appendChild(convActionButton('✎', '重命名会话', '重命名「' + (conv.title || '新对话') + '」', function () {
+      renameConversation(conv.id);
+    }));
+    actions.appendChild(convActionButton('⇩', '导出会话', '导出「' + (conv.title || '新对话') + '」为 Markdown', function () {
+      exportConversation(conv.id);
+    }));
+    actions.appendChild(convActionButton('×', '删除会话', '删除会话：' + (conv.title || '新对话'), function () {
+      deleteConversation(conv.id);
+    }, 'is-danger'));
+    row.appendChild(actions);
+
+    return row;
+  }
+
   function renderConvList() {
     els.convList.textContent = '';
     conversationButtons.clear();
@@ -854,58 +993,58 @@
       els.convList.appendChild(noMatch);
       return;
     }
+
+    // 子会话挂到父会话下面：先按 parent_id 建索引，再只渲染根会话 + 各自的孩子。
+    // 父会话不在当前筛选结果里时，孩子按根会话处理（不会被吞掉）。
+    var inList = {};
+    list.forEach(function (conv) { inList[conv.id] = true; });
+    var childrenOf = {};
     list.forEach(function (conv) {
-      var row = document.createElement('div');
-      row.className = 'conv-row';
-
-      var isChild = !!conv.parent_id;
-      var parentTitle = conv.parent_title || '';
-      if (isChild && !parentTitle) {
-        var parent = state.conversations.filter(function (c) {
-          return c.id === conv.parent_id;
-        })[0];
-        parentTitle = (parent && parent.title) || '';
+      if (conv.parent_id && inList[conv.parent_id]) {
+        (childrenOf[conv.parent_id] = childrenOf[conv.parent_id] || []).push(conv);
       }
+    });
+    var roots = sortConversations(list.filter(function (conv) {
+      return !(conv.parent_id && inList[conv.parent_id]);
+    }));
+    var filtering = !!kw;
 
-      var item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'conv-item' + (conv.id === state.currentId ? ' active' : '') + (isChild ? ' is-child' : '');
-      item.setAttribute('aria-label', (conv.title || '新对话') + (isChild ? '，子会话' : ''));
-      item.title = isChild ? ('子会话 · 父会话：' + (parentTitle || '未知')) : (conv.title || '新对话');
-      if (conv.id === state.currentId) item.setAttribute('aria-current', 'true');
-      conversationButtons.set(conv.id, item);
-      if (conv.id === state.currentId) activeConversationButton = item;
-
-      if (isChild) {
-        var childBadge = document.createElement('span');
-        childBadge.className = 'conv-child-badge';
-        childBadge.textContent = '子';
-        item.appendChild(childBadge);
-      }
-
-      var title = document.createElement('span');
-      title.className = 'conv-title';
-      title.textContent = conv.title || '新对话';
-      item.appendChild(title);
-      item.addEventListener('click', function () {
-        openConversation(conv.id);
-      });
-      row.appendChild(item);
-
-      var actions = document.createElement('div');
-      actions.className = 'conv-actions';
-      actions.appendChild(convActionButton('✎', '重命名会话', '重命名「' + (conv.title || '新对话') + '」', function () {
-        renameConversation(conv.id);
-      }));
-      actions.appendChild(convActionButton('⇩', '导出会话', '导出「' + (conv.title || '新对话') + '」为 Markdown', function () {
-        exportConversation(conv.id);
-      }));
-      actions.appendChild(convActionButton('×', '删除会话', '删除会话：' + (conv.title || '新对话'), function () {
-        deleteConversation(conv.id);
-      }, 'is-danger'));
-      row.appendChild(actions);
-
+    roots.forEach(function (conv) {
+      var kids = childrenOf[conv.id] ? sortConversations(childrenOf[conv.id]) : [];
+      var hasKids = kids.length > 0;
+      // 正在看的会话、或置顶的子会话在折叠组里时强制展开：
+      // 否则「当前会话」或用户手动置顶的那条会被藏起来。
+      var activeInside = kids.some(function (kid) { return kid.id === state.currentId; });
+      var pinnedInside = kids.some(function (kid) { return conversationMetaFor(kid.id).pinned; });
+      var collapsed = hasKids && !filtering && !activeInside && !pinnedInside && collapsedConvParents.has(conv.id);
+      var row = convRowEl(conv, { hasChildren: hasKids, collapsed: collapsed, filtering: filtering });
       els.convList.appendChild(row);
+      if (!hasKids) return;
+
+      var group = document.createElement('div');
+      group.className = 'conv-children' + (collapsed ? ' is-collapsed' : '');
+      group.id = 'conv-children-' + conv.id;
+      group.dataset.parentId = String(conv.id);
+      var inner = document.createElement('div');
+      inner.className = 'conv-children-inner';
+      kids.forEach(function (kid) { inner.appendChild(convRowEl(kid, {})); });
+      group.appendChild(inner);
+      els.convList.appendChild(group);
+
+      var toggle = row.querySelector('.conv-toggle');
+      if (!toggle) return;
+      toggle.setAttribute('aria-controls', group.id);
+      toggle.addEventListener('click', function () {
+        var next = !group.classList.contains('is-collapsed');
+        group.classList.toggle('is-collapsed', next);
+        row.classList.toggle('is-collapsed', next);
+        toggle.setAttribute('aria-expanded', next ? 'false' : 'true');
+        toggle.title = next ? '展开子会话' : '收起子会话';
+        toggle.setAttribute('aria-label', (next ? '展开' : '收起') + '子会话：' + (conv.title || '新对话'));
+        if (next) collapsedConvParents.add(conv.id);
+        else collapsedConvParents.delete(conv.id);
+        saveCollapsedConvParents();
+      });
     });
   }
 
@@ -929,7 +1068,7 @@
   // 契约 §7：页签由 5 个减为 3 个（密钥移到右上角按钮、知识库并入对话视图）。
   // 新增的 assistants / prompts 两个视图的 DOM 与脚本在 index.html 里，逻辑各在自己的 js 文件里；
   // 这里只把它们登记进视图表，切过去时由 index.html 末尾的内联钩子调 init()。
-  var VIEW_TITLES = { chat: '对话', models: '模型', assistants: '助手', prompts: '提示词', skills: '技能', cua: '电脑操控' };
+  var VIEW_TITLES = { chat: '对话', taskboard: '任务可视化', models: '模型', assistants: '助手', prompts: '提示词', skills: '技能', cua: '电脑操控' };
 
   function stateBox(text, onRetry) {
     var box = document.createElement('div');
@@ -1146,8 +1285,23 @@
     els.memoryCount.textContent = text && text !== '—' ? text + ' 个文档' : '';
   }
 
+  // 视图切换：能开原生 View Transition 就包一层（对话 ↔ 任务看板/技能/电脑操控），
+  // 关掉动效或浏览器不支持时退回原来的瞬时切换。
   function showView(name) {
     if (state.view === name && els.app && els.app.getAttribute('data-view') === name) return;
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (document.startViewTransition && !reduced) {
+      try {
+        document.startViewTransition(function () { applyView(name); });
+        return;
+      } catch (e) {
+        // 动画起不来就直切，别让路由卡住。
+      }
+    }
+    applyView(name);
+  }
+
+  function applyView(name) {
     state.view = name;
     if (window.APP_RUNTIME) window.APP_RUNTIME.wake();
     var viewStart = performance.now();
@@ -1174,6 +1328,7 @@
       els.topbarTitle.textContent = VIEW_TITLES[name];
     }
     if (name === 'models') loadModelsView();
+    if (name === 'taskboard' && window.TASKBOARD) window.TASKBOARD.onShow();
     // 技能视图：skills.js 和 kb.js / cua.js 一样先于本文件加载，列表加载交给它自己。
     if (name === 'skills' && window.SKILLS) window.SKILLS.onShow();
     // Day 25：电脑操控视图（契约 §4）。cua.js 与 kb.js 一样先于本文件加载，所以这里必然可用。
@@ -1274,11 +1429,26 @@
     try {
       var list = await apiJSON('/api/conversations');
       state.conversations = Array.isArray(list) ? list : [];
+      state.conversations.forEach(function (conv) {
+        if (!conv || conv.id === state.currentId) return;
+        var meta = conversationMetaFor(conv.id);
+        var updated = Date.parse(conv.updated_at || '');
+        if (conv.unread || (meta.openedAt && updated && updated > Number(meta.openedAt))) meta.unread = true;
+      });
+      saveConversationMeta();
     } catch (e) {
       state.conversations = [];
       state.convError = e.message || '未知错误';
     }
     renderConvList();
+  }
+
+  function startConversationPolling() {
+    if (conversationPoll) return;
+    conversationPoll = startPoll(function () {
+      if (state.streaming) return;
+      return loadConversations();
+    }, 30000);
   }
 
   function titleFromQuestion(text) {
@@ -1340,6 +1510,7 @@
     resetTaskCounters();
     notifyTaskCard();
     clearTeamCard(); // 新对话没有团队数据，别把上一个会话的成员留在卡片上
+    clearPlan(); // 计划属于会话：新对话不能沿用上一个会话的步骤
     els.input.focus();
   }
 
@@ -1360,6 +1531,13 @@
     stopChildRunPolling();
 
     state.currentId = id;
+    // 计划是进程内状态，打开会话时向后端恢复；请求回来前先清掉上一个会话的步骤。
+    clearPlan();
+    loadConversationPlan(id);
+    var openedMeta = conversationMetaFor(id);
+    openedMeta.openedAt = Date.now();
+    openedMeta.unread = false;
+    saveConversationMeta();
     clearTeamCard(); // 先藏掉上一个会话的团队行，等新数据回来再显示
     var conv = state.conversations.filter(function (c) {
       return c.id === id;
@@ -1433,6 +1611,60 @@
   window.CHAT = window.CHAT || {};
   window.CHAT.openConversation = function (id, parentId, title) {
     return openConversation(Number(id), true, parentId, title);
+  };
+  // 任务看板只读当前会话快照，不直接依赖 chat.js 的内部变量。
+  // historyCache 中保留最近一次服务端校对后的消息，DOM 则补上当前尚未落库的流式内容。
+  window.CHAT.getTaskSnapshot = function () {
+    var conv = state.conversations.filter(function (c) { return c.id === state.currentId; })[0] || null;
+    var cached = state.currentId != null ? historyCache.get(state.currentId) : null;
+    var messages = cached && Array.isArray(cached.history) ? cached.history.filter(function (m) {
+      return m && (m.role === 'user' || m.role === 'assistant');
+    }).slice() : [];
+    // 流式生成时最新一轮还没落库，补读当前 DOM，避免看板落后一整轮。
+    if (els.thread) {
+      var liveMessages = els.thread.querySelectorAll('.msg[data-role]');
+      for (var mi = 0; mi < liveMessages.length; mi++) {
+        var live = liveMessages[mi];
+        var role = live.getAttribute('data-role');
+        if (role !== 'user' && role !== 'assistant') continue;
+        var raw = live.getAttribute('data-raw-content') || '';
+        if (!raw) {
+          var bubble = live.querySelector('.bubble');
+          raw = bubble ? bubble.textContent : '';
+        }
+        var id = live.getAttribute('data-message-id');
+        var exists = messages.some(function (m) {
+          return (id && String(m.id || '') === id) || (!id && m.role === role && String(m.content || '') === raw);
+        });
+        if (!exists && raw) messages.push({ id: id || null, role: role, content: raw });
+      }
+    }
+    var toolCards = [];
+    if (els.thread) {
+      var cards = els.thread.querySelectorAll('.tool-card, .subagent-card, .activity-memory');
+      for (var i = 0; i < cards.length; i++) {
+        var card = cards[i];
+        toolCards.push({
+          type: card.classList.contains('subagent-card') ? 'agent' : (card.classList.contains('activity-memory') ? 'memory' : 'tool'),
+          name: (card.querySelector('.tool-card-name, .subagent-card-label, .activity-memory > summary') || {}).textContent || '',
+          status: card.classList.contains('is-error') || card.classList.contains('is-failed') ? 'failed' : (card.classList.contains('is-running') ? 'running' : 'completed'),
+          text: (card.querySelector('.tool-card-summary, .subagent-card-activity, .activity-memory-body') || {}).textContent || '',
+          summary: (card.querySelector('.tool-card-summary, .subagent-card-activity, .activity-memory-body') || {}).textContent || ''
+        });
+      }
+    }
+    return {
+      id: state.currentId,
+      title: conv && conv.title ? conv.title : (els.topbarTitle && els.topbarTitle.textContent) || '新任务',
+      model: state.model || (els.modelSelect && els.modelSelect.value) || '',
+      kind: (els.kindSelect && els.kindSelect.value) || 'work',
+      streaming: !!state.streaming,
+      workspace: taskState.workspace || '',
+      toolTotal: taskState.toolTotal,
+      toolDone: taskState.toolDone,
+      messages: messages,
+      toolCards: toolCards
+    };
   };
 
   async function deleteConversation(id) {
@@ -1572,6 +1804,45 @@
     return wrap;
   }
 
+  // 工具轨迹用面向用户的动作名称，而不是把内部工具名直接暴露出来。
+  // 内部名仍保存在 data-tool-name/title，便于调试和历史回放；视觉上保持截图里的
+  // 「思考 / 网页获取 / 查看目标 / 运行命令」四类节奏。
+  function toolDisplayMeta(name) {
+    var raw = String(name || '').trim();
+    var lower = raw.toLowerCase();
+    if (/run[_-]?command|shell|terminal|exec/.test(lower)) {
+      return { label: '运行命令', icon: '›_', kind: 'command' };
+    }
+    if (/memory|think|thought|reason|plan|goal/.test(lower)) {
+      return { label: '思考', icon: '⚛', kind: 'thought' };
+    }
+    if (/web|fetch|browse|browser|http|url|^(?:search)(?:_|$)/.test(lower)) {
+      return { label: '网页获取', icon: '▤', kind: 'web' };
+    }
+    if (/read|list|inspect|target|file|image|sql|query/.test(lower)) {
+      return { label: '查看目标', icon: '◉', kind: 'inspect' };
+    }
+    return { label: raw || '工具', icon: '◇', kind: 'tool' };
+  }
+
+  function toolCardTitle(card, name) {
+    if (!card) return;
+    var meta = toolDisplayMeta(name);
+    card.setAttribute('data-tool-kind', meta.kind);
+    card.setAttribute('data-tool-name', String(name || ''));
+    card.title = name ? String(name) : '';
+    var icon = card.querySelector('.tool-card-icon');
+    if (icon) {
+      icon.textContent = meta.icon;
+      icon.setAttribute('aria-label', meta.label);
+    }
+    var label = card.querySelector('.tool-card-name');
+    if (label) label.textContent = meta.label;
+    var separator = card.querySelector('.tool-card-separator');
+    if (separator) separator.hidden = !name;
+    return meta;
+  }
+
   function toolCardFor(container, data, createIfMissing) {
     var id = data && data.id ? String(data.id) : '';
     var card = null;
@@ -1582,10 +1853,18 @@
     if (id) card.setAttribute('data-tool-id', id);
     var head = document.createElement('div');
     head.className = 'tool-card-head';
+    var icon = document.createElement('span');
+    icon.className = 'tool-card-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    head.appendChild(icon);
     var name = document.createElement('span');
     name.className = 'tool-card-name';
-    name.textContent = (data && data.name) || '工具';
     head.appendChild(name);
+    var separator = document.createElement('span');
+    separator.className = 'tool-card-separator';
+    separator.textContent = '·';
+    separator.setAttribute('aria-hidden', 'true');
+    head.appendChild(separator);
     // 历史轨迹里没有 arguments（契约 §5 只存 name/ok/summary/detail），空摘要就不占位。
     var argsText = summarizeToolArgs(data && data.arguments);
     if (argsText) {
@@ -1603,6 +1882,7 @@
     summary.className = 'tool-card-summary';
     summary.textContent = '正在调用…';
     card.appendChild(summary);
+    toolCardTitle(card, (data && data.name) || '工具');
     var list = container.querySelector('.tool-cards-list') || container;
     container.hidden = false;
     container.open = true;
@@ -1651,13 +1931,102 @@
     refreshActivitySummary(container);
   }
 
+  // ---- 任务计划条 -------------------------------------------------------------
+  // 数据源有两个：打开会话时 GET /api/agent/plan（后端内存态），以及实时 tool_result
+  // 里的 display.plan。计划只读，增删改都由 agent 的 update_plan 完成。
+  var planState = { steps: [], explanation: '' };
+
+  function planMark(status) {
+    switch (status) {
+      case 'completed': return '✓';
+      case 'in_progress': return '▶';
+      case 'blocked': return '!';
+      default: return '○';
+    }
+  }
+
+  function renderPlan(plan) {
+    if (!els.planPanel || !els.planSteps) return;
+    var steps = plan && Array.isArray(plan.steps) ? plan.steps.filter(function (s) {
+      return s && typeof s.step === 'string' && s.step.trim();
+    }) : [];
+    planState = { steps: steps, explanation: (plan && plan.explanation) || '' };
+    if (!steps.length) {
+      clearPlan();
+      return;
+    }
+    var done = steps.filter(function (s) { return s.status === 'completed'; }).length;
+    if (els.planProgress) els.planProgress.textContent = done + '/' + steps.length;
+    els.planSteps.textContent = '';
+    steps.forEach(function (step) {
+      var li = document.createElement('li');
+      li.className = 'plan-step is-' + (step.status || 'pending');
+      var mark = document.createElement('span');
+      mark.className = 'plan-step-mark';
+      mark.setAttribute('aria-hidden', 'true');
+      mark.textContent = planMark(step.status);
+      var text = document.createElement('span');
+      text.className = 'plan-step-text';
+      text.textContent = step.step;
+      li.appendChild(mark);
+      li.appendChild(text);
+      els.planSteps.appendChild(li);
+    });
+    els.planPanel.hidden = false;
+    if (els.planPanel.classList.contains('is-collapsed')) {
+      els.planToggle.setAttribute('aria-expanded', 'false');
+    } else {
+      els.planToggle.setAttribute('aria-expanded', 'true');
+    }
+  }
+
+  function clearPlan() {
+    planState = { steps: [], explanation: '' };
+    if (!els.planPanel) return;
+    els.planPanel.hidden = true;
+    if (els.planSteps) els.planSteps.textContent = '';
+    if (els.planProgress) els.planProgress.textContent = '';
+  }
+
+  async function loadConversationPlan(id) {
+    if (!id) {
+      clearPlan();
+      return;
+    }
+    try {
+      var plan = await apiJSON('/api/agent/plan?conversation_id=' + encodeURIComponent(id));
+      // 用户可能在请求途中切走：只渲染当前会话的结果。
+      if (state.currentId !== id) return;
+      renderPlan(plan);
+    } catch (e) {
+      // 计划是辅助信息；接口失败不影响对话，保持当前位置。
+    }
+  }
+
+  function setPlanCollapsed(collapsed) {
+    if (!els.planPanel || !els.planToggle) return;
+    els.planPanel.classList.toggle('is-collapsed', !!collapsed);
+    els.planToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    els.planToggle.setAttribute('aria-label', collapsed ? '展开任务计划' : '收起任务计划');
+  }
+
   function renderToolEvent(container, kind, data) {
     if (!container || !data) return;
+    if (kind === 'tool_result' && data.name === 'update_plan') {
+      var livePlan = data.display && data.display.plan;
+      if (Array.isArray(livePlan)) {
+        renderPlan({ steps: livePlan, explanation: data.display.explanation });
+      } else if (state.currentId) {
+        loadConversationPlan(state.currentId);
+      }
+    }
     if (kind === 'tool_call') {
       toolCardFor(container, data, true);
       return;
     }
     var card = toolCardFor(container, data, true);
+    var meta = toolCardTitle(card, data.name || card.getAttribute('data-tool-name') || '工具');
+    card.classList.toggle('tool-card--thought', !!meta && meta.kind === 'thought');
     var ok = data.ok !== false;
     card.classList.remove('is-running');
     card.classList.add(ok ? 'is-ok' : 'is-error');
@@ -1665,14 +2034,32 @@
     if (status) status.textContent = ok ? '完成' : '失败';
     var summary = card.querySelector('.tool-card-summary');
     if (summary) summary.textContent = data.summary || (ok ? '已执行' : '执行失败');
+    card.classList.add('has-result');
+    var args = card.querySelector('.tool-card-args');
+    if (data.summary && args) {
+      args.textContent = String(data.summary);
+    } else if (data.summary && !args) {
+      var headRow = card.querySelector('.tool-card-head');
+      var statusNode = card.querySelector('.tool-card-status');
+      if (headRow) {
+        args = document.createElement('span');
+        args.className = 'tool-card-args';
+        args.textContent = String(data.summary);
+        if (statusNode) headRow.insertBefore(args, statusNode);
+        else headRow.appendChild(args);
+      }
+    }
+    // 思考事件有时只带一行 summary；仍给它保留一个可展开的原文入口，
+    // 这样不会把长推理直接铺满时间线，也能与带 detail 的事件保持一致。
     var detail = typeof data.detail === 'string' ? data.detail : '';
+    if (!detail && meta && meta.kind === 'thought' && data.summary) detail = String(data.summary);
     if (detail) {
       var box = card.querySelector('.tool-card-detail');
       if (!box) {
         box = document.createElement('details');
         box.className = 'tool-card-detail';
         var head = document.createElement('summary');
-        head.textContent = '完整结果';
+        head.textContent = meta && meta.kind === 'thought' ? '查看原文' : '查看结果';
         box.appendChild(head);
         var pre = document.createElement('pre');
         pre.className = 'tool-card-body';
@@ -1682,6 +2069,40 @@
       var body = card.querySelector('.tool-card-body');
       if (body) body.textContent = detail;
     }
+    refreshActivitySummary(container);
+  }
+
+  // activity is the richer lifecycle stream. Legacy tool_call/tool_result
+  // frames still render the card; activity only enriches that same card with
+  // explicit phase/status/timing so clients never show duplicate rows.
+  function renderActivityEvent(container, data) {
+    if (!container || !data) return;
+    var phase = data.phase || data.type || '';
+    if (phase === 'tool_call') {
+      renderToolEvent(container, 'tool_call', data);
+    } else if (phase === 'tool_result') {
+      renderToolEvent(container, 'tool_result', data);
+    } else if (phase === 'error') {
+      var id = data.id || ('activity-error-' + Date.now());
+      renderToolEvent(container, 'tool_result', {
+        id: id,
+        name: data.name || '思考',
+        ok: false,
+        summary: data.summary || data.detail || '执行失败',
+        detail: data.detail || data.summary || ''
+      });
+    } else {
+      return;
+    }
+    var idValue = data.id ? String(data.id) : '';
+    var card = idValue ? container.querySelector('[data-tool-id="' + idValue.replace(/"/g, '') + '"]') : null;
+    if (!card) return;
+    if (data.status) card.setAttribute('data-activity-status', data.status);
+    if (data.started_at) card.setAttribute('data-started-at', data.started_at);
+    if (data.finished_at) card.setAttribute('data-finished-at', data.finished_at);
+    if (typeof data.duration_ms === 'number') card.setAttribute('data-duration-ms', String(data.duration_ms));
+    if (data.status === 'waiting') card.classList.add('is-waiting');
+    if (data.status === 'paused') card.classList.add('is-paused');
     refreshActivitySummary(container);
   }
 
@@ -2394,6 +2815,9 @@
       } else if (event === 'tool_call' || event === 'tool_result') {
         var tool = safeParse(data);
         if (tool) onTool(event, tool);
+      } else if (event === 'activity') {
+        var activity = safeParse(data);
+        if (activity) onTool('activity', activity);
       } else if (event === 'need_input') {
         var ask = safeParse(data);
         if (ask) onTool('need_input', ask);
@@ -2688,6 +3112,31 @@
         mdBox.textContent = mdText;
       }
     }
+    function appendErrorActions(message) {
+      if (!bubble || bubble.querySelector('.error-actions')) return;
+      var row = document.createElement('div');
+      row.className = 'error-actions';
+      var retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'btn btn-ghost';
+      retry.textContent = '重试';
+      retry.setAttribute('aria-label', '重试这次请求');
+      retry.addEventListener('click', function () {
+        var msg = bubble.closest ? bubble.closest('.msg') : null;
+        if (msg) regenerateMessage(msg);
+      });
+      var copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'btn btn-ghost';
+      copy.textContent = '复制错误';
+      copy.setAttribute('aria-label', '复制错误信息');
+      copy.addEventListener('click', function () {
+        copyText(String(message || '请求失败')).then(function () { toast('错误信息已复制'); });
+      });
+      row.appendChild(retry);
+      row.appendChild(copy);
+      bubble.appendChild(row);
+    }
     function flushPaint() {
       if (paintFrame) {
         cancelAnimationFrame(paintFrame);
@@ -2725,6 +3174,7 @@
         bubble.classList.add('is-error');
         bubble.textContent = message;
       }
+      appendErrorActions(message);
       setStreaming(false);
       scrollToBottom(true);
     }
@@ -2769,6 +3219,10 @@
         finishDone,
         finishError,
         function (kind, data) {
+          if (kind === 'activity') {
+            renderActivityEvent(toolCards, data);
+            return;
+          }
           if (kind === 'memory') {
             renderMemoryActivity(toolCards, data);
             return;
@@ -2951,6 +3405,10 @@
         var conv = await createConversation();
         conversationId = conv.id;
         state.currentId = conv.id;
+        clearPlan(); // 新会话从空计划开始
+        conversationMetaFor(conversationId).openedAt = Date.now();
+        conversationMetaFor(conversationId).unread = false;
+        saveConversationMeta();
         createdNow = true;
         refreshTitle = true;
         els.topbarTitle.textContent = conv.title || '新对话';
@@ -3015,6 +3473,28 @@
   });
 
   els.sidebarToggle.addEventListener('click', openSidebar);
+
+  // 桌面端侧栏收拢/展开：宽度由 CSS 过渡，这里只管状态与持久化。
+  var sidebarCollapse = document.getElementById('sidebar-collapse');
+  function applySidebarCollapsed(collapsed) {
+    document.documentElement.setAttribute('data-sidebar', collapsed ? 'collapsed' : 'expanded');
+    if (sidebarCollapse) {
+      sidebarCollapse.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      sidebarCollapse.setAttribute('aria-label', collapsed ? '展开侧栏' : '收拢侧栏');
+      sidebarCollapse.setAttribute('title', collapsed ? '展开侧栏' : '收拢侧栏');
+    }
+    try {
+      window.localStorage.setItem('blogmy:sidebar', collapsed ? 'collapsed' : 'expanded');
+    } catch (e) {
+      // 隐私模式忽略。
+    }
+  }
+  if (sidebarCollapse) {
+    applySidebarCollapsed(document.documentElement.getAttribute('data-sidebar') === 'collapsed');
+    sidebarCollapse.addEventListener('click', function () {
+      applySidebarCollapsed(document.documentElement.getAttribute('data-sidebar') !== 'collapsed');
+    });
+  }
   // ---------- 工作目录（左下角入口） ----------
 
   var activeWorkspaces = [];
@@ -3209,6 +3689,11 @@
 
   els.sidebarOverlay.addEventListener('click', closeSidebar);
   els.newChat.addEventListener('click', newChat);
+  if (els.planToggle) {
+    els.planToggle.addEventListener('click', function () {
+      setPlanCollapsed(!els.planPanel.classList.contains('is-collapsed'));
+    });
+  }
 
   // 契约 §7：密钥弹层。入口是右上角按钮；关掉后把 hash 收回当前视图，
   // 否则停在 #/keys 上刷新页面会又弹一次，用户会觉得关不掉。
@@ -3237,6 +3722,27 @@
   els.convFilter.addEventListener('input', function () {
     renderConvList();
   });
+
+  if (els.runSettingsToggle && els.composerSettings) {
+    els.runSettingsToggle.addEventListener('click', function () {
+      var open = els.composerSettings.hidden;
+      els.composerSettings.hidden = !open;
+      els.runSettingsToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) {
+        var first = els.composerSettings.querySelector('button, select');
+        if (first) first.focus();
+      }
+    });
+  }
+  if (els.emptyExamples) {
+    els.emptyExamples.addEventListener('click', function (ev) {
+      var btn = ev.target.closest ? ev.target.closest('[data-example]') : null;
+      if (!btn || !els.input) return;
+      els.input.value = btn.getAttribute('data-example') || '';
+      autoGrow();
+      els.input.focus();
+    });
+  }
 
   els.composer.addEventListener('submit', function (ev) {
     ev.preventDefault();
@@ -3316,6 +3822,7 @@
     else loadPromptLibrary();
     loadAssistants();
     await Promise.all([loadModels(), loadConversations()]);
+    startConversationPolling();
     autoGrow();
     // 首屏就把「当前任务」卡片画出来（内容是「暂无任务 / 0/0 已完成」），
     // 和参考图一样常驻，而不是等第一次对话才出现。

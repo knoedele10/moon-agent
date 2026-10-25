@@ -2,10 +2,7 @@ package web
 
 import "testing"
 
-// 审计官 2026-10-21 定稿的唯一 P1：eino 执行器（默认）下
-// AGENT_TOOL_PARALLEL=read 静默失效，而状态接口把配置值当生效值回显。
-//
-// 本用例把「配置值」与「生效值」的区分锁死：两处都要对，且必须能看出不一致。
+// 配置值与生效值必须一致地回显；两个执行器都应支持只读并发。
 func TestParallelEffectiveMatchesEngine(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -14,7 +11,7 @@ func TestParallelEffectiveMatchesEngine(t *testing.T) {
 		wantConf string
 		wantEff  string
 	}{
-		{name: "默认 eino 下配 read", engine: "eino", parallel: "read", wantConf: "read", wantEff: "off"},
+		{name: "默认 eino 下配 read", engine: "eino", parallel: "read", wantConf: "read", wantEff: "read"},
 		{name: "legacy 下配 read", engine: "legacy", parallel: "read", wantConf: "read", wantEff: "read"},
 		{name: "eino 下不配", engine: "eino", parallel: "", wantConf: "off", wantEff: "off"},
 		{name: "legacy 下不配", engine: "legacy", parallel: "", wantConf: "off", wantEff: "off"},

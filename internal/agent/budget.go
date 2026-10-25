@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
 	"blog-my/internal/llm"
 	"github.com/cloudwego/eino/schema"
@@ -14,6 +15,10 @@ import (
 // runBudget is local to a run. ReAct executes its model and tools sequentially.
 // Extra windows permit replanning, while retaining an eventual finite boundary.
 type runBudget struct {
+	// mu protects the counters below. Model calls stay sequential; tool calls may
+	// run concurrently in the Eino executor (read-only whitelist), so reserveTool
+	// and record must be atomic.
+	mu                        sync.Mutex
 	iterations, tools, rounds int
 	modelCalls, toolCalls     int
 	succeeded, failed         int
@@ -43,6 +48,8 @@ func (b *runBudget) maxIterations() int { return b.iterations * (1 + b.rounds) }
 func (b *runBudget) maxTools() int      { return b.tools * (1 + b.rounds) }
 
 func (b *runBudget) reserveModel() (string, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if b.toolExhausted {
 		return "", fmt.Errorf("%w：已执行 %d 次（含自动续行）", ErrMaxToolCalls, b.toolCalls)
 	}
@@ -59,6 +66,8 @@ func (b *runBudget) reserveModel() (string, error) {
 }
 
 func (b *runBudget) reserveTool() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if b.toolCalls >= b.maxTools() {
 		b.toolExhausted = true
 		return fmt.Errorf("%w：已执行 %d 次（含自动续行），本次请求没有执行", ErrMaxToolCalls, b.toolCalls)
@@ -71,6 +80,8 @@ func (b *runBudget) reserveTool() error {
 }
 
 func (b *runBudget) record(name string, res Result) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if res.IsError {
 		b.failed++
 	} else {

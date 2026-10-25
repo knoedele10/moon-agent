@@ -68,8 +68,11 @@ type ImagePart struct {
 // Exec 是一次运行的执行上下文：文件工具的沙箱根目录从这里取。
 type Exec struct {
 	SessionID string
-	Root      string   // 工具可操作的根目录（绝对路径）
-	Roots     []string // 同一工作区中其余可操作目录；路径通过 @workspaceN/... 选择。
+	// TurnID 标识「这一轮用户请求」。检查点按它分组，restore_turn 才能一次撤销整轮改动。
+	// 为空时退化为只按会话分组（旧调用方无需改）。
+	TurnID string
+	Root   string   // 工具可操作的根目录（绝对路径）
+	Roots  []string // 同一工作区中其余可操作目录；路径通过 @workspaceN/... 选择。
 	// AllowOutside 为 true 时，文件工具额外放行工作区之外的**绝对路径**（Clean 归一化，
 	// 系统目录仍然永远拒绝）。默认 false：与改造前完全一致，工作区之外的路径一律拒绝。
 	// 写类工具在非 auto 档会先由 web 层的外部路径确认壳问过用户，才走到这里。

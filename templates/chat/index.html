@@ -22,8 +22,12 @@
                         <span class="brand-name">多模型工作台</span>
                         <span class="brand-mid">AI<i>//</i>WORKSPACE</span>
                     </span>
+                    <!-- 桌面端收拢/展开侧栏：收拢后只留 64px 图标轨道，状态存 localStorage。 -->
+                    <button type="button" class="sidebar-collapse" id="sidebar-collapse" aria-label="收拢侧栏" aria-expanded="true" title="收拢侧栏">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 17-5-5 5-5"></path><path d="m18 17-5-5 5-5"></path></svg>
+                    </button>
                 </div>
-                <button type="button" class="btn btn-block new-chat-btn" id="new-chat"><span aria-hidden="true">+</span> 新建对话</button>
+                <button type="button" class="btn btn-block new-chat-btn" id="new-chat" title="新建对话"><span aria-hidden="true">+</span> 新建对话</button>
             </div>
             <!-- 重排：页签从横排改竖排分组。6 个页签横排在 264px 侧栏里早已互相挤压
                  （.view-tab 的 flex-basis:auto 只是缓兵之计，「电脑操控」带角标仍然挤），
@@ -33,32 +37,13 @@
                  图标用 lucide 的路径数据内联成 SVG——项目没有构建步骤，引不了图标库；
                  aria-hidden 放在 svg 上，可读名字仍由旁边的文字节点提供。 -->
             <nav class="view-nav" aria-label="功能导航">
-                <a class="view-tab active" href="#/chat" data-view="chat" aria-current="page">
+                <a class="view-tab active" href="#/chat" data-view="chat" aria-current="page" title="对话">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
                     <span>对话</span>
                 </a>
                 <div class="nav-group">
-                    <div class="nav-group-tag" aria-hidden="true">LIBRARY</div>
-                    <a class="view-tab" href="#/skills" data-view="skills">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.9 15.5A2 2 0 0 0 8.5 14.1l-6.1-1.6a.5.5 0 0 1 0-1l6.1-1.6A2 2 0 0 0 9.9 8.5l1.6-6.1a.5.5 0 0 1 1 0l1.6 6.1a2 2 0 0 0 1.4 1.4l6.1 1.6a.5.5 0 0 1 0 1l-6.1 1.6a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0z"></path></svg>
-                        <span>技能</span>
-                    </a>
-                    <a class="view-tab" href="#/assistants" data-view="assistants">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                        <span>助手</span>
-                    </a>
-                    <a class="view-tab" href="#/prompts" data-view="prompts">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
-                        <span>提示词</span>
-                    </a>
-                    <a class="view-tab" href="#/models" data-view="models">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="16" height="16" x="4" y="4" rx="2"></rect><rect width="6" height="6" x="9" y="9" rx="1"></rect><path d="M15 2v2"></path><path d="M15 20v2"></path><path d="M2 15h2"></path><path d="M2 9h2"></path><path d="M20 15h2"></path><path d="M20 9h2"></path><path d="M9 2v2"></path><path d="M9 20v2"></path></svg>
-                        <span>模型</span>
-                    </a>
-                </div>
-                <div class="nav-group">
-                    <div class="nav-group-tag" aria-hidden="true">LABS</div>
-                    <a class="view-tab" href="#/cua" data-view="cua" aria-label="电脑操控（测试版）">
+                    <div class="nav-group-tag" aria-hidden="true">实验</div>
+                    <a class="view-tab" href="#/cua" data-view="cua" aria-label="电脑操控（测试版）" title="电脑操控（测试版）">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line></svg>
                         <span>电脑操控</span>
                         <span class="view-tab-beta" title="测试版：功能仍在打磨，接口与交互可能变化">测试版</span>
@@ -160,9 +145,8 @@
                  内部元素 id 与原来完全一致，所以 kb.js 一行都不用改；折叠 + 内部滚动，展开不会把对话区挤没。 -->
             <details class="memory-panel" id="memory-panel">
                 <summary class="memory-summary">
-                    <span class="memory-tag" aria-hidden="true">MEMORY</span>
                     <span class="memory-title">记忆</span>
-                    <span class="memory-sub">AI 的记忆系统：上传的资料、检索与问答都在这里</span>
+                    <span class="memory-sub">上传的资料、检索与问答都在这里</span>
                     <span class="memory-count" id="memory-count"></span>
                 </summary>
                 <div class="memory-body">
@@ -248,7 +232,7 @@
                  没有命中时隐藏，不占对话区高度；source=hybrid 说明大模型重排不可用。 -->
             <div class="skill-auto" id="skill-auto" role="status" aria-live="polite" hidden></div>
 
-            <section class="messages" id="messages">
+            <section class="messages" id="messages" aria-label="对话消息" aria-busy="false">
                 <!-- 首屏空状态：月牙标记 + 招呼 + 一句随模式变化的话。
                      副文案由 kind.js 按当前会话模式写进 #hero-sub，不靠改 DOM 结构。
                      名字写的是「小月」——用户给助手起的名字；要改就改这一行。 -->
@@ -258,11 +242,30 @@
                         <span class="hero-spark hero-spark-a"></span>
                         <span class="hero-spark hero-spark-b"></span>
                     </div>
-                    <p class="empty-tag">YOUR THINKING SPACE</p>
+                    <p class="empty-tag">你的思考空间</p>
                     <h2>让<em class="hero-name">小月</em>来帮你把今天的事做完</h2>
                     <p class="empty-sub" id="hero-sub">选一个模型，从一句话、一个想法，或者一份要处理的文件开始。</p>
+                    <div class="empty-examples" id="empty-examples" aria-label="示例任务">
+                        <button type="button" class="empty-example" data-example="总结这份文件，并列出三个关键结论">总结一份文件</button>
+                        <button type="button" class="empty-example" data-example="检查当前项目，找出最值得先修复的问题">检查项目问题</button>
+                        <button type="button" class="empty-example" data-example="帮我制定今天的工作计划，并按优先级排序">制定工作计划</button>
+                    </div>
                 </div>
-                <div class="thread" id="thread"></div>
+                <div class="thread" id="thread" role="log" aria-live="polite" aria-relevant="additions text" aria-busy="false"></div>
+                <p class="sr-only" id="activity-status" role="status" aria-live="polite" aria-atomic="true"></p>
+            </section>
+
+            <!-- 任务计划：agent 调用 update_plan 时出现，打开会话时由后端恢复。
+                 只读展示，不在这里增删步骤；收起状态只影响本机界面。 -->
+            <section class="plan-panel" id="plan-panel" aria-label="任务计划" hidden>
+                <div class="plan-head">
+                    <span class="plan-title">任务计划</span>
+                    <span class="plan-progress" id="plan-progress"></span>
+                    <button type="button" class="plan-toggle" id="plan-toggle" aria-expanded="true" aria-label="收起任务计划">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                    </button>
+                </div>
+                <ol class="plan-steps" id="plan-steps"></ol>
             </section>
 
             <div class="composer">
@@ -271,22 +274,25 @@
                     <!-- 输入框内的工具条：左边决定「这次会话怎么跑」，右边是参数与发送。
                          原来四个控件和 textarea 挤在一行，窗口一窄就互相抢宽度，所以拆成两行。 -->
                     <div class="composer-toolbar">
-                        <!-- 工作区可同时启用多个目录；普通相对路径默认落在主工作区。 -->
-                        <button type="button" class="composer-chip composer-ws-btn" id="ws-pick" title="管理 AI 可访问的多个工作目录">
+                        <button type="button" class="composer-settings-toggle" id="run-settings-toggle" aria-expanded="false" aria-controls="composer-settings" title="运行设置">运行设置</button>
+                        <div class="composer-settings" id="composer-settings" hidden>
+                            <!-- 工作区可同时启用多个目录；普通相对路径默认落在主工作区。 -->
+                            <button type="button" class="composer-chip composer-ws-btn" id="ws-pick" title="管理 AI 可访问的多个工作目录">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path></svg>
                             <span class="composer-ws-label">工作区</span>
-                        </button>
-                        <!-- Agent 自主档位。三档：只列计划 / 风险操作先问 / 自主执行。 -->
-                        <select class="composer-chip" id="mode-select" title="Agent 自主档位">
-                            <option value="plan">只列计划</option>
-                            <option value="confirm">风险操作先问</option>
-                            <option value="auto">自主执行</option>
-                        </select>
-                        <!-- 当前助手：选具体助手时，它的灵魂/模型/档位/工作区会覆盖全局设置；
-                             「不使用助手」= 全部走设置页里的全局配置。选项由 chat.js 从 /api/assistants 填。 -->
-                        <select class="composer-chip" id="assistant-select" title="选择助手（每个助手有自己的说话方式、模型、档位与工作区）">
-                            <option value="">不使用助手</option>
-                        </select>
+                            </button>
+                            <!-- Agent 自主档位。三档：只列计划 / 风险操作先问 / 自主执行。 -->
+                            <select class="composer-chip" id="mode-select" title="Agent 自主档位">
+                                <option value="plan">只列计划</option>
+                                <option value="confirm">风险操作先问</option>
+                                <option value="auto">自主执行</option>
+                            </select>
+                            <!-- 当前助手：选具体助手时，它的灵魂/模型/档位/工作区会覆盖全局设置；
+                                 「不使用助手」= 全部走设置页里的全局配置。选项由 chat.js 从 /api/assistants 填。 -->
+                            <select class="composer-chip" id="assistant-select" title="选择助手（每个助手有自己的说话方式、模型、档位与工作区）">
+                                <option value="">不使用助手</option>
+                            </select>
+                        </div>
                         <!-- 会话模式的真状态。控件已经搬到顶栏的 #kind-switch（参考图顶部那颗胶囊），
                              这里留一个隐藏 select：chat.js 读的是它，后端协议与按会话记忆因此一行都不用改。
                              双向同步在 static/js/kind.js。 -->
@@ -319,7 +325,7 @@
             <section class="view" id="view-skills" aria-label="技能管理">
                 <div class="view-body">
                     <header class="view-head">
-                        <p class="view-tag">WORKSPACE<i>//</i>SKILLS</p>
+                        <p class="view-tag">工作区<i>//</i>技能</p>
                         <h2>技能</h2>
                         <p class="view-sub">技能是一段可复用的任务说明。对话时后端会自动挑出最相关的几条交给模型；这里可以搜索、启停、编辑，或从本地文件夹批量导入 SKILL.md。</p>
                     </header>
@@ -350,13 +356,60 @@
                 </div>
             </section>
 
+            <section class="view taskboard-view" id="view-taskboard" aria-label="任务可视化">
+                <div class="view-body taskboard-shell">
+                    <header class="view-head taskboard-head">
+                        <div>
+                            <p class="view-tag">工作区<i>//</i>任务控制</p>
+                            <h2>任务可视化</h2>
+                            <p class="view-sub">把当前会话的内容、计划、工具轨迹和 agent 团队放在同一张工作台上，随执行过程实时更新。</p>
+                        </div>
+                        <div class="taskboard-head-actions">
+                            <span class="taskboard-live" id="taskboard-live"><i aria-hidden="true"></i>等待任务</span>
+                            <button type="button" class="btn btn-outline" id="taskboard-refresh">刷新</button>
+                            <a class="btn btn-ghost" href="#/chat">返回对话</a>
+                        </div>
+                    </header>
+
+                    <div class="taskboard-summary" aria-label="任务概览">
+                        <article class="taskboard-stat taskboard-stat-primary"><span>当前任务</span><strong id="taskboard-title">暂无任务</strong><small id="taskboard-context">选择一个会话开始执行</small></article>
+                        <article class="taskboard-stat"><span>完成进度</span><strong id="taskboard-progress">0%</strong><small id="taskboard-progress-note">0 / 0 个步骤</small></article>
+                        <article class="taskboard-stat"><span>团队成员</span><strong id="taskboard-member-count">0</strong><small id="taskboard-member-note">暂无活跃 agent</small></article>
+                        <article class="taskboard-stat"><span>工具调用</span><strong id="taskboard-tool-count">0</strong><small id="taskboard-tool-note">等待轨迹</small></article>
+                    </div>
+
+                    <div class="taskboard-grid">
+                        <section class="taskboard-panel taskboard-content-panel">
+                            <div class="taskboard-panel-head"><div><span class="taskboard-kicker">01 / 内容</span><h3>内容</h3></div><span class="taskboard-panel-meta" id="taskboard-content-meta">最近消息</span></div>
+                            <div class="taskboard-content" id="taskboard-content"><div class="taskboard-empty">当前会话还没有可展示的内容。</div></div>
+                        </section>
+
+                        <section class="taskboard-panel taskboard-plan-panel">
+                            <div class="taskboard-panel-head"><div><span class="taskboard-kicker">02 / 计划</span><h3>计划与进度</h3></div><span class="taskboard-panel-meta" id="taskboard-plan-meta">0 项任务</span></div>
+                            <div class="taskboard-plan" id="taskboard-plan"><div class="taskboard-empty">任务板会在 agent 创建计划后显示。</div></div>
+                        </section>
+
+                        <section class="taskboard-panel taskboard-team-panel">
+                            <div class="taskboard-panel-head"><div><span class="taskboard-kicker">03 / 团队</span><h3>Agent 团队</h3></div><span class="taskboard-panel-meta" id="taskboard-team-meta">0 位成员</span></div>
+                            <div class="taskboard-team" id="taskboard-team"><div class="taskboard-empty">当前会话尚未组建 agent 团队。</div></div>
+                        </section>
+
+                        <section class="taskboard-panel taskboard-activity-panel">
+                            <div class="taskboard-panel-head"><div><span class="taskboard-kicker">04 / 活动</span><h3>思考与执行轨迹</h3></div><span class="taskboard-panel-meta" id="taskboard-activity-meta">0 条记录</span></div>
+                            <div class="taskboard-stage-strip" aria-label="执行阶段"><span class="is-active">思考</span><i>→</i><span>调用工具</span><i>→</i><span>检查结果</span></div>
+                            <div class="taskboard-activity" id="taskboard-activity"><div class="taskboard-empty">工具调用和记忆写入会显示在这里。</div></div>
+                        </section>
+                    </div>
+                </div>
+            </section>
+
             <!-- 自定义助手：一个助手 = 一套「人格 + 默认模型 + 档位 + 工作区」。
                  留空的字段一律表示「跟随全局设置」，所以改全局时没覆盖过的助手会跟着变。
                  列表与表单由 static/js/assistants.js 渲染（它暴露 window.ASSISTANTS.init）。 -->
             <section class="view" id="view-assistants" aria-label="自定义助手">
                 <div class="view-body">
                     <header class="view-head">
-                        <p class="view-tag">WORKSPACE<i>//</i>ASSISTANTS</p>
+                        <p class="view-tag">工作区<i>//</i>助手</p>
                         <h2>助手</h2>
                         <p class="view-sub">每个助手有自己的说话方式、做事方式、默认模型与工作区。留空的字段跟随全局设置走，所以改全局时没覆盖过的助手会一起变。</p>
                     </header>
@@ -372,7 +425,7 @@
             <section class="view" id="view-prompts" aria-label="提示词库">
                 <div class="view-body">
                     <header class="view-head">
-                        <p class="view-tag">WORKSPACE<i>//</i>PROMPTS</p>
+                        <p class="view-tag">工作区<i>//</i>提示词</p>
                         <h2>提示词</h2>
                         <p class="view-sub">把常用指令存成可复用的模板，需要时一键填进输入框。</p>
                     </header>
@@ -386,7 +439,7 @@
             <section class="view" id="view-models" aria-label="模型列表">
                 <div class="view-body">
                     <header class="view-head">
-                        <p class="view-tag">WORKSPACE<i>//</i>MODELS</p>
+                        <p class="view-tag">工作区<i>//</i>模型</p>
                         <h2>可用模型</h2>
                         <p class="view-sub">查看已接入的模型与密钥状态，返回对话即可切换使用。</p>
                     </header>
@@ -399,7 +452,7 @@
             <section class="view" id="view-cua" aria-label="电脑操控">
                 <div class="view-body">
                     <header class="view-head">
-                        <p class="view-tag">WORKSPACE<i>//</i>COMPUTER USE</p>
+                        <p class="view-tag">工作区<i>//</i>电脑操控</p>
                         <h2>电脑操控</h2>
                         <p class="view-sub">让视觉模型看屏幕、动鼠标键盘，把「只有图形界面能做」的任务跑完。默认是演练模式（dry_run）：只截屏与决策，不真正操作键鼠。真实接管前请先确认下方环境状态。</p>
                     </header>
@@ -640,6 +693,7 @@
     <script src="/static/js/chipselect.js"></script>
     <script src="/static/js/kind.js"></script>
     <script src="/static/js/taskcard.js"></script>
+    <script src="/static/js/taskboard.js"></script>
     <script src="/static/js/public-access.js"></script>
     <script src="/static/js/theme.js"></script>
     <script src="/static/js/chat.js"></script>

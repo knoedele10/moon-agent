@@ -64,6 +64,8 @@ var kindProfiles = map[string]kindProfile{
 		Tools: map[string]bool{
 			"memory_search": true, "memory_write": true, "soul_evolve": true,
 			"datetime": true, "calculator": true, "ask_user": true,
+			// 「明早提醒我」在陪伴场景里最常见，所以聊天模式也给唤醒三件套。
+			"schedule_wakeup": true, "list_wakeups": true, "cancel_wakeup": true,
 		},
 		Prompt: "\n【当前模式：日常聊天】这是一次陪伴性质的对话，不是工作任务。" +
 			"不要主动把话题引向工作，也不要提议去改文件或跑命令；语气自然、简短、像熟人聊天。" +
@@ -86,15 +88,18 @@ var kindProfiles = map[string]kindProfile{
 		Label:       "代码协作",
 		MemoryScope: scopeWork,
 		Tools: map[string]bool{
-			"read": true, "list": true, "read_image": true,
+			"read": true, "list": true, "read_image": true, "grep": true, "glob": true,
+			"restore": true, "restore_turn": true,
 			"write": true, "edit": true, "move": true, "delete": true,
-			"json_format": true, "calculator": true, "datetime": true, "ask_user": true,
+			"json_format": true, "calculator": true, "datetime": true, "ask_user": true, "update_plan": true,
 			"memory_search": true, "memory_write": true, "soul_evolve": true,
 			"skill_search": true, "skill_read": true, "skill_run": true, "skill_write": true,
 			"run_command": true,
-			"subagent":    true, "list_subagents": true, "spawn_teammate": true,
+			"git_status":  true, "git_diff": true, "git_log": true, "git_show": true, "git_add": true, "git_commit": true,
+			"subagent": true, "list_subagents": true, "spawn_teammate": true,
 			"send_message": true, "list_agents": true, "wait_agent": true,
 			"team_task_create": true, "team_task_list": true, "team_task_get": true, "team_task_update": true,
+			"schedule_wakeup": true, "list_wakeups": true, "cancel_wakeup": true,
 		},
 		Prompt: "\n【当前模式：代码协作】这是改代码的会话。" +
 			"规矩：**改之前先读**（不读就改会被工具拒绝）；优先用 edit 做定点修改，只有整体重写才用 write；" +
@@ -107,14 +112,16 @@ var kindProfiles = map[string]kindProfile{
 		Label:       "学习陪伴",
 		MemoryScope: scopeLife,
 		Tools: map[string]bool{
-			"read": true, "list": true, "read_image": true,
+			"read": true, "list": true, "read_image": true, "grep": true, "glob": true,
+			"restore": true, "restore_turn": true,
 			"write": true, "edit": true,
-			"json_format": true, "calculator": true, "datetime": true, "ask_user": true,
+			"json_format": true, "calculator": true, "datetime": true, "ask_user": true, "update_plan": true,
 			"memory_search": true, "memory_write": true, "soul_evolve": true,
 			"skill_search": true, "skill_read": true,
 			"subagent": true, "list_subagents": true, "spawn_teammate": true,
 			"send_message": true, "list_agents": true, "wait_agent": true,
 			"team_task_create": true, "team_task_list": true, "team_task_get": true, "team_task_update": true,
+			"schedule_wakeup": true, "list_wakeups": true, "cancel_wakeup": true,
 		},
 		Prompt: "\n【当前模式：学习陪伴】这是陪用户学东西的会话，不是替他做完。" +
 			"流程：先弄清材料在讲什么 → 用提问检查他是否真的懂了 → 帮他把要点整理成笔记 → 记住他的进度。" +

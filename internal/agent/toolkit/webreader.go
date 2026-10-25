@@ -116,13 +116,12 @@ func (WebReaderTool) Execute(ctx context.Context, raw json.RawMessage, ex *agent
 		truncated = true
 	}
 
-	var b strings.Builder
-	fmt.Fprintf(&b, "来源：%s\n\n%s", u.String(), text)
+	body := text
 	if truncated {
-		fmt.Fprintf(&b, "\n\n...（已截断，只显示前 %d 个字符）", maxChars)
+		body += fmt.Sprintf("\n\n...（已截断，只显示前 %d 个字符）", maxChars)
 	}
 	return agent.Result{
-		Content: b.String(),
+		Content: wrapUntrustedContent("网页正文", u.String(), body),
 		Display: map[string]any{"url": u.String(), "chars": len([]rune(text)), "truncated": truncated, "fallback": usedFallback},
 	}, nil
 }

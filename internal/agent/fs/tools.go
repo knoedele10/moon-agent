@@ -17,6 +17,10 @@ import (
 const (
 	defaultReadLimit = 2000
 	maxImageBytes    = 10 << 20 // 10MB：再大就不往模型上下文里塞了
+	// maxFullReadBytes 是「整文件读进内存」的上限。
+	// 超过它改走流式按行读取：模型要的通常只是某一段，而一次 os.ReadFile
+	// 读几百 MB 的日志会直接把进程内存打满。PDF/Office 需要全量字节解析，超限则明确拒绝。
+	maxFullReadBytes = 8 << 20
 )
 
 // Tools 返回契约 §4 的四个工具，顺序稳定（即暴露给模型的顺序）。
@@ -250,6 +254,36 @@ func (ReadTool) Execute(ctx context.Context, raw json.RawMessage, ex *agent.Exec
 		return agent.Result{}, &Error{Code: CodeSandboxDenied, Reason: "目标不是普通文件（目录或设备）"}
 	}
 
+	// 超大文本走流式窗口读取：只按 offset/limit 读需要的行，不把整个文件读进内存。
+	// PDF/Office 必须拿到完整字节才能解析，超过上限时明确拒绝而不是硬扛 OOM。
+	if fi.Size() > maxFullReadBytes {
+		if isPDF(target, nil) || officeKind(target) != "" {
+			return agent.Result{}, &Error{
+				Code: CodeInvalidArgs, Path: display,
+				Reason: fmt.Sprintf("\"%s\" 有 %.1f MB，超过 %d MB 的文档解析上限；请先拆分或转换成文本后再读", display, float64(fi.Size())/(1<<20), maxFullReadBytes>>20),
+			}
+		}
+		text, shown, truncated, rerr := readTextWindow(target, a.Offset, a.Limit)
+		if rerr != nil {
+			recordAbsent(ex, target)
+			return agent.Result{}, &Error{Code: CodeIOError, Path: display, Reason: ioCause(rerr, target, display)}
+		}
+		if shown == 0 {
+			text = fmt.Sprintf("(从第 %d 行起没有内容：文件可能更短，或 offset 超出末尾)", normalizedOffset(a.Offset))
+		}
+		if truncated {
+			text += fmt.Sprintf("... (文件较大（%.1f MB），已显示 %d 行；用 offset=%d 继续)\n",
+				float64(fi.Size())/(1<<20), shown, normalizedOffset(a.Offset)+shown)
+		}
+		if fi2, err2 := os.Stat(target); err2 == nil {
+			recordPresent(ex, target, fi2)
+		}
+		return agent.Result{
+			Content: text,
+			Display: map[string]any{"file_path": display, "shown": shown, "bytes": fi.Size(), "truncated": truncated, "streamed": true},
+		}, nil
+	}
+
 	data, err := os.ReadFile(target)
 	if err != nil {
 		recordAbsent(ex, target)
@@ -404,6 +438,10 @@ func (WriteTool) Execute(ctx context.Context, raw json.RawMessage, ex *agent.Exe
 		}
 	}
 
+	if !createIfAbsent {
+		// 覆盖已有文件前留一份检查点，供 restore 撤回；失败不阻断写入。
+		saveCheckpointForTarget(ex, target, display)
+	}
 	ver, created, err := writeFileAtomic(target, display, data, createIfAbsent)
 	if err != nil {
 		return agent.Result{}, err
@@ -523,6 +561,12 @@ func (EditTool) Execute(ctx context.Context, raw json.RawMessage, ex *agent.Exec
 		replaced = 1
 	}
 	newContent := strings.Replace(content, a.OldString, a.NewString, replaced)
+	// 第一处匹配在旧内容里的字节偏移。替换只发生在它之后，所以这个偏移在新内容里同样有效，
+	// 用来算「改到了第几行」——即便 new_string 为空（删除）也能定位。
+	firstOffset := strings.Index(content, a.OldString)
+
+	// 旧内容已经在手，直接留检查点；失败不阻断编辑。
+	_ = checkpoints.save(sessionOf(ex), turnIDOf(ex), target, display, data)
 
 	ver, _, err := writeFileAtomic(target, display, []byte(newContent), false)
 	if err != nil {
@@ -530,10 +574,54 @@ func (EditTool) Execute(ctx context.Context, raw json.RawMessage, ex *agent.Exec
 	}
 	observations.set(sessionOf(ex), target, Observation{Kind: ObsPresent, Version: ver})
 
+	feedback, startLine, endLine := editRedisplay(newContent, firstOffset, a.NewString, replaced)
 	return agent.Result{
-		Content: fmt.Sprintf("Edited %s (%d 处替换)", display, replaced),
-		Display: map[string]any{"file_path": display, "replacements": replaced, "version": ver},
+		Content: fmt.Sprintf("Edited %s (%d 处替换)\n%s", display, replaced, feedback),
+		Display: map[string]any{
+			"file_path": display, "replacements": replaced, "version": ver,
+			"changed_lines": fmt.Sprintf("%d-%d", startLine, endLine),
+		},
 	}, nil
+}
+
+// editRedisplay 在编辑成功后回显修改区域（带行号），对齐 SWE-agent 的
+// 「edit 之后自动重显」设计：模型不必再花一次 read 才能确认改成了什么样，
+// 也更容易立刻发现缩进错位、多删了一行这类问题。
+//
+// 只回显修改处前后各 3 行、最多 60 行：既能看清上下文，又不会把大文件塞回上下文。
+// 需要完整文件时模型仍应显式 read（那也是「修改后验证」的正规来源）。
+func editRedisplay(newContent string, firstOffset int, newString string, replaced int) (feedback string, startLine, endLine int) {
+	const contextLines = 3
+	const maxLines = 60
+	if firstOffset < 0 {
+		return "（已写入；无法定位修改行，请 read 核对）", 0, 0
+	}
+	// 偏移落在多字节字符中间时 Count 仍然正确：我们只数换行符。
+	startLine = 1 + strings.Count(newContent[:firstOffset], "\n")
+	endLine = startLine + strings.Count(newString, "\n")
+	if endLine < startLine {
+		endLine = startLine
+	}
+	first := startLine - contextLines
+	if first < 1 {
+		first = 1
+	}
+	last := endLine + contextLines
+	text, shown, total, truncated := numberLines(newContent, first, last-first+1)
+	if shown == 0 {
+		return "（已写入；修改区域为空）", startLine, endLine
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "修改区域回显（第 %d-%d 行，文件共 %d 行；本次改的是第 %d-%d 行）：\n",
+		first, first+shown-1, total, startLine, endLine)
+	b.WriteString(text)
+	if truncated || first+shown-1 < endLine {
+		b.WriteString("…（只回显修改区域附近；需要完整内容请 read）")
+	}
+	if replaced > 1 {
+		fmt.Fprintf(&b, "\n注意：本次共替换 %d 处，上面只回显第一处附近。", replaced)
+	}
+	return b.String(), startLine, endLine
 }
 
 // ---------- read_image ----------
@@ -613,6 +701,7 @@ const defaultListLimit = 200
 type listArgs struct {
 	DirPath string `json:"dir_path"`
 	Limit   int    `json:"limit"`
+	Offset  int    `json:"offset"`
 }
 
 // ListTool 列出工作区里某个目录的直接子项。
@@ -625,7 +714,8 @@ func (ListTool) Name() string { return "list" }
 
 func (ListTool) Description() string {
 	return "列出活动工作区里某个目录的直接子项（不传 dir_path 就是主工作区根目录）。" +
-		"其他活动工作区使用 @workspace2/、@workspace3/ 等前缀选择；不确定有哪些文件时先用它看一眼。只读，不改任何东西。"
+		"其他活动工作区使用 @workspace2/、@workspace3/ 等前缀选择；不确定有哪些文件时先用它看一眼。" +
+		"目录很大时用 limit/offset 分页。只读，不改任何东西。"
 }
 
 func (ListTool) Parameters() map[string]any {
@@ -634,6 +724,7 @@ func (ListTool) Parameters() map[string]any {
 		"properties": map[string]any{
 			"dir_path": map[string]any{"type": "string", "description": "要列出的目录；缺省为主工作区根目录，其他活动工作区使用 @workspace2/、@workspace3/ 等前缀"},
 			"limit":    map[string]any{"type": "integer", "description": "最多列出多少项（默认 200）"},
+			"offset":   map[string]any{"type": "integer", "description": "从第几项开始（默认 0）；上一页末尾会给出 next_offset"},
 		},
 	}
 }
@@ -675,13 +766,20 @@ func (ListTool) Execute(ctx context.Context, raw json.RawMessage, ex *agent.Exec
 		limit = defaultListLimit
 	}
 	total := len(entries)
-	shown := total
+	start := a.Offset
+	if start < 0 {
+		start = 0
+	}
+	if start > total {
+		start = total
+	}
+	shown := total - start
 	if shown > limit {
 		shown = limit
 	}
 
 	var b strings.Builder
-	for i := 0; i < shown; i++ {
+	for i := start; i < start+shown; i++ {
 		e := entries[i]
 		if e.IsDir() {
 			b.WriteString(e.Name() + "/\n")
@@ -696,13 +794,22 @@ func (ListTool) Execute(ctx context.Context, raw json.RawMessage, ex *agent.Exec
 	text := b.String()
 	if total == 0 {
 		text = "(空目录)"
+	} else if shown == 0 {
+		text = fmt.Sprintf("(从第 %d 项起没有内容：共 %d 项，offset 超出末尾)", start, total)
 	}
-	if shown < total {
-		text += fmt.Sprintf("... (共 %d 项，已列出 %d 项；用 limit 或 dir_path 缩小范围)\n", total, shown)
+	nextOffset := 0
+	if start+shown < total {
+		nextOffset = start + shown
+		text += fmt.Sprintf("... (共 %d 项，已显示第 %d-%d 项；用 offset=%d 继续，或用 dir_path 缩小范围)\n",
+			total, start+1, start+shown, nextOffset)
+	}
+	displayInfo := map[string]any{"dir_path": display, "entries": total, "shown": shown, "offset": start}
+	if nextOffset > 0 {
+		displayInfo["next_offset"] = nextOffset
 	}
 	return agent.Result{
 		Content: text,
-		Display: map[string]any{"dir_path": display, "entries": total, "shown": shown},
+		Display: displayInfo,
 	}, nil
 }
 
@@ -780,6 +887,8 @@ func (DeleteTool) Execute(ctx context.Context, raw json.RawMessage, ex *agent.Ex
 		return agent.Result{}, &Error{Code: CodeNotObserved, Path: display}
 	}
 
+	// 删除同样留检查点：恢复时按原路径重建。
+	saveCheckpointForTarget(ex, target, display)
 	if err := os.Remove(target); err != nil {
 		if os.IsNotExist(err) {
 			recordAbsent(ex, target)
@@ -904,6 +1013,8 @@ func (MoveTool) Execute(ctx context.Context, raw json.RawMessage, ex *agent.Exec
 		}
 	}
 
+	// 移动前按源路径留检查点；恢复源路径即可拿回内容。
+	saveCheckpointForTarget(ex, src, srcDisplay)
 	if err := os.Rename(src, dst); err != nil {
 		return agent.Result{}, &Error{Code: CodeIOError, Path: dstDisplay, Reason: ioCause(err, dst, dstDisplay)}
 	}

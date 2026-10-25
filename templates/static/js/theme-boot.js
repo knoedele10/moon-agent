@@ -19,4 +19,13 @@
   }
 
   document.documentElement.setAttribute('data-theme', theme);
+
+  // 侧栏收拢状态也要在首屏前落位，否则每次打开都会先闪一帧展开态再收起来。
+  try {
+    if (window.localStorage.getItem('blogmy:sidebar') === 'collapsed') {
+      document.documentElement.setAttribute('data-sidebar', 'collapsed');
+    }
+  } catch (e) {
+    // 隐私模式下忽略，按展开态继续。
+  }
 })();

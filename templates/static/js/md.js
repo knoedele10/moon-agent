@@ -75,11 +75,64 @@
       if (para.length) { html.push('<p>' + para.join('<br>') + '</p>'); para = []; }
     }
 
+    // 表格：模型写 Markdown 表格的频率很高，以前会原样显示成一排竖线。
+    // 只在「表头 + 分隔行」同时成立时才认，避免把正文里偶然的 | 当成表格。
+    function splitRow(row) {
+      var s = row.trim();
+      if (s.charAt(0) === '|') s = s.slice(1);
+      if (s.charAt(s.length - 1) === '|') s = s.slice(0, -1);
+      return s.split('|').map(function (cell) { return cell.trim(); });
+    }
+    function isSeparatorRow(row) {
+      var cells = splitRow(row);
+      if (!cells.length) return false;
+      return cells.every(function (cell) { return /^:?-{1,}:?$/.test(cell); });
+    }
+    function cellAlign(cell) {
+      var left = cell.charAt(0) === ':';
+      var right = cell.charAt(cell.length - 1) === ':';
+      if (left && right) return 'center';
+      if (right) return 'right';
+      return '';
+    }
+    function isTableRow(line) {
+      return /^\s*\|/.test(line);
+    }
+
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i];
       var mUl = /^\s*[-*+]\s+(.*)$/.exec(line);
       var mOl = /^\s*\d+[.)]\s+(.*)$/.exec(line);
       var mH = /^\s*(#{1,4})\s+(.*)$/.exec(line);
+
+      // 表格先于列表/标题判断：`| - |` 这样的单元格不该被当成列表项。
+      if (isTableRow(line) && i + 1 < lines.length && isSeparatorRow(lines[i + 1])) {
+        flushPara();
+        closeList();
+        var headCells = splitRow(line);
+        var aligns = splitRow(lines[i + 1]).map(function (cell) {
+          var a = cellAlign(cell);
+          return a ? ' style="text-align:' + a + '"' : '';
+        });
+        var out = ['<div class="md-table"><table><thead><tr>'];
+        for (var h = 0; h < headCells.length; h++) {
+          out.push('<th' + (aligns[h] || '') + '>' + renderInline(headCells[h], mathParts) + '</th>');
+        }
+        out.push('</tr></thead><tbody>');
+        i += 1; // 跨过分隔行
+        while (i + 1 < lines.length && isTableRow(lines[i + 1])) {
+          i += 1;
+          var cells = splitRow(lines[i]);
+          out.push('<tr>');
+          for (var c = 0; c < headCells.length; c++) {
+            out.push('<td' + (aligns[c] || '') + '>' + renderInline(cells[c] || '', mathParts) + '</td>');
+          }
+          out.push('</tr>');
+        }
+        out.push('</tbody></table></div>');
+        html.push(out.join(''));
+        continue;
+      }
 
       if (mUl) {
         flushPara();
@@ -96,7 +149,10 @@
       if (mH) {
         flushPara();
         closeList();
-        html.push('<h4>' + renderInline(mH[2], mathParts) + '</h4>');
+        // 保留标题层级（# → h2，#### → h5）：以前全部压成 h4，模型写的「## 小节」
+        // 和正文一样大，长回答就成了一堵平墙。h1 留给页面标题，不从消息里产出。
+        var level = Math.min(mH[1].length + 1, 5);
+        html.push('<h' + level + '>' + renderInline(mH[2], mathParts) + '</h' + level + '>');
         continue;
       }
       if (/^\s*$/.test(line)) { flushPara(); closeList(); continue; }

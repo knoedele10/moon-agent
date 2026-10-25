@@ -51,7 +51,11 @@ func InitDB() error {
 		return fmt.Errorf("connect database %q: %w", name, err)
 	}
 
-	if err := DB.AutoMigrate(&User{}, &UserKey{}, &Conversation{}, &Message{}, &KBDocument{}, &KBChunk{}, &AgentSetting{}, &KBMemoryEvent{}, &AgentSkill{}, &AgentPendingTool{}, &AgentAssistant{}, &AgentPrompt{}, &AgentProactiveState{}, &AgentProactiveMessage{}, &AgentSubagentRun{}, &AgentTeamTask{}); err != nil {
+	if err := DB.AutoMigrate(&User{}, &UserKey{}, &Conversation{}, &Message{}, &KBDocument{}, &KBChunk{}, &AgentSetting{}, &KBMemoryEvent{}, &AgentSkill{}, &AgentPendingTool{}, &AgentAssistant{}, &AgentPrompt{}, &AgentProactiveState{}, &AgentProactiveMessage{}, &AgentSubagentRun{}, &AgentTeamTask{},
+		// 自媒体内容库（素材/稿件/版本/关联/发布台账）：只增表，不改既有表语义。
+		&ContentAsset{}, &ContentDraft{}, &ContentDraftVersion{}, &ContentDraftAsset{}, &ContentPublication{},
+		// 定时唤醒（到点让 agent 在该会话里跑一轮）：同样只增表。
+		&AgentWakeup{}); err != nil {
 		if sqlDB, closeErr := DB.DB(); closeErr == nil {
 			_ = sqlDB.Close()
 		}

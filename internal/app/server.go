@@ -48,6 +48,12 @@ func Run(ctx context.Context) error {
 	defer ln.Close()
 	web.StartProactiveScheduler(ctx)
 	defer web.StopProactiveScheduler()
+	// 排期到点自动导出：到期的自媒体排期生成本地成品包，推进台账到 exported。
+	web.StartContentPublishScheduler(ctx)
+	defer web.StopContentPublishScheduler()
+	// 定时唤醒：到点让 agent 在目标会话里自己跑一轮（见 docs/agent/12-wakeup.md）。
+	web.StartWakeupScheduler(ctx)
+	defer web.StopWakeupScheduler()
 	log.Printf("READY http://%s", ln.Addr().String())
 	return serve(ctx, ln, r)
 }

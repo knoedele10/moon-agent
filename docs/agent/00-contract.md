@@ -270,6 +270,19 @@ event: tool_result
 data: {"id":"call_abc","name":"read","ok":true,"summary":"读取 a.txt（12 行）","detail":"1\thello\n2\t...","display":{}}
 ```
 
+工具事件同时会有兼容的 `activity` 生命周期帧：
+
+```text
+event: activity
+data: {"type":"tool_call","phase":"tool_call","status":"running","id":"call_abc","name":"read","started_at":"2026-10-24T12:00:00Z"}
+
+event: activity
+data: {"type":"tool_result","phase":"tool_result","status":"completed","id":"call_abc","name":"read","ok":true,"summary":"读取完成","duration_ms":1250}
+```
+
+前端应按 `id` 更新同一张工具卡片。`status` 可为 `running`、`completed`、`waiting`、`failed`、`paused`；
+生命周期帧可被旧客户端忽略，不改变原有 `tool_call` / `tool_result` 的兼容保证。
+
 `POST /api/chat` 的请求体**追加**一个可选字段 `tools`（bool，默认 false）：
 - `false`/`省略` → 现有行为，一个字节不变。
 - `true` → 走 agent 循环。

@@ -22,8 +22,6 @@ func Setup(r *gin.Engine, reg *llm.Registry) {
 	// 单测里测试自己会装，所以"测试全绿但生产走不通"这种缺口单测抓不到
 	// （实际上就漏过一次，由 cua-ui 的真机端到端发现）。
 	agent.SetStreamer(agent.RegistryStreamer(reg))
-	// 配了但不生效的开关要在启动日志里说清楚（典型：eino 执行器下开只读并发）。
-	warnIfParallelIneffective()
 
 	// 只读 SQL 工具需要数据库句柄；取不到就保持未配置（工具会明确报错，而不是 panic）。
 	if model.DB != nil {
@@ -81,6 +79,8 @@ func Setup(r *gin.Engine, reg *llm.Registry) {
 		// 工作区设置：用户自己指定文件工具的沙箱根目录（契约外的新增能力）。
 		api.GET("/agent/settings", getAgentSettings)
 		api.PUT("/agent/settings", putAgentSettings)
+		// 当前会话的任务计划（内存态）：前端在打开会话时恢复计划面板。
+		api.GET("/agent/plan", getAgentPlan)
 		// 关闭页面时补齐记忆（sendBeacon 调用，幂等）。
 		api.POST("/agent/flush-memory", postFlushMemory)
 
@@ -139,6 +139,14 @@ func Setup(r *gin.Engine, reg *llm.Registry) {
 		api.PUT("/proactive/settings", proactiveSettings)
 		api.POST("/proactive/run-now", proactiveRunNow)
 		api.GET("/proactive/messages", proactiveMessages)
+		// 自媒体内容：排期到点自动导出成品包并推进台账（不代替用户发平台）。
+		// 调度器由 app/server.go 启动，这里只暴露「看状态 / 立刻跑一轮」。
+		api.GET("/content/jobs", contentJobsStatus)
+		api.POST("/content/jobs/run", contentJobsRun)
+		// 定时唤醒：到点让 agent 在这个会话里自己跑一轮（一次性、可取消、有台账）。
+		api.GET("/wakeups", listWakeupsAPI)
+		api.POST("/wakeups", createWakeupAPI)
+		api.DELETE("/wakeups/:id", cancelWakeupAPI)
 		api.POST("/keys", upsertKey)
 		api.DELETE("/keys/:id", deleteKey)
 	}

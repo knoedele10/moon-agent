@@ -21,7 +21,9 @@ win.fetch = async (url, options = {}) => {
   if (pathname === '/api/chat' || pathname.endsWith('/regenerate')) {
     requests.push({ pathname, body: JSON.parse(options.body) });
     const incomplete = requests.length === 1;
-    const frames = 'event: tool_call\ndata: {"id":"r1","name":"read","arguments":{}}\n\n' +
+    const frames = 'event: activity\ndata: {"type":"tool_call","phase":"tool_call","status":"running","id":"r1","name":"read","started_at":"2026-10-24T12:00:00Z"}\n\n' +
+      'event: tool_call\ndata: {"id":"r1","name":"read","arguments":{}}\n\n' +
+      'event: activity\ndata: {"type":"tool_result","phase":"tool_result","status":"completed","id":"r1","name":"read","ok":true,"summary":"已读取","duration_ms":1250}\n\n' +
       'event: tool_result\ndata: {"id":"r1","name":"read","ok":true,"summary":"已读取","detail":"中文结果"}\n\n' +
       'event: delta\ndata: {"content":"' + (incomplete ? '已读取，剩余工作尚未完成。' : '已完成核对。') + '"}\n\n' +
       'event: done\ndata: ' + JSON.stringify(incomplete ? { incomplete: true, reason: 'execution_limit' } : {}) + '\n\n';
@@ -66,6 +68,10 @@ async function until(check) {
   assert.equal(requests[0].body.execution_mode, 'auto');
   assert.equal(requests[0].body.assistant_id, 5);
   const activity = doc.querySelectorAll('.tool-cards')[0];
+  const liveTool = activity.querySelector('[data-tool-id="r1"]');
+  assert.ok(liveTool, 'activity lifecycle should reuse the tool card');
+  assert.equal(liveTool.getAttribute('data-activity-status'), 'completed');
+  assert.equal(liveTool.getAttribute('data-duration-ms'), '1250');
   assert.equal(activity.getAttribute('data-incomplete'), 'true', 'incomplete metadata must reach the UI');
   assert.match(activity.querySelector('.tool-cards-summary').textContent, /已暂停/);
   assert.match(doc.getElementById('thread').textContent, /剩余工作尚未完成/);

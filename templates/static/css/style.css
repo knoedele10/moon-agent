@@ -13,7 +13,7 @@
   /* 文字 */
   --text: #2c4261;
   --text-muted: #526d8d;
-  --text-faint: #687f9a;
+  --text-faint: #59708f;
   /* 重音：蓝。--accent-rgb 是给半透明叠加用的（rgb(var(--accent-rgb) / .1)），
      因为 rgba() 里塞不进 var()，拆成 rgb 三通道才能在两个主题间复用同一套透明度。 */
   /* 深浅是算过的：--accent 与白底、以及白字压在它上面的对比度都要 ≥ 4.5，
@@ -627,6 +627,10 @@ textarea:focus-visible,
   background: var(--accent);
   opacity: 1;
 }
+.conv-row.is-pinned .conv-item { color: var(--text); }
+.conv-row.is-pinned .conv-item::before { background: var(--warn); opacity: 1; }
+.conv-row.is-unread .conv-title { font-weight: 650; color: var(--text); }
+.conv-unread-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
 .conv-title {
   min-width: 0;
@@ -1557,6 +1561,7 @@ textarea:focus-visible,
    结果点「助手」「提示词」只有顶栏标题在变、视图本体永远不显示（浏览器探针发现后补上）。
    契约 §7 的历史：keys 改成弹层、kb 并进对话视图，整页视图早就不止 models / cua 两个。 */
 .app[data-view="models"] #view-models,
+.app[data-view="taskboard"] #view-taskboard,
 .app[data-view="skills"] #view-skills,
 .app[data-view="assistants"] #view-assistants,
 .app[data-view="prompts"] #view-prompts,
@@ -1570,8 +1575,8 @@ textarea:focus-visible,
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* 非对话视图（models / skills / assistants / prompts / cua）：对话区的三块 + 记忆面板一起收起。
-   用 :not([data-view="chat"]) 一条写全——data-view 的取值就这 6 个（chat.js 的 viewFromHash
+/* 非对话视图（taskboard / models / skills / assistants / prompts / cua）：对话区的三块 + 记忆面板一起收起。
+   用 :not([data-view="chat"]) 一条写全——data-view 的取值由 chat.js 的 viewFromHash
    白名单控制），以后再加整页视图不必回来补名单；assistants / prompts 漏写显示规则的教训
    正好说明名单式容易漏。电脑操控视图用自己的「视觉模型」下拉（契约 §2.2 只接受
    status.models），所以顶栏的通用模型选择器在所有整页视图里都收起。 */
@@ -2616,6 +2621,145 @@ textarea:focus-visible,
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ---- Mission control / task visualization ---- */
+.taskboard-view { overflow-y: auto; }
+.taskboard-shell { width: min(100%, 1180px); padding-top: 34px; }
+.taskboard-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+.taskboard-head .view-sub { max-width: 720px; }
+.taskboard-head-actions { display: flex; align-items: center; gap: 9px; flex: none; }
+.taskboard-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.taskboard-live i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.taskboard-live.is-live { border-color: rgb(var(--accent-rgb) / .3); color: var(--accent); }
+.taskboard-live.is-live i { background: var(--accent); box-shadow: 0 0 0 4px rgb(var(--accent-rgb) / .12); animation: activity-pulse 1.5s ease-in-out infinite; }
+.taskboard-summary {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.65fr) repeat(3, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.taskboard-stat {
+  min-width: 0;
+  padding: 16px 17px 15px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--glass) 90%, transparent);
+  box-shadow: inset 0 1px var(--glass-line), var(--shadow-sm);
+}
+.taskboard-stat > span,
+.taskboard-stat > small { display: block; color: var(--text-faint); font-size: 11px; }
+.taskboard-stat > strong { display: block; margin: 7px 0 2px; overflow: hidden; color: var(--text); font-size: clamp(21px, 2.4vw, 30px); font-weight: 650; letter-spacing: -.03em; text-overflow: ellipsis; white-space: nowrap; }
+.taskboard-stat-primary > strong { color: var(--accent); font-size: clamp(18px, 2vw, 24px); }
+.taskboard-stat > small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.taskboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
+  gap: 12px;
+  align-items: start;
+}
+.taskboard-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--glass) 90%, transparent);
+  box-shadow: inset 0 1px var(--glass-line), var(--shadow-sm);
+}
+.taskboard-content-panel { grid-row: span 2; }
+.taskboard-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 17px 13px;
+  border-bottom: 1px solid var(--border);
+}
+.taskboard-kicker { color: var(--accent); font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; }
+.taskboard-panel-head h3 { margin: 3px 0 0; font-size: 16px; font-weight: 620; letter-spacing: -.01em; }
+.taskboard-panel-meta { flex: none; color: var(--text-faint); font-size: 11px; }
+.taskboard-content,
+.taskboard-plan,
+.taskboard-team,
+.taskboard-activity { padding: 10px 12px 13px; }
+.taskboard-stage-strip { display: flex; align-items: center; gap: 7px; padding: 10px 17px 0; color: var(--text-faint); font-size: 10px; }
+.taskboard-stage-strip span { padding: 3px 7px; border: 1px solid var(--border); border-radius: 999px; white-space: nowrap; }
+.taskboard-stage-strip span.is-active { border-color: rgb(var(--accent-rgb) / .28); background: var(--accent-soft); color: var(--accent); }
+.taskboard-stage-strip i { color: var(--text-faint); font-style: normal; }
+.taskboard-message { padding: 12px 13px; border-bottom: 1px solid var(--border); }
+.taskboard-message:last-child { border-bottom: 0; }
+.taskboard-message-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.taskboard-message-role { color: var(--accent); font-size: 11px; font-weight: 650; }
+.taskboard-message.is-user .taskboard-message-role { color: var(--text-muted); }
+.taskboard-message-index { color: var(--text-faint); font-family: var(--font-mono); font-size: 10px; }
+.taskboard-message-body { max-height: 150px; margin: 0; overflow: auto; color: var(--text); font-size: 12px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.taskboard-empty { padding: 23px 8px; color: var(--text-faint); font-size: 12px; text-align: center; }
+.taskboard-plan-row { position: relative; display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 9px 6px; }
+.taskboard-plan-row + .taskboard-plan-row { border-top: 1px solid var(--border); }
+.taskboard-plan-rail { position: relative; display: flex; justify-content: center; }
+.taskboard-plan-row:not(:last-child) .taskboard-plan-rail::after { position: absolute; top: 15px; bottom: -17px; width: 1px; background: var(--border-strong); content: ""; }
+.taskboard-plan-dot { z-index: 1; width: 9px; height: 9px; margin-top: 5px; border: 2px solid var(--surface); border-radius: 50%; background: var(--text-faint); box-shadow: 0 0 0 3px var(--border); }
+.taskboard-plan-row.is-completed .taskboard-plan-dot { background: var(--accent); box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / .14); }
+.taskboard-plan-row.is-in_progress .taskboard-plan-dot { background: var(--warn); box-shadow: 0 0 0 3px rgb(var(--warn-rgb) / .17); animation: activity-pulse 1.6s ease-in-out infinite; }
+.taskboard-plan-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.taskboard-plan-title b { min-width: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.taskboard-plan-detail { margin: 4px 0 0; overflow: hidden; color: var(--text-faint); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.taskboard-status { display: inline-flex; align-items: center; flex: none; min-height: 20px; padding: 2px 7px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-faint); font-size: 10px; white-space: nowrap; }
+.taskboard-status.status-completed { border-color: rgb(var(--accent-rgb) / .25); color: var(--accent); }
+.taskboard-status.status-in_progress { border-color: rgb(var(--warn-rgb) / .3); color: var(--warn-strong); }
+.taskboard-status.status-failed { border-color: var(--danger-soft); color: var(--danger); }
+.taskboard-member-row { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 9px; align-items: start; padding: 10px 6px; }
+.taskboard-member-row + .taskboard-member-row { border-top: 1px solid var(--border); }
+.taskboard-member-avatar { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 700; }
+.taskboard-member-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.taskboard-member-head b { overflow: hidden; font-family: var(--font-mono); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.taskboard-member-role, .taskboard-member-activity { margin: 3px 0 0; overflow: hidden; color: var(--text-faint); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.taskboard-member-activity { color: var(--text-muted); }
+.taskboard-member-row.is-running .taskboard-member-avatar { box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / .12); }
+.taskboard-activity-row { display: grid; grid-template-columns: 25px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 9px 6px; border-bottom: 1px solid var(--border); }
+.taskboard-activity-row:last-child { border-bottom: 0; }
+.taskboard-activity-index { color: var(--text-faint); font-family: var(--font-mono); font-size: 10px; }
+.taskboard-activity-body { min-width: 0; }
+.taskboard-activity-body b { display: block; overflow: hidden; color: var(--text); font-family: var(--font-mono); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.taskboard-activity-body p { margin: 2px 0 0; overflow: hidden; color: var(--text-faint); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 960px) {
+  .taskboard-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .taskboard-stat-primary { grid-column: 1 / -1; }
+  .taskboard-grid { grid-template-columns: 1fr; }
+  .taskboard-content-panel { grid-row: auto; }
+}
+@media (max-width: 640px) {
+  .taskboard-shell { padding: 24px 15px 38px; }
+  .taskboard-head { align-items: flex-start; flex-direction: column; gap: 14px; }
+  .taskboard-head-actions { width: 100%; }
+  .taskboard-head-actions .btn { flex: 1; text-align: center; }
+  .taskboard-summary { gap: 8px; }
+  .taskboard-stat { padding: 13px; }
+  .taskboard-stat > strong { font-size: 22px; }
+  .taskboard-activity-row { grid-template-columns: 21px minmax(0, 1fr); }
+  .taskboard-activity-row > .taskboard-status { grid-column: 2; justify-self: start; }
 }
 
 /* Day 23：本地知识库视图 */
@@ -6019,3 +6163,1088 @@ dialog::backdrop { background: var(--overlay); backdrop-filter: blur(5px); }
 .evolution-panel summary { cursor: pointer; font-weight: 600; }
 .evolution-panel p, .evolution-panel li { line-height: 1.65; overflow-wrap: anywhere; }
 .evolution-panel ul { padding-inline-start: 22px; margin-bottom: 0; }
+
+/* ---- Activity polish: thinking / tool / memory timeline ---- */
+.tool-cards {
+  width: min(100%, 700px);
+  max-width: min(100%, 700px);
+  padding-left: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--glass) 88%, transparent);
+  box-shadow: inset 0 1px var(--glass-line), 0 10px 28px rgb(24 52 82 / .06);
+}
+.tool-cards-summary {
+  min-height: 42px;
+  padding: 9px 13px;
+  gap: 9px;
+  border-bottom: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 600;
+}
+.tool-cards[open] > .tool-cards-summary { border-bottom-color: var(--border); }
+.tool-cards-summary::after {
+  content: "活动轨迹";
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.tool-cards-list {
+  position: relative;
+  gap: 0;
+  padding: 8px 12px 12px 17px;
+}
+.tool-cards-list::before {
+  position: absolute;
+  top: 18px;
+  bottom: 20px;
+  left: 25px;
+  width: 1px;
+  background: linear-gradient(var(--border-strong), transparent);
+  content: "";
+}
+.tool-card,
+.activity-memory {
+  position: relative;
+  margin: 0 0 7px 13px;
+  padding: 10px 11px 10px 15px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  transition: border-color 160ms ease, transform 160ms ease, background 160ms ease;
+}
+.tool-card::before,
+.activity-memory::before {
+  position: absolute;
+  top: 15px;
+  left: -18px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / .12);
+  content: "";
+}
+.tool-card.is-running::before { animation: activity-pulse 1.5s ease-in-out infinite; }
+.tool-card.is-error::before { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
+.tool-card:hover,
+.activity-memory:hover { transform: translateX(2px); border-color: var(--border-strong); background: var(--surface-hover); }
+.tool-card-head { gap: 7px; }
+.tool-card-name { font-size: 11px; letter-spacing: .01em; }
+.tool-card-summary { margin-top: 6px; font-size: 12px; line-height: 1.65; }
+.tool-card-detail { margin-top: 8px; }
+.tool-card-body { max-height: 200px; border-radius: 8px; }
+.activity-memory { color: var(--text-muted); }
+@keyframes activity-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / .10); }
+  50% { box-shadow: 0 0 0 7px rgb(var(--accent-rgb) / 0); }
+}
+
+/* The floating task summary becomes a compact bottom sheet on narrow windows. */
+.task-card { width: clamp(236px, 22vw, 300px); }
+@media (max-width: 1180px) and (min-width: 761px) {
+  .task-card { top: auto; right: 18px; bottom: 92px; width: 270px; max-height: min(42vh, 340px); overflow: auto; }
+}
+@media (max-width: 760px) {
+  .tool-cards { width: 100%; max-width: 100%; }
+  .tool-cards-list { padding-right: 8px; }
+  .task-card { top: auto; right: 12px; bottom: 82px; width: min(330px, calc(100vw - 24px)); max-height: 44vh; overflow: auto; }
+}
+
+/* Composer keeps the primary action visible and tucks secondary run controls away. */
+.composer-settings-toggle {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.composer-settings-toggle:hover,
+.composer-settings-toggle[aria-expanded="true"] { border-color: var(--border-strong); background: var(--surface-hover); color: var(--text); }
+.composer-settings { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.empty-examples { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 18px; }
+.empty-example { padding: 7px 11px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-muted); font-size: 11px; cursor: pointer; transition: border-color 140ms ease, background 140ms ease, color 140ms ease; }
+.empty-example:hover { border-color: var(--border-strong); background: var(--surface-hover); color: var(--text); }
+.error-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.error-actions .btn { min-height: 28px; padding: 4px 9px; border-color: rgb(var(--danger-rgb) / .28); color: var(--danger-strong); font-size: 11px; }
+.error-actions .btn:hover { background: var(--danger-soft); }
+@media (max-width: 600px) {
+  .composer-settings { width: 100%; order: 3; }
+  .composer-settings-toggle { order: 1; }
+  .composer-toolbar .composer-spacer { display: none; }
+  .empty-examples { align-items: stretch; flex-direction: column; width: min(100%, 280px); margin-inline: auto; }
+  .empty-example { width: 100%; }
+}
+
+/* ---- Screenshot-style activity rows ----
+   Keep the existing disclosure and data contract, but make each event read like
+   a compact reasoning timeline: icon + localized action + one-line result.
+   The full result remains behind .tool-card-detail for long output/errors. */
+.tool-cards {
+  width: 100%;
+  max-width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.tool-cards-summary {
+  min-height: 34px;
+  padding: 6px 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 550;
+}
+.tool-cards-summary::before { margin-right: 2px; }
+.tool-cards-summary::after { content: ""; }
+.tool-cards[open] > .tool-cards-summary { border-bottom-color: transparent; }
+.tool-cards-list {
+  gap: 0;
+  padding: 2px 0 8px 17px;
+}
+.tool-cards-list::before {
+  top: 17px;
+  bottom: 17px;
+  left: 5px;
+  background: linear-gradient(var(--border-strong), color-mix(in srgb, var(--border) 38%, transparent));
+}
+.tool-card,
+.activity-memory {
+  margin: 0 0 2px 0;
+  padding: 6px 2px 7px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.tool-card:hover,
+.activity-memory:hover {
+  transform: none;
+  border-color: transparent;
+  background: transparent;
+}
+.tool-card::before,
+.activity-memory::before {
+  top: 13px;
+  left: -16px;
+  width: 7px;
+  height: 7px;
+  border-width: 1px;
+  border-color: var(--bg);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / .11);
+}
+.tool-card.is-error::before { box-shadow: 0 0 0 3px var(--danger-soft); }
+.tool-card-head {
+  display: grid;
+  grid-template-columns: 20px auto auto minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+}
+.tool-card-icon {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1;
+}
+.tool-card[data-tool-kind="thought"] .tool-card-icon,
+.tool-card[data-tool-kind="web"] .tool-card-icon,
+.tool-card[data-tool-kind="command"] .tool-card-icon,
+.tool-card[data-tool-kind="inspect"] .tool-card-icon { color: var(--text-muted); }
+.tool-card[data-tool-kind="thought"] .tool-card-name,
+.tool-card[data-tool-kind="web"] .tool-card-name,
+.tool-card[data-tool-kind="command"] .tool-card-name,
+.tool-card[data-tool-kind="inspect"] .tool-card-name { color: var(--text); }
+.tool-card-name {
+  min-width: max-content;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 550;
+  letter-spacing: 0;
+}
+.tool-card-separator { color: var(--text-faint); font-size: 12px; }
+.tool-card-args {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool-card-status {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.tool-card-status { display: none; }
+.tool-card-summary {
+  margin: 2px 0 0 27px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.tool-card.has-result .tool-card-summary { display: none; }
+.tool-card.has-result.is-error .tool-card-args { color: var(--danger); }
+.tool-card.is-error .tool-card-summary { color: var(--danger); }
+.tool-card-detail { margin: 4px 0 0 27px; }
+.tool-card-detail > summary {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+.tool-card-body {
+  max-height: 220px;
+  margin-top: 5px;
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--bg) 74%, transparent);
+  font-size: 11px;
+}
+.activity-memory { padding-left: 0; color: var(--text-muted); }
+.activity-memory > summary { font-size: 11px; }
+@media (max-width: 620px) {
+  .tool-card-head { grid-template-columns: 20px auto auto minmax(0, 1fr); }
+  .tool-card-status { grid-column: 2 / -1; justify-self: start; margin-left: 0; }
+  .tool-card-summary,
+  .tool-card-detail { margin-left: 27px; }
+}
+
+/* ---- Accessibility and long-session guardrails ---- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.messages[aria-busy="true"] .thread,
+.thread[aria-busy="true"] {
+  overflow-anchor: none;
+}
+
+.tool-cards-summary:focus-visible,
+.tool-card-detail > summary:focus-visible,
+.activity-memory > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Keep touch targets usable even when a compact visual treatment is active. */
+.icon-btn,
+.kind-switch-btn,
+.composer-chip,
+.send-btn,
+.msg-action-btn,
+.tool-cards-summary,
+.tool-card-detail > summary,
+.activity-memory > summary {
+  min-height: 40px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
+/* =========================================================================
+   2026-10-25 版式修正
+   ---------------------------------------------------------------------
+   目标（按实测尺寸定的，不是凭感觉）：
+   1. 宽屏给右上任务卡留出真实栏位，正文不再被压在卡片底下；
+   2. 阅读宽度从 820 收到 680，中文一行约 40 字；
+   3. 移动端消息操作条不再盖住下一条（根因是 40px 触摸高度 + -22px 定位）；
+   4. 浅色主题的小字对比度补到 AA，装饰层退到正文之外；
+   5. 标题层级、段落节奏、记忆条对齐。
+   只在末尾覆盖，不改上面的历史规则，方便回滚。
+   ========================================================================= */
+
+/* ---- 1. 右侧栏：正文与输入框一起让位 ---- */
+.main {
+  --reading: 680px;
+  --rail: 0px;
+  /* 对话列在 messages 的可用宽度里居中，记忆条按同一个起点缩进 */
+  --thread-inset: max(0px, calc((100% - 48px - var(--rail) - var(--reading)) / 2));
+}
+
+@media (min-width: 1181px) {
+  .main {
+    /* 卡片宽度是 clamp(236px, 22vw, 300px)，这里给它 + 40（右边距 20 + 间隙 20） */
+    --rail: calc(clamp(236px, 22vw, 300px) + 40px);
+  }
+
+  /* 还没有任务卡（hidden）时不占位，避免右侧留一条空沟 */
+  .main:has(#task-card[hidden]) {
+    --rail: 0px;
+  }
+
+  .messages,
+  .composer {
+    padding-right: calc(24px + var(--rail));
+  }
+
+  /* 卡片从记忆条下面开始，不要切进那条横带 */
+  .task-card {
+    top: 116px;
+  }
+}
+
+/* 让最后一行不要贴着输入框被裁成半个字 */
+.messages {
+  padding-bottom: 28px;
+}
+
+/* ---- 2. 阅读宽度 ---- */
+.thread {
+  max-width: var(--reading);
+}
+
+.composer-inner {
+  max-width: var(--reading);
+}
+
+/* ---- 3. 记忆条：去掉重复标签后与对话列对齐 ---- */
+.memory-summary {
+  padding-left: calc(22px + var(--thread-inset));
+  padding-right: calc(22px + var(--rail) + var(--thread-inset));
+}
+
+.memory-title {
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+
+.memory-sub {
+  font-size: 11px;
+}
+
+/* ---- 4. 回答的可读性：标题真正分级、段落有呼吸 ---- */
+.md p {
+  margin: 0 0 10px;
+}
+
+.md h2,
+.md h3,
+.md h4,
+.md h5 {
+  margin: 20px 0 8px;
+  color: var(--text);
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.md h2 { font-size: 18px; font-weight: 650; }
+.md h3 { font-size: 16px; font-weight: 650; }
+.md h4 { font-size: 14.5px; font-weight: 650; }
+.md h5 { font-size: 13.5px; font-weight: 650; color: var(--text-muted); }
+.md > :first-child { margin-top: 0; }
+.md h2 + p, .md h3 + p, .md h4 + p, .md h5 + p { margin-top: 0; }
+
+.md ul,
+.md ol {
+  margin: 6px 0 12px;
+  padding-left: 20px;
+}
+
+.md li {
+  margin: 3px 0;
+}
+
+.md blockquote {
+  margin: 12px 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+.md blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+.md hr {
+  margin: 20px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+/* 表格：以前模型写的表格会原样显示成一排竖线 */
+.md-table {
+  margin: 10px 0 14px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.md-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.md-table th,
+.md-table td {
+  padding: 7px 11px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.md-table th {
+  background: var(--surface-raised);
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.md-table td {
+  color: var(--text-muted);
+}
+
+.md-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* 回答之间多留一点，提问与回答之间收紧：一眼能看出「一轮」在哪结束 */
+.msg.assistant {
+  margin-bottom: 30px;
+}
+
+.msg.user {
+  margin-bottom: 18px;
+}
+
+/* ---- 5. 消息操作条：不再压住下一条 ---- */
+/* 旧的触摸尺寸规则把 .msg-action-btn 定到 40px 高，而操作条是 bottom:-22px 的
+   绝对定位，40px 直接盖进下一条正文。桌面端也不需要 40px。 */
+.msg-action-btn {
+  min-height: 26px;
+}
+
+@media (max-width: 600px), (hover: none) {
+  .msg-actions {
+    bottom: -30px;
+    flex-wrap: nowrap;
+    opacity: 0.65;
+  }
+
+  .msg-action-btn {
+    min-height: 30px;
+    padding: 3px 7px;
+    font-size: 10.5px;
+  }
+
+  .msg {
+    margin-bottom: 42px;
+  }
+}
+
+/* ---- 6. 移动端/窄窗：最后一行不要贴着输入框 ---- */
+@media (max-width: 820px) {
+  .messages {
+    padding-bottom: 26px;
+  }
+}
+
+@media (max-width: 600px) {
+  .messages {
+    padding-bottom: 30px;
+  }
+}
+
+/* ---- 7. 浅色主题（azure）：装饰退到边缘 ---- */
+/* --text-faint 已在上面的 :root 里统一提到 #5b7291（AA 4.6:1），这里只压装饰层。 */
+:root[data-theme="azure"] body::before {
+  opacity: 0.5;
+}
+
+:root[data-theme="azure"] .main::before {
+  opacity: 0.55;
+}
+
+:root[data-theme="azure"] .main::after {
+  opacity: 0.4;
+}
+
+/* ---- 8. 会话模式切换只属于对话视图 ---- */
+/* 设置/任务板里它既不生效，又抢走顶栏中间的位置。 */
+.app:not([data-view="chat"]) .kind-switch {
+  visibility: hidden;
+}
+
+/* ---- 9. 移动端顶栏：汉堡按钮回到第一行，别再单独占一行 ---- */
+/* 原来它没被分配 grid-area，自动排进了隐式行，顶栏因此变成 156px 高，
+   第一行和模式胶囊之间空出一整条。 */
+@media (max-width: 820px) {
+  .topbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "menu title actions"
+      "switch switch switch";
+  }
+
+  .hamburger {
+    grid-area: menu;
+  }
+}
+
+/* ---- 10. 「处理过程 · N 个步骤」收成一枚可点的胶囊 ---- */
+/* 原来是一行 11px 灰字，看不出能展开；步骤本身是重要信息，值得一个控件的样子。 */
+.tool-cards > .tool-cards-summary {
+  display: inline-flex;
+  width: auto;
+  min-height: 28px;
+  gap: 5px;
+  padding: 3px 10px 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.tool-cards > .tool-cards-summary:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* ---- 11. 顶栏窄窗不再遮挡 ---- */
+/* 原来左右两列都是 minmax(0,1fr)，右侧被限成一半剩余宽度，模型下拉比栏宽时
+   就往左溢出、压住中间的模式胶囊（900px 下实测压掉 73px）。改成右侧按内容宽度，
+   标题列吸收挤压；窗口再窄时把模型名收短，标题本来就是可截断的。 */
+@media (min-width: 821px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto max-content;
+  }
+
+  .topbar-actions {
+    min-width: 0;
+  }
+
+  .model-wrap {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .model-wrap .select {
+    min-width: 0;
+  }
+}
+
+@media (min-width: 821px) and (max-width: 1100px) {
+  .model-wrap .select {
+    max-width: 200px;
+  }
+}
+
+@media (min-width: 821px) and (max-width: 960px) {
+  .model-wrap .select {
+    max-width: 160px;
+  }
+}
+
+/* ---- 12. 设置页：资源入口 ---- */
+/* 任务看板 / 技能 / 助手 / 提示词 / 模型从侧栏搬到这里，设置页是唯一的入口。 */
+.settings-nav-label-sub {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-resource-list {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-resource {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "name arrow"
+    "desc arrow";
+  column-gap: 12px;
+  align-items: center;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.settings-resource:hover,
+.settings-resource:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.settings-resource-name {
+  grid-area: name;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-resource-desc {
+  grid-area: desc;
+  color: var(--text-faint);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.settings-resource-arrow {
+  grid-area: arrow;
+  color: var(--text-faint);
+  font-size: 16px;
+  transition: transform 140ms ease, color 140ms ease;
+}
+
+.settings-resource:hover .settings-resource-arrow {
+  color: var(--accent);
+  transform: translateX(3px);
+}
+
+/* ---- 13. 侧栏收拢 / 展开 ---- */
+/* 收拢后是 64px 的图标轨道，不是完全消失：logo、新建、导航图标、底部账号都还在，
+   点箭头随时展开。宽度用 grid-template-columns 过渡，正文列跟着让出空间。 */
+@media (min-width: 821px) {
+  .app {
+    transition: grid-template-columns 320ms var(--ease-out);
+  }
+
+  .sidebar-collapse {
+    display: grid;
+    width: 26px;
+    height: 26px;
+    flex: none;
+    place-items: center;
+    margin-left: auto;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+  }
+
+  .sidebar-collapse:hover,
+  .sidebar-collapse:focus-visible {
+    border-color: var(--border);
+    background: var(--surface-hover);
+    color: var(--text);
+  }
+
+  .sidebar-collapse svg {
+    width: 16px;
+    height: 16px;
+    transition: transform 320ms var(--ease-out);
+  }
+
+  /* 展开态这些元素是「宽度参与布局」的；收拢时把宽度收到 0 并淡出，
+     这样侧栏变窄的同时文字不会挤成一列换行。 */
+  .brand-text,
+  .view-tab span,
+  .nav-group-tag,
+  .sidebar-user {
+    transition: opacity 180ms ease, max-width 240ms var(--ease-out), max-height 240ms var(--ease-out);
+  }
+
+  :root[data-sidebar="collapsed"] .app {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  :root[data-sidebar="collapsed"] .sidebar-head {
+    padding-inline: 6px;
+  }
+
+  :root[data-sidebar="collapsed"] .brand-row {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  :root[data-sidebar="collapsed"] .brand-text {
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+  }
+
+  :root[data-sidebar="collapsed"] .sidebar-collapse {
+    margin-left: 0;
+  }
+
+  :root[data-sidebar="collapsed"] .sidebar-collapse svg {
+    transform: rotate(180deg);
+  }
+
+  :root[data-sidebar="collapsed"] .new-chat-btn {
+    width: 42px;
+    min-height: 42px;
+    margin: 0 auto;
+    padding: 0;
+    font-size: 0;
+    justify-content: center;
+  }
+
+  :root[data-sidebar="collapsed"] .new-chat-btn > span {
+    font-size: 17px;
+  }
+
+  :root[data-sidebar="collapsed"] .view-nav {
+    padding-inline: 6px;
+  }
+
+  :root[data-sidebar="collapsed"] .view-tab {
+    justify-content: center;
+    gap: 0;
+    padding: 9px 0;
+  }
+
+  :root[data-sidebar="collapsed"] .view-tab span {
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+  }
+
+  :root[data-sidebar="collapsed"] .nav-group-tag {
+    max-height: 0;
+    margin: 0;
+    padding-block: 0;
+    padding-inline: 11px;
+    overflow: hidden;
+    opacity: 0;
+  }
+
+  :root[data-sidebar="collapsed"] .conv-filter {
+    max-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    opacity: 0;
+  }
+
+  :root[data-sidebar="collapsed"] .conv-list {
+    flex: 0 0 0;
+    max-height: 0;
+    padding-block: 0;
+    overflow: hidden;
+    opacity: 0;
+  }
+
+  :root[data-sidebar="collapsed"] .sidebar-user {
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+  }
+
+  :root[data-sidebar="collapsed"] .sidebar-foot {
+    flex-direction: column;
+    gap: 6px;
+    margin-top: auto;
+    padding: 10px 6px 14px;
+  }
+}
+
+/* ---- 14. 「思考 / 处理过程」折叠动画 ---- */
+/* 原生 details 是瞬间展开的。给 ::details-content 做高度过渡后，
+   思考卡片、处理过程、记忆面板这些 <details> 都统一有收拢/张开的手感。
+   不支持 ::details-content 的浏览器只是退回原来的瞬时切换。 */
+:root {
+  interpolate-size: allow-keywords;
+}
+
+details::details-content {
+  block-size: 0;
+  overflow: hidden;
+  transition: block-size 260ms var(--ease-out), content-visibility 260ms;
+  transition-behavior: allow-discrete;
+}
+
+details[open]::details-content {
+  block-size: auto;
+}
+
+/* ---- 15. 页面转场 ---- */
+/* 设置页是独立文档，所以用跨文档 View Transition：支持就淡入淡出（logo 连续变形），
+   不支持就正常跳转。同文档的视图切换在 chat.js 里用 startViewTransition 包了一层。 */
+@view-transition {
+  navigation: auto;
+}
+
+.brand-row .logo,
+.auth-brand .logo {
+  view-transition-name: brand-mark;
+}
+
+::view-transition-group(brand-mark) {
+  animation-duration: 320ms;
+}
+
+::view-transition-old(root) {
+  animation: vt-fade-out 170ms var(--ease-out) both;
+}
+
+::view-transition-new(root) {
+  animation: vt-fade-in 240ms var(--ease-out) both;
+}
+
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes vt-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+
+  details::details-content {
+    transition: none !important;
+  }
+}
+
+/* ---- 16. 会话列表：子会话收拢 / 展开 ---- */
+/* 父会话前面的箭头接管了原来那个小圆点的位置，标题仍与普通行左对齐。 */
+.conv-row.has-children .conv-item {
+  padding-left: 26px;
+}
+
+.conv-row.has-children .conv-item::before {
+  display: none;
+}
+
+.conv-toggle {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 5px;
+  display: grid;
+  width: 20px;
+  height: 30px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: color 140ms ease, background 140ms ease;
+}
+
+.conv-toggle:hover,
+.conv-toggle:focus-visible {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.conv-toggle svg {
+  width: 13px;
+  height: 13px;
+  transition: transform 240ms var(--ease-out);
+}
+
+.conv-row.is-collapsed .conv-toggle svg {
+  transform: rotate(-90deg);
+}
+
+/* 用 grid 的 0fr → 1fr 做高度过渡：子会话数量不固定，也不需要 JS 去量高度。 */
+.conv-children {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 260ms var(--ease-out);
+}
+
+.conv-children > .conv-children-inner {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 3px;
+  overflow: hidden;
+  transition: opacity 200ms ease;
+}
+
+.conv-children.is-collapsed {
+  grid-template-rows: 0fr;
+}
+
+.conv-children.is-collapsed > .conv-children-inner {
+  opacity: 0;
+}
+
+/* ---- 任务计划条（update_plan）------------------------------------------
+   放在对话区与输入框之间：长任务滚动时它始终可见，但不抢对话的阅读宽度。
+   收起状态只隐藏步骤列表，标题与进度仍保留，方便随时展开。 */
+.plan-panel {
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 0 24px 4px;
+}
+
+.plan-panel[hidden] {
+  display: none;
+}
+
+.plan-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 10px 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.4) inset;
+}
+
+.plan-title {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+
+.plan-progress {
+  color: var(--accent);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-toggle {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.plan-toggle:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.plan-toggle svg {
+  width: 15px;
+  height: 15px;
+  transition: transform 160ms var(--ease-out);
+}
+
+.plan-panel.is-collapsed .plan-toggle svg {
+  transform: rotate(-90deg);
+}
+
+.plan-steps {
+  display: flex;
+  max-height: 168px;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 7px 12px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  list-style: none;
+}
+
+.plan-panel.is-collapsed .plan-steps {
+  display: none;
+}
+
+.plan-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.plan-step-mark {
+  flex: 0 0 auto;
+  width: 16px;
+  color: var(--text-faint);
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Consolas, monospace);
+  font-size: 12px;
+  text-align: center;
+}
+
+.plan-step.is-completed {
+  color: var(--text-faint);
+  text-decoration: line-through;
+  text-decoration-color: var(--line-strong);
+}
+
+.plan-step.is-completed .plan-step-mark {
+  color: var(--accent);
+}
+
+.plan-step.is-in_progress {
+  font-weight: 600;
+}
+
+.plan-step.is-in_progress .plan-step-mark {
+  color: var(--accent);
+}
+
+.plan-step.is-blocked {
+  color: var(--danger);
+}
+
+.plan-step.is-blocked .plan-step-mark {
+  color: var(--danger);
+}
+
+@media (max-width: 720px) {
+  .plan-panel {
+    padding: 0 12px 4px;
+  }
+}

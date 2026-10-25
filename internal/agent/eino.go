@@ -76,6 +76,15 @@ type einoRunState struct {
 	cfg    Config
 	budget *runBudget
 
+	// execMu 保护调用次数与预算预留；并行只读时多个 goroutine 会同时抢额度。
+	execMu sync.Mutex
+	// stateMu 保护 images / needInput 这类跨 goroutine 的附属状态。
+	stateMu sync.Mutex
+	// gate 让只读工具共享执行、写工具独占执行：mixed 批次里写不会被读打断，
+	// 但如果整批都是只读，它们可以真正并行。
+	gate     sync.RWMutex
+	parallel bool
+
 	maxCalls        int
 	executed        int
 	needInput       string
@@ -84,6 +93,49 @@ type einoRunState struct {
 	modelText       strings.Builder
 	toolPreface     strings.Builder
 	checkedToolCall bool
+}
+
+// rememberImage / takeImage 让 images map 在并行工具下安全。
+func (s *einoRunState) rememberImage(id string, img *ImagePart) {
+	if img == nil || len(img.Data) == 0 {
+		return
+	}
+	s.stateMu.Lock()
+	s.images[id] = img
+	s.stateMu.Unlock()
+}
+
+func (s *einoRunState) takeImage(id string) *ImagePart {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	img := s.images[id]
+	delete(s.images, id)
+	return img
+}
+
+// setNeedInput 只记录第一个提问：同一批并行工具里多个 ask_user 没有意义。
+func (s *einoRunState) setNeedInput(q string) {
+	if strings.TrimSpace(q) == "" {
+		return
+	}
+	s.stateMu.Lock()
+	if s.needInput == "" {
+		s.needInput = q
+	}
+	s.stateMu.Unlock()
+}
+
+func (s *einoRunState) needInputText() string {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	return s.needInput
+}
+
+// executedCount 供 MessageRewriter 生成本轮状态提示（与工具执行不重叠，仍加锁防竞态）。
+func (s *einoRunState) executedCount() int {
+	s.execMu.Lock()
+	defer s.execMu.Unlock()
+	return s.executed
 }
 
 func (s *einoRunState) send(ev Event) {
@@ -129,6 +181,9 @@ type einoToolAdapter struct {
 	state *einoRunState
 	inner Tool
 	info  *schema.ToolInfo
+	// readOnly 来自 web 层的只读白名单（AGENT_TOOL_PARALLEL=read），
+	// agent 包不猜工具语义；白名单外的工具一律按写工具独占执行。
+	readOnly bool
 }
 
 var _ tool.InvokableTool = (*einoToolAdapter)(nil)
@@ -138,7 +193,20 @@ func (t *einoToolAdapter) Info(context.Context) (*schema.ToolInfo, error) {
 }
 
 func (t *einoToolAdapter) InvokableRun(ctx context.Context, args string, _ ...tool.Option) (string, error) {
-	return t.state.call(ctx, t.inner.Name(), args)
+	return t.state.callGated(ctx, t.inner.Name(), args, t.readOnly)
+}
+
+// callGated 用读写锁把「只读并发 / 写独占」落实到每次调用上。
+// 未开启 Parallel 时所有调用都走独占锁，行为与串行完全一致。
+func (s *einoRunState) callGated(ctx context.Context, name, args string, readOnly bool) (string, error) {
+	if s.parallel && readOnly {
+		s.gate.RLock()
+		defer s.gate.RUnlock()
+	} else {
+		s.gate.Lock()
+		defer s.gate.Unlock()
+	}
+	return s.call(ctx, name, args)
 }
 
 func (s *einoRunState) call(ctx context.Context, name, args string) (string, error) {
@@ -147,8 +215,12 @@ func (s *einoRunState) call(ctx context.Context, name, args string) (string, err
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
+	// 额度预留是并发临界区：两个只读调用同时到达时只能有一个拿到最后的名额。
+	s.execMu.Lock()
 	if s.cfg.LimitRecoveryRounds <= 0 && s.executed >= s.maxCalls {
-		return "", fmt.Errorf("%w：本次运行已执行 %d 次工具调用（上限 %d）", ErrMaxToolCalls, s.executed, s.maxCalls)
+		executed := s.executed
+		s.execMu.Unlock()
+		return "", fmt.Errorf("%w：本次运行已执行 %d 次工具调用（上限 %d）", ErrMaxToolCalls, executed, s.maxCalls)
 	}
 	var budgetErr error
 	if s.budget != nil && s.budget.rounds > 0 {
@@ -157,7 +229,9 @@ func (s *einoRunState) call(ctx context.Context, name, args string) (string, err
 	if budgetErr == nil {
 		s.executed++
 	}
+	s.execMu.Unlock()
 
+	// 工具执行本身不在锁内：begin/finish 各自加锁，只读调用因此可以真正并行。
 	res := s.runToolState.execute(ctx, s.source, call, s.ex, budgetErr)
 	if s.budget != nil && s.budget.rounds > 0 && budgetErr == nil {
 		s.budget.record(name, res)
@@ -166,11 +240,9 @@ func (s *einoRunState) call(ctx context.Context, name, args string) (string, err
 	s.send(Event{Kind: EvToolResult, ToolID: call.ID, ToolName: name, OK: !res.IsError,
 		AwaitUser: strings.TrimSpace(res.AwaitUser) != "",
 		Summary:   summarize(name, res), Detail: res.Content, Display: res.Display})
-	if res.Image != nil && len(res.Image.Data) > 0 {
-		s.images[call.ID] = res.Image
-	}
+	s.rememberImage(call.ID, res.Image)
 	if question := strings.TrimSpace(res.AwaitUser); question != "" {
-		s.needInput = question
+		s.setNeedInput(question)
 		s.send(Event{Kind: EvNeedInput, ToolID: call.ID, ToolName: name, Content: question, Display: res.Display})
 		return "", errEinoNeedsInput
 	}
@@ -188,18 +260,19 @@ func (s *einoRunState) rewrite(ctx context.Context, msgs []*schema.Message) []*s
 	out := make([]*schema.Message, 0, len(msgs)+len(s.images))
 	for _, msg := range msgs {
 		// Replace our transient status on each model step instead of accumulating it.
-		if msg != nil && msg.Role == schema.System && strings.HasPrefix(msg.Content, executionStatePrefix) {
+		// 计划块同理：它每轮重新渲染，旧的那条必须丢掉，否则会一份份堆进上下文。
+		if msg != nil && msg.Role == schema.System &&
+			(strings.HasPrefix(msg.Content, executionStatePrefix) || planInjected(msg.Content)) {
 			continue
 		}
 		out = append(out, msg)
 		if msg == nil || msg.Role != schema.Tool {
 			continue
 		}
-		img := s.images[msg.ToolCallID]
+		img := s.takeImage(msg.ToolCallID)
 		if img == nil {
 			continue
 		}
-		delete(s.images, msg.ToolCallID)
 		b64 := base64.StdEncoding.EncodeToString(img.Data)
 		out = append(out, &schema.Message{Role: schema.User, UserInputMultiContent: []schema.MessageInputPart{
 			{Type: schema.ChatMessagePartTypeText, Text: "（下面的图片由工具 " + msg.ToolName + " 返回）"},
@@ -215,7 +288,7 @@ func (s *einoRunState) rewrite(ctx context.Context, msgs []*schema.Message) []*s
 		}
 	}
 	s.lastHistory = append([]*schema.Message(nil), out...)
-	if s.executed > 0 {
+	if executed := s.executedCount(); executed > 0 {
 		verification := "本轮尚无成功修改需要核对"
 		if s.lastMutationSeq > 0 {
 			verification = "最后一次成功修改之后尚未调用核对工具"
@@ -225,7 +298,12 @@ func (s *einoRunState) rewrite(ctx context.Context, msgs []*schema.Message) []*s
 		}
 		out = append(out, &schema.Message{Role: schema.System, Content: fmt.Sprintf(
 			"%s 已尝试执行 %d 次工具调用；%s。失败或结果未知的操作不能声称完成。继续处理未完成步骤；完成后简洁说明实际结果和验证情况。",
-			executionStatePrefix, s.executed, verification)})
+			executionStatePrefix, executed, verification)})
+	}
+	if s.ex != nil {
+		if block := PlanBlock(s.ex.SessionID); block != "" {
+			out = append(out, &schema.Message{Role: schema.System, Content: block})
+		}
 	}
 	return out
 }
@@ -316,7 +394,7 @@ func runEino(ctx context.Context, cfg Config, history []llm.Message, emit func(E
 	source := toolSourceOf(cfg, reg)
 	budget := newRunBudget(cfg)
 	state := &einoRunState{emit: emit, source: source, ex: ex, stream: Streamer(), cfg: cfg, budget: budget,
-		maxCalls: maxCalls, images: make(map[string]*ImagePart)}
+		maxCalls: maxCalls, images: make(map[string]*ImagePart), parallel: cfg.Parallel}
 	chatModel := cfg.EinoModel
 	if cfg.ToolSource != nil {
 		chatModel = &disclosureEinoModel{inner: chatModel, source: source, bindMu: &sync.Mutex{}}
@@ -339,12 +417,19 @@ func runEino(ctx context.Context, cfg Config, history []llm.Message, emit func(E
 			if !ok {
 				continue
 			}
-			adapters = append(adapters, &einoToolAdapter{state: state, inner: inner, info: info})
+			adapters = append(adapters, &einoToolAdapter{
+				state: state, inner: inner, info: info,
+				readOnly: cfg.Parallel && cfg.ParallelTools[info.Name],
+			})
 		}
 		return react.NewAgent(ctx, &react.AgentConfig{
 			ToolCallingModel: modelWrapper,
 			ToolsConfig: compose.ToolsNodeConfig{
-				Tools: adapters, ExecuteSequentially: true, UnknownToolsHandler: state.unknown,
+				Tools: adapters,
+				// 默认串行；只有显式开启只读并发时交给 Eino 起 goroutine，
+				// 再由 callGated 的读写锁保证「读并行、写独占」。
+				ExecuteSequentially: !state.parallel,
+				UnknownToolsHandler: state.unknown,
 			},
 			MaxStep:         modelWrapper.limit*2 + 2,
 			MessageRewriter: state.rewrite,
@@ -364,7 +449,7 @@ func runEino(ctx context.Context, cfg Config, history []llm.Message, emit func(E
 		}
 		reader, err := reactAgent.Stream(ctx, input)
 		if err != nil {
-			if state.needInput != "" && errors.Is(err, errEinoNeedsInput) {
+			if state.needInputText() != "" && errors.Is(err, errEinoNeedsInput) {
 				return nil
 			}
 			return state.runError(ctx, err, maxIter)
@@ -381,7 +466,7 @@ func runEino(ctx context.Context, cfg Config, history []llm.Message, emit func(E
 			}
 			if readErr != nil {
 				reader.Close()
-				if state.needInput != "" && errors.Is(readErr, errEinoNeedsInput) {
+				if state.needInputText() != "" && errors.Is(readErr, errEinoNeedsInput) {
 					return nil
 				}
 				return state.runError(ctx, readErr, maxIter)
@@ -399,7 +484,7 @@ func runEino(ctx context.Context, cfg Config, history []llm.Message, emit func(E
 			passText.WriteString(actualText)
 		}
 		allText.WriteString(passText.String())
-		if state.needInput != "" {
+		if state.needInputText() != "" {
 			return nil
 		}
 		feedback := ""

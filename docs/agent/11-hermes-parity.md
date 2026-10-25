@@ -150,7 +150,8 @@ func RunBatch(ctx context.Context, ex *agent.Exec, reg *agent.Registry, calls []
      「看起来无害、实际会改状态」的调用永不进并发批。
    - 事件与 tool 消息仍按模型给出的**输入顺序**回放；并发只影响执行，不影响呈现与历史。
    - 自主模式（`LimitRecoveryRounds > 0`，预算记账串行）下**不并发**，避免绕过触顶检查。
-   - Eino ReAct 执行器保持串行：它的图是每 pass 重建的，并发只加在传统循环里。
+   - Eino ReAct 执行器同样支持：工具节点并发执行，`callGated` 用读写锁保证只读共享、写独占；
+     预算/镜像/执行记账已加锁。2026-10-25 第二轮补齐。
    - 默认关闭；`AGENT_TOOL_PARALLEL=read` 打开，`AGENT_TOOL_PARALLEL_MAX` 覆盖并发上限（默认 4）。
 
 

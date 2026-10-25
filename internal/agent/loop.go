@@ -195,8 +195,9 @@ func Run(ctx context.Context, cfg Config, history []llm.Message, emit func(Event
 		// 只取一次的话模型永远看不到新激活的工具。静态注册表下这一步是常量开销。
 		defs = source.Defs()
 		req := llm.ChatRequest{
-			Model:       cfg.Model,
-			Messages:    msgs,
+			Model: cfg.Model,
+			// 计划是瞬态状态：每轮从 store 重新渲染，不写进 msgs。
+			Messages:    withPlanContext(msgs, ex.SessionID),
 			Temperature: cfg.Temperature,
 			MaxTokens:   cfg.MaxTokens,
 			Tools:       defs,
