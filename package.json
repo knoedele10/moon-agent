@@ -1,6 +1,6 @@
 {
   "name": "blog-my-desktop",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "多模型聊天客户端 (Electron 壳 + Go/Gin 后端)",
   "main": "electron/main.js",
