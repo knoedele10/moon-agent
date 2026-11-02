@@ -8,13 +8,16 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/blog-my ./cmd/blog-my
 
 FROM alpine:3.22
-RUN apk add --no-cache ca-certificates \
-    && addgroup -S app && adduser -S -G app app
+RUN apk add --no-cache ca-certificates git \
+    && addgroup -S app && adduser -S -G app app \
+    && mkdir -p /data /workspace \
+    && chown app:app /data /workspace
 WORKDIR /app
 COPY --from=build /out/blog-my /app/blog-my
 COPY templates /app/templates
 COPY skills /app/skills
-ENV APP_HOST=0.0.0.0 APP_PORT=8080 TEMPLATES_DIR=/app/templates
+ENV APP_HOST=0.0.0.0 APP_PORT=8080 TEMPLATES_DIR=/app/templates \
+    DB_DRIVER=sqlite SQLITE_PATH=/data/blog-my.db AGENT_FS_ROOT=/workspace
 EXPOSE 8080
 USER app
 ENTRYPOINT ["/app/blog-my"]

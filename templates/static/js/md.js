@@ -33,6 +33,7 @@
       return '<code>' + code + '</code>';
     });
     s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
     s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
     // 链接：只认 http/https，其余（javascript:、data: 等）原样留成文本。
     s = s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,
@@ -51,9 +52,13 @@
 
     // 第一步：把围栏代码块挖出来占位，免得里面的 ** 被当成强调、内容被拆行。
     var blocks = [];
-    src = src.replace(/```[ \t]*([a-zA-Z0-9_+-]*)[ \t]*\n?([\s\S]*?)```/g, function (_, lang, code) {
+    var langs = [];
+    // 占位符前后各补一个换行：保证它独占一行，渲染时能当成块级元素单独输出，
+    // 而不是被并进相邻段落里（<p> 里套 <pre> 是非法嵌套，浏览器会把段落拆碎）。
+    src = src.replace(/```[ \t]*([a-zA-Z0-9_+#.-]*)[^\n]*\n?([\s\S]*?)```/g, function (_, lang, code) {
       blocks.push(code.replace(/\n$/, ''));
-      return '\u0000B' + (blocks.length - 1) + '\u0000';
+      langs.push(String(lang || '').toLowerCase());
+      return '\n\u0000B' + (blocks.length - 1) + '\u0000\n';
     });
 
     // Math must be protected before HTML escaping and Markdown emphasis. The
@@ -67,12 +72,25 @@
     var html = [];
     var list = null; // 'ul' | 'ol' | null
     var para = [];   // 连续普通行的缓冲，合成一个 <p>
+    var quote = [];  // 连续「> 」行的缓冲，合成一个 <blockquote>
 
     function closeList() {
       if (list) { html.push(list === 'ul' ? '</ul>' : '</ol>'); list = null; }
     }
     function flushPara() {
       if (para.length) { html.push('<p>' + para.join('<br>') + '</p>'); para = []; }
+    }
+    function flushQuote() {
+      if (quote.length) { html.push('<blockquote><p>' + quote.join('<br>') + '</p></blockquote>'); quote = []; }
+    }
+    // 任务列表：「- [ ] 待办」/「- [x] 完成」。只产出固定的 span，不放真 checkbox——
+    // 这是模型回复的只读展示，可点的复选框会让人以为能改状态。
+    function listItem(body) {
+      var task = /^\[([ xX])\]\s+(.*)$/.exec(body);
+      if (!task) return '<li>' + renderInline(body, mathParts) + '</li>';
+      var done = task[1] !== ' ';
+      return '<li class="md-task' + (done ? ' is-done' : '') + '"><span class="md-check" aria-hidden="true"></span>'
+        + '<span class="sr-only">' + (done ? '已完成：' : '未完成：') + '</span>' + renderInline(task[2], mathParts) + '</li>';
     }
 
     // 表格：模型写 Markdown 表格的频率很高，以前会原样显示成一排竖线。
@@ -101,6 +119,29 @@
 
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i];
+      var mQ = /^\s*&gt;\s?(.*)$/.exec(line);
+      if (mQ) {
+        flushPara();
+        closeList();
+        if (mQ[1].trim()) quote.push(renderInline(mQ[1], mathParts));
+        else if (quote.length) quote.push('');
+        continue;
+      }
+      flushQuote();
+      // 代码块占位符独占一行：作为块级元素直接输出。
+      if (/^\u0000B\d+\u0000$/.test(line.trim())) {
+        flushPara();
+        closeList();
+        html.push(line.trim());
+        continue;
+      }
+      // 分隔线：--- / *** / ___（三个及以上）。
+      if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
+        flushPara();
+        closeList();
+        html.push('<hr>');
+        continue;
+      }
       var mUl = /^\s*[-*+]\s+(.*)$/.exec(line);
       var mOl = /^\s*\d+[.)]\s+(.*)$/.exec(line);
       var mH = /^\s*(#{1,4})\s+(.*)$/.exec(line);
@@ -137,7 +178,7 @@
       if (mUl) {
         flushPara();
         if (list !== 'ul') { closeList(); html.push('<ul>'); list = 'ul'; }
-        html.push('<li>' + renderInline(mUl[1], mathParts) + '</li>');
+        html.push(listItem(mUl[1]));
         continue;
       }
       if (mOl) {
@@ -161,12 +202,17 @@
       para.push(renderInline(line, mathParts));
     }
     flushPara();
+    flushQuote();
     closeList();
 
     // 第二步：把代码块占位换回来（内容单独转义一次）。
     return html.join('').replace(/\u0000B(\d+)\u0000/g, function (_, idx) {
       // 复制按钮只是占位结构，点击由 chat.js 用事件委托处理（md.js 只产出字符串）。
-      return '<pre class="md-code"><button class="md-code-copy" data-md-copy="1" type="button" aria-label="复制这段代码" title="复制">复制</button><code>'
+      var lang = langs[Number(idx)] || '';
+      var label = lang ? escapeHtml(lang) : 'code';
+      return '<pre class="md-code"' + (lang ? ' data-lang="' + escapeHtml(lang) + '"' : '') + '>'
+        + '<span class="md-code-lang" aria-hidden="true">' + label + '</span>'
+        + '<button class="md-code-copy" data-md-copy="1" type="button" aria-label="复制这段代码" title="复制">复制</button><code>'
         + escapeHtml(blocks[Number(idx)]) + '</code></pre>';
     });
   }

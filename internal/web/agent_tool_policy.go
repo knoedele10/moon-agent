@@ -122,6 +122,9 @@ func buildAgentTools(p agentToolPolicy) []agent.Tool {
 	// 子 agent 委派：还没到深度上限时才给这两个工具。
 	// 放在 confirm 包裹**之后**：委派本身不动用户文件，不该让用户再确认一次；
 	// 真正的风险操作发生在子 agent 内部，那里有更严的策略（见 web/subagent.go）。
+	if depth == 0 {
+		tools = append(tools, sessionRouterTool{policy: p})
+	}
 	runner := newSubagentRunner()
 	if depth < subagentMaxDepth() {
 		tools = append(tools,
@@ -152,7 +155,13 @@ func buildAgentTools(p agentToolPolicy) []agent.Tool {
 		listWakeupsTool{userID: userID},
 		cancelWakeupTool{userID: userID},
 	)
-	return finalizeAgentTools(tools, p)
+	tools = finalizeAgentTools(tools, p)
+	// 长任务入口只给主对话（非闲聊、非计划档、非子级）：在用途过滤之后追加，
+	// 不需要逐个用途白名单登记；执行仍在独立执行对话里按原有策略进行。
+	if depth == 0 && !p.Child && normalizeKind(p.Kind) != KindChat && p.Kind != "" {
+		tools = append(tools, taskManageTool{policy: p})
+	}
+	return tools
 }
 
 // finalizeAgentTools applies the conversation Kind and child confirmation policy.

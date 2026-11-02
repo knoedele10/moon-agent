@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"blog-my/internal/agent"
 	"blog-my/internal/llm"
 	"blog-my/internal/model"
 )
@@ -99,7 +100,14 @@ func maybeCompactHistory(ctx context.Context, conv *model.Conversation, history 
 	if trigger <= keepN {
 		trigger = keepN + 1
 	}
-	if len(history) <= trigger {
+	// 两个触发条件任一满足就压缩：条数超过 trigger，或估算 token 超过模型窗口的一半。
+	// 只看条数会让「几条巨大的工具输出」把小窗口模型撑爆。
+	tokenTrigger := compactTokenTrigger(modelID)
+	overTokens := tokenTrigger > 0 && agent.EstimateMessagesTokens(history) > tokenTrigger
+	if overTokens {
+		keepN = compactKeepForTokens(history, keepN, tokenTrigger/2)
+	}
+	if len(history) <= trigger && !overTokens {
 		// 历史还不长，但已经存过摘要（比如之前压缩过、用户又接着聊）时，
 		// 仍然把摘要带上，否则被裁掉的那段就永远看不到了。
 		if strings.TrimSpace(conv.Summary) != "" {
@@ -137,8 +145,11 @@ func maybeCompactHistory(ctx context.Context, conv *model.Conversation, history 
 
 	// 距离上次摘要没攒够新消息就先用旧摘要顶着，避免每轮都重算。
 	// 距上次摘要没攒够新消息就先用旧摘要顶着，避免每轮都重算。
-	if !summarizeIsStale(rows[:cut], conv.SummaryUpto, compactMinNewMessages, strings.TrimSpace(conv.Summary) != "") {
-		out.History = toLLMMessages(rows[cut:])
+	// 按 token 触发时不能「先用旧摘要顶着」：未覆盖的那段本身就可能撑爆窗口。
+	if !overTokens && !summarizeIsStale(rows[:cut], conv.SummaryUpto, compactMinNewMessages, strings.TrimSpace(conv.Summary) != "") {
+		// Only discard messages actually covered by the stored summary.
+		// New messages outside keepN have not been summarized yet.
+		out.History = toLLMMessages(uncoveredCompactRows(rows, conv.SummaryUpto))
 		out.Summary = strings.TrimSpace(conv.Summary)
 		out.Compacted = true
 		return out
@@ -169,6 +180,21 @@ func maybeCompactHistory(ctx context.Context, conv *model.Conversation, history 
 	out.Summary = summary
 	out.Compacted = true
 	return out
+}
+
+// compactKeepForTokens 在按 token 触发时缩小保留窗口：从 keepN 往下减，
+// 直到尾部估算 token 不超过 budget（至少保留最近 2 条，最新输入永远原样保留）。
+func compactKeepForTokens(history []llm.Message, keepN, budget int) int {
+	if keepN > len(history)-1 {
+		keepN = len(history) - 1
+	}
+	for keepN > 2 && agent.EstimateMessagesTokens(history[len(history)-keepN:]) > budget {
+		keepN--
+	}
+	if keepN < 1 {
+		keepN = 1
+	}
+	return keepN
 }
 
 // toLLMMessages 把库里的消息行投影成 llm.Message，角色映射与 chat.go 完全一致。
@@ -233,9 +259,26 @@ func generateCompactSummary(ctx context.Context, modelID, key, previous string, 
 		b.WriteString("\n")
 	}
 
-	out, err := memoryLLMCaller(modelID, key)(ctx, compactSystemPrompt, b.String())
+	var out string
+	var err error
+	if registry == nil {
+		// 没有注册表（单测/嵌入场景）时走 agent 的模型缝，与执行轮次用同一个模型实现。
+		out, err = taskLLMCall(ctx, modelID, key, compactSystemPrompt, b.String())
+	} else {
+		out, err = memoryLLMCaller(modelID, key)(ctx, compactSystemPrompt, b.String())
+	}
 	if err != nil {
 		return "", err
 	}
 	return clipRunes(strings.TrimSpace(out), compactMaxRunes), nil
+}
+
+// uncoveredCompactRows keeps the unsummarized gap as well as the recent tail.
+func uncoveredCompactRows(rows []model.Message, upto uint) []model.Message {
+	for i, row := range rows {
+		if row.Id > upto {
+			return rows[i:]
+		}
+	}
+	return nil
 }

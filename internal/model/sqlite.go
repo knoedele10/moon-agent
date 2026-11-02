@@ -83,10 +83,16 @@ func initSQLite() error {
 }
 
 func autoMigrate() error {
-	if err := DB.AutoMigrate(&User{}, &UserKey{}, &Conversation{}, &Message{}, &KBDocument{}, &KBChunk{}, &AgentSetting{}, &KBMemoryEvent{}, &AgentSkill{}, &AgentPendingTool{}, &AgentAssistant{}, &AgentPrompt{}, &AgentProactiveState{}, &AgentProactiveMessage{}, &AgentSubagentRun{}, &AgentTeamTask{},
+	if err := DB.AutoMigrate(&User{}, &UserSession{}, &UserKey{}, &Conversation{}, &Message{}, &KBDocument{}, &KBChunk{}, &AgentSetting{}, &KBMemoryEvent{}, &AgentSkill{}, &AgentPendingTool{}, &AgentAssistant{}, &AgentPrompt{}, &AgentProactiveState{}, &AgentProactiveMessage{}, &AgentSubagentRun{}, &AgentTeamTask{},
 		&ContentAsset{}, &ContentDraft{}, &ContentDraftVersion{}, &ContentDraftAsset{}, &ContentPublication{},
-		&AgentWakeup{}, &AgentUsage{}); err != nil {
+		&AgentWakeup{}, &AgentUsage{}, &QQChatBinding{}); err != nil {
 		return fmt.Errorf("migrate database: %w", err)
+	}
+	if err := DB.AutoMigrate(TaskModels()...); err != nil {
+		return fmt.Errorf("migrate task tables: %w", err)
+	}
+	if err := DB.AutoMigrate(SAModels()...); err != nil {
+		return fmt.Errorf("migrate superagent tables: %w", err)
 	}
 	reclaimRunningSubagents()
 	return nil

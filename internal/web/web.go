@@ -42,6 +42,7 @@ func Setup(r *gin.Engine, reg *llm.Registry) {
 	r.POST("/register", postRegister)
 	r.GET("/logout", logout)
 	r.GET("/settings", authRequired, pageSettings)
+	r.GET("/admin", authRequired, adminRequired, pageAdmin)
 
 	// 探活不鉴权：健康检查要在未登录时也能被探到（与 docs/api-contract.md 一致）。
 	r.GET("/api/health", health)
@@ -49,8 +50,17 @@ func Setup(r *gin.Engine, reg *llm.Registry) {
 	// CUA 的模型代理：子进程没有 session cookie，改用它自己的每 run Bearer token（契约 3）。
 	r.POST("/internal/cua/llm/v1/chat/completions", cuaLLMProxy)
 
+	// QQ 接入（OneBot v11 反向 WebSocket）：NapCat 等客户端没有 session cookie，
+	// 改用 QQ_ONEBOT_TOKEN 鉴权；未启用时返回 404（docs/agent/17-qq-onebot.md）。
+	r.GET("/onebot/v11/ws", qqOneBotWS)
+
 	api := r.Group("/api", authRequired)
 	{
+		admin := api.Group("/admin", adminRequired)
+		admin.GET("/sessions", adminListSessions)
+		admin.POST("/sessions/:id/revoke", adminRevokeSession)
+		admin.POST("/users/:id/disable", adminDisableUser)
+		admin.POST("/users/:id/enable", adminEnableUser)
 		api.GET("/models", listModels)
 
 		api.GET("/conversations", listConversations)
@@ -147,6 +157,11 @@ func Setup(r *gin.Engine, reg *llm.Registry) {
 		api.GET("/wakeups", listWakeupsAPI)
 		api.POST("/wakeups", createWakeupAPI)
 		api.DELETE("/wakeups/:id", cancelWakeupAPI)
+		// 长任务：持久目标/验收条件，宿主自动续跑与逐项验收（docs/agent/16-task-runtime.md）。
+		api.GET("/tasks", listTasksAPI)
+		api.POST("/tasks", createTaskAPI)
+		api.GET("/tasks/:id", getTaskAPI)
+		api.POST("/tasks/:id/:action", taskActionAPI)
 		api.GET("/setup/status", getSetupStatus)
 		api.GET("/agent/usage", getAgentUsage)
 		api.GET("/agent/runs", getAgentRuns)
@@ -161,5 +176,9 @@ func Setup(r *gin.Engine, reg *llm.Registry) {
 		api.GET("/agent/triggers/files", getFileTrigger)
 		api.POST("/keys", upsertKey)
 		api.DELETE("/keys/:id", deleteKey)
+		// Superagent 各工作线的接口（docs/agent/18-superagent.md）：由各自文件的 init() 注册。
+		for _, register := range saRouteRegistrars {
+			register(api)
+		}
 	}
 }

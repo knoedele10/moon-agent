@@ -75,6 +75,11 @@ type Config struct {
 	// ParallelTools 是允许并发的工具名白名单。agent 包不认识具体工具，
 	// 只按名字判断，避免把「看起来像读」当成「真的只读」。
 	ParallelTools map[string]bool
+
+	// ContextTokens 是本次模型的上下文窗口（估算 token）。>0 时循环内压缩按它的 60% 触发；
+	// 0 保持原有的全局阈值。系统提示词（msgs[0]）在压缩中始终保留，
+	// 长任务把原始目标/约束/进度放在系统提示里，压缩多少次都不会丢。
+	ContextTokens int
 }
 
 const (
@@ -180,7 +185,7 @@ func Run(ctx context.Context, cfg Config, history []llm.Message, emit func(Event
 		// 循环内压缩：长工具链跑到中段会把上下文撑爆，而入口那次检查管不到这里
 		// （每轮都在往 msgs 里塞 assistant 回复 + 工具输出）。
 		// 阈值按估算 token 判；压缩失败会原样返回，不影响这一轮。
-		if estimateMessagesTokens(msgs) >= midLoopCompactTokens() {
+		if estimateMessagesTokens(msgs) >= midLoopThreshold(cfg) {
 			msgs = midLoopCompact(ctx, stream, cfg.Model, cfg.APIKey, msgs, midLoopKeepTail)
 		}
 		if budget.rounds > 0 {

@@ -62,18 +62,34 @@ func initMySQL() error {
 		return fmt.Errorf("connect database %q: %w", name, err)
 	}
 
-	if err := DB.AutoMigrate(&User{}, &UserKey{}, &Conversation{}, &Message{}, &KBDocument{}, &KBChunk{}, &AgentSetting{}, &KBMemoryEvent{}, &AgentSkill{}, &AgentPendingTool{}, &AgentAssistant{}, &AgentPrompt{}, &AgentProactiveState{}, &AgentProactiveMessage{}, &AgentSubagentRun{}, &AgentTeamTask{},
+	if err := DB.AutoMigrate(&User{}, &UserSession{}, &UserKey{}, &Conversation{}, &Message{}, &KBDocument{}, &KBChunk{}, &AgentSetting{}, &KBMemoryEvent{}, &AgentSkill{}, &AgentPendingTool{}, &AgentAssistant{}, &AgentPrompt{}, &AgentProactiveState{}, &AgentProactiveMessage{}, &AgentSubagentRun{}, &AgentTeamTask{},
 		// 自媒体内容库（素材/稿件/版本/关联/发布台账）：只增表，不改既有表语义。
 		&ContentAsset{}, &ContentDraft{}, &ContentDraftVersion{}, &ContentDraftAsset{}, &ContentPublication{},
 		// 定时唤醒（到点让 agent 在该会话里跑一轮）：同样只增表。
 		&AgentWakeup{},
 		// token 账：按轮写入，会话接口再汇总。
-		&AgentUsage{}); err != nil {
+		&AgentUsage{},
+		// QQ 聊天 → 本地会话的绑定（OneBot 接入，见 docs/agent/17-qq-onebot.md）。
+		&QQChatBinding{}); err != nil {
 		if sqlDB, closeErr := DB.DB(); closeErr == nil {
 			_ = sqlDB.Close()
 		}
 		DB = nil
 		return fmt.Errorf("migrate database: %w", err)
+	}
+	if err := DB.AutoMigrate(TaskModels()...); err != nil {
+		if sqlDB, closeErr := DB.DB(); closeErr == nil {
+			_ = sqlDB.Close()
+		}
+		DB = nil
+		return fmt.Errorf("migrate task tables: %w", err)
+	}
+	if err := DB.AutoMigrate(SAModels()...); err != nil {
+		if sqlDB, closeErr := DB.DB(); closeErr == nil {
+			_ = sqlDB.Close()
+		}
+		DB = nil
+		return fmt.Errorf("migrate superagent tables: %w", err)
 	}
 	reclaimRunningSubagents()
 	dropLegacySHAIndex()

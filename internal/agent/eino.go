@@ -284,7 +284,7 @@ func (s *einoRunState) rewrite(ctx context.Context, msgs []*schema.Message) []*s
 	}
 	if s.stream != nil {
 		plain := schemaMessagesToLLM(out)
-		if estimateMessagesTokens(plain) >= midLoopCompactTokens() {
+		if estimateMessagesTokens(plain) >= midLoopThreshold(s.cfg) {
 			out = llm.ToSchemaMessages(midLoopCompact(ctx, s.stream, s.cfg.Model, s.cfg.APIKey, plain, midLoopKeepTail))
 		}
 	}

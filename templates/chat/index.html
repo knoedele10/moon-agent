@@ -61,6 +61,7 @@
             <div class="sidebar-foot">
                 <span class="sidebar-avatar" aria-hidden="true">月</span>
                 <span class="sidebar-user" title="{{.Username}}">{{.Username}}</span>
+                {{if .IsAdmin}}<a class="icon-btn" href="/admin" title="公网用户控制台" aria-label="公网用户控制台">⌁</a>{{end}}
                 <a class="icon-btn" href="/settings" title="设置" aria-label="设置">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                 </a>
@@ -132,7 +133,7 @@
                     </button>
                     <!-- 契约 §7：密钥入口移到右上角；#/keys 路由仍可达（chat.js 的 handleRoute 特判），点开是弹层。
                          设置 / 退出 已挪到侧栏左下角，顶栏只留与「当前会话」直接相关的东西。 -->
-                    <button type="button" class="btn btn-ghost" id="keys-open" aria-haspopup="dialog" aria-expanded="false" aria-controls="keys-dialog">密钥</button>
+                    <button type="button" class="btn btn-ghost" id="keys-open" aria-haspopup="dialog" aria-expanded="false" aria-controls="keys-dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"></path><path d="m21 2-9.6 9.6"></path><circle cx="7.5" cy="15.5" r="5.5"></circle></svg><span>密钥</span></button>
                 </div>
             </header>
 
@@ -718,6 +719,7 @@
     <script src="/static/js/public-access.js"></script>
     <script src="/static/js/theme.js"></script>
     <script src="/static/js/chat.js"></script>
+    <script src="/static/js/longtask.js"></script>
     <!-- 助手 / 提示词两个视图的懒加载钩子。
          这两个视图的逻辑各在自己的文件里，chat.js 只管切视图；用一小段内联脚本把它们接起来，
          就不必为了加两个页签去改 chat.js 的视图路由表。 -->

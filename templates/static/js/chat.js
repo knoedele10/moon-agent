@@ -438,7 +438,7 @@
       if (!code) return;
       ev.preventDefault();
       copyText(code.textContent == null ? '' : code.textContent).then(function () {
-        btn.textContent = '✓';
+        btn.textContent = '已复制';
         btn.classList.add('ok');
         if (btn._copyTimer) clearTimeout(btn._copyTimer);
         btn._copyTimer = setTimeout(function () {
@@ -889,10 +889,52 @@
       var am = conversationMetaFor(a.id);
       var bm = conversationMetaFor(b.id);
       if (!!am.pinned !== !!bm.pinned) return am.pinned ? -1 : 1;
-      return (Number(bm.openedAt) || Number(b.updated_at) || Number(b.id) || 0) - (Number(am.openedAt) || Number(a.updated_at) || Number(a.id) || 0);
+      return (conversationTime(b) || Number(b.id) || 0) - (conversationTime(a) || Number(a.id) || 0);
     });
     return rows;
   }
+
+  // 会话的「最近活动时间」：本机最后打开时间与服务端 updated_at 取较新的一个。
+  // updated_at 是 RFC3339 字符串，必须用 Date.parse；直接 Number() 会得到 NaN，排序就退化成按 id。
+  function conversationTime(conv) {
+    var meta = conversationMetaFor(conv.id);
+    var opened = Number(meta.openedAt) || 0;
+    var updated = Date.parse(conv.updated_at || '') || 0;
+    return Math.max(opened, updated);
+  }
+
+  // 侧栏分组：置顶 / 今天 / 昨天 / 近 7 天 / 更早。按本地日历日切，不按 24 小时滚动。
+  function conversationGroup(conv) {
+    if (conversationMetaFor(conv.id).pinned) return '置顶';
+    var t = conversationTime(conv);
+    if (!t) return '更早';
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var day = 86400000;
+    if (t >= today.getTime()) return '今天';
+    if (t >= today.getTime() - day) return '昨天';
+    if (t >= today.getTime() - 6 * day) return '近 7 天';
+    return '更早';
+  }
+
+  // 列表右侧的短时间：今天显示时:分，今年显示月/日，再早显示年份。
+  function conversationStamp(conv) {
+    var t = Date.parse(conv.updated_at || '');
+    if (!t) return '';
+    var d = new Date(t);
+    var now = new Date();
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    if (d.toDateString() === now.toDateString()) return pad(d.getHours()) + ':' + pad(d.getMinutes());
+    if (d.getFullYear() === now.getFullYear()) return (d.getMonth() + 1) + '/' + d.getDate();
+    return String(d.getFullYear());
+  }
+
+  var CONV_ICONS = {
+    pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"></path><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"></path></svg>',
+    edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.38 3.62a1 1 0 0 1 3 3L7.37 18.64a2 2 0 0 1-.86.5l-2.87.84a.5.5 0 0 1-.62-.62l.84-2.87a2 2 0 0 1 .5-.86z"></path></svg>',
+    export: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path><path d="M12 15V3"></path></svg>',
+    remove: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>'
+  };
 
   function convRowEl(conv, opts) {
     opts = opts || {};
@@ -943,6 +985,14 @@
     title.className = 'conv-title';
     title.textContent = conv.title || '新对话';
     item.appendChild(title);
+    var stamp = conversationStamp(conv);
+    if (stamp && !isChild) {
+      var time = document.createElement('span');
+      time.className = 'conv-time';
+      time.setAttribute('aria-hidden', 'true');
+      time.textContent = stamp;
+      item.appendChild(time);
+    }
     if (meta.unread) {
       var unread = document.createElement('span');
       unread.className = 'conv-unread-dot';
@@ -956,18 +1006,18 @@
 
     var actions = document.createElement('div');
     actions.className = 'conv-actions';
-    actions.appendChild(convActionButton(meta.pinned ? '★' : '☆', meta.pinned ? '取消置顶会话' : '置顶会话', meta.pinned ? '取消置顶「' + (conv.title || '新对话') + '」' : '置顶「' + (conv.title || '新对话') + '」', function () {
+    actions.appendChild(convActionButton(CONV_ICONS.pin, meta.pinned ? '取消置顶会话' : '置顶会话', meta.pinned ? '取消置顶「' + (conv.title || '新对话') + '」' : '置顶「' + (conv.title || '新对话') + '」', function () {
       meta.pinned = !meta.pinned;
       saveConversationMeta();
       renderConvList();
     }, meta.pinned ? 'is-pinned' : ''));
-    actions.appendChild(convActionButton('✎', '重命名会话', '重命名「' + (conv.title || '新对话') + '」', function () {
+    actions.appendChild(convActionButton(CONV_ICONS.edit, '重命名会话', '重命名「' + (conv.title || '新对话') + '」', function () {
       renameConversation(conv.id);
     }));
-    actions.appendChild(convActionButton('⇩', '导出会话', '导出「' + (conv.title || '新对话') + '」为 Markdown', function () {
+    actions.appendChild(convActionButton(CONV_ICONS.export, '导出会话', '导出「' + (conv.title || '新对话') + '」为 Markdown', function () {
       exportConversation(conv.id);
     }));
-    actions.appendChild(convActionButton('×', '删除会话', '删除会话：' + (conv.title || '新对话'), function () {
+    actions.appendChild(convActionButton(CONV_ICONS.remove, '删除会话', '删除会话：' + (conv.title || '新对话'), function () {
       deleteConversation(conv.id);
     }, 'is-danger'));
     row.appendChild(actions);
@@ -1016,8 +1066,20 @@
       return !(conv.parent_id && inList[conv.parent_id]);
     }));
     var filtering = !!kw;
+    var lastGroup = '';
 
     roots.forEach(function (conv) {
+      if (!filtering) {
+        var groupName = conversationGroup(conv);
+        if (groupName !== lastGroup) {
+          var label = document.createElement('div');
+          label.className = 'conv-group-label';
+          label.setAttribute('role', 'presentation');
+          label.textContent = groupName;
+          els.convList.appendChild(label);
+          lastGroup = groupName;
+        }
+      }
       var kids = childrenOf[conv.id] ? sortConversations(childrenOf[conv.id]) : [];
       var hasKids = kids.length > 0;
       // 正在看的会话、或置顶的子会话在折叠组里时强制展开：
@@ -1060,7 +1122,9 @@
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn btn-ghost conv-action' + (extraClass ? ' ' + extraClass : '');
-    btn.textContent = label;
+    // label 要么是内置的 SVG 图标串（CONV_ICONS，常量、无用户输入），要么是普通文字。
+    if (/^<svg[\s>]/.test(label)) btn.innerHTML = label;
+    else btn.textContent = label;
     btn.title = title;
     btn.setAttribute('aria-label', ariaLabel);
     btn.disabled = state.streaming;
@@ -1622,6 +1686,9 @@
   window.CHAT.openConversation = function (id, parentId, title) {
     return openConversation(Number(id), true, parentId, title);
   };
+  // 长任务面板（longtask.js）按当前会话过滤任务。
+  window.CHAT.currentConversationId = function () { return state.currentId; };
+  window.CHAT.currentModel = function () { return els.modelSelect ? els.modelSelect.value : ''; };
   // 任务看板只读当前会话快照，不直接依赖 chat.js 的内部变量。
   // historyCache 中保留最近一次服务端校对后的消息，DOM 则补上当前尚未落库的流式内容。
   window.CHAT.getTaskSnapshot = function () {

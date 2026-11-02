@@ -20,14 +20,14 @@ import (
 //   - 未归类的新工具落到 "misc"，永远不被 AGENT_TOOLSETS 过滤掉：宁可多给一个
 //     工具，也不要让新功能因为忘了登记就静默消失。
 const (
-	toolsetCore   = "core"   // 基础能力：不碰磁盘的通用工具
-	toolsetFS     = "fs"     // 工作区文件读写
-	toolsetMemory = "memory" // 记忆库
-	toolsetSkill  = "skill"  // 技能库与自模型
-	toolsetExec   = "exec"   // 命令执行
-	toolsetAgent  = "agent"  // 子 agent 委派
-	toolsetTeam   = "team"   // 团队成员与共享任务板
-	toolsetEvolve = "evolve" // 自我进化：轨迹/账本/结构化记忆/固化
+	toolsetCore    = "core"    // 基础能力：不碰磁盘的通用工具
+	toolsetFS      = "fs"      // 工作区文件读写
+	toolsetMemory  = "memory"  // 记忆库
+	toolsetSkill   = "skill"   // 技能库与自模型
+	toolsetExec    = "exec"    // 命令执行
+	toolsetAgent   = "agent"   // 子 agent 委派
+	toolsetTeam    = "team"    // 团队成员与共享任务板
+	toolsetEvolve  = "evolve"  // 自我进化：轨迹/账本/结构化记忆/固化
 	toolsetMCP     = "mcp"     // 显式配置的外部工具服务
 	toolsetBrowser = "browser" // 浏览器（静态快照 / 本机页面）
 	toolsetMisc    = "misc"    // 未归类
@@ -54,7 +54,7 @@ func toolsetOf(name string) string {
 		return toolsetBrowser
 	case "subagent", "list_subagents", "schedule_wakeup", "list_wakeups", "cancel_wakeup":
 		return toolsetAgent
-	case "spawn_teammate", "send_message", "list_agents", "wait_agent",
+	case "orchestrator_route", "spawn_teammate", "send_message", "list_agents", "wait_agent",
 		"team_task_create", "team_task_list", "team_task_get", "team_task_update":
 		return toolsetTeam
 	case "memory_note", "memory_list", "memory_forget", "evolution_report", "tool_search", "read_tool_result":

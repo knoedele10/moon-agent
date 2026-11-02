@@ -12,7 +12,21 @@ type User struct {
 	Id        string    `gorm:"column:id;primaryKey;size:36"`
 	Username  string    `gorm:"column:username;uniqueIndex;size:64;not null"`
 	Password  string    `gorm:"column:password;size:100;not null"`
+	Role      string    `gorm:"column:role;size:16;not null;default:user"`
+	Status    string    `gorm:"column:status;size:16;not null;default:active"`
 	CreatedAt time.Time `gorm:"column:created_at"`
+}
+
+// UserSession records an authenticated browser session so administrators can
+// see and revoke users connected through a public tunnel.
+type UserSession struct {
+	Id         string     `gorm:"column:id;primaryKey;size:36"`
+	UserID     string     `gorm:"column:user_id;index;size:36;not null"`
+	IP         string     `gorm:"column:ip;size:128"`
+	UserAgent  string     `gorm:"column:user_agent;type:text"`
+	CreatedAt  time.Time  `gorm:"column:created_at"`
+	LastSeenAt time.Time  `gorm:"column:last_seen_at;index"`
+	RevokedAt  *time.Time `gorm:"column:revoked_at;index"`
 }
 
 func (u *User) BeforeCreate(tx *gorm.DB) error {
@@ -67,6 +81,7 @@ type Message struct {
 }
 
 func (User) TableName() string         { return "user" }
+func (UserSession) TableName() string  { return "user_session" }
 func (UserKey) TableName() string      { return "user_key" }
 func (Conversation) TableName() string { return "conversation" }
 func (Message) TableName() string      { return "message" }

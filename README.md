@@ -128,6 +128,7 @@ ollama pull qwen2.5vl:7b
 | `AGENT_CHECKPOINT_DIR` | 文件检查点目录（默认用户缓存目录下的 `blog-my/checkpoints`）。`write/edit/move/delete` 前自动留副本，`restore` 恢复单个文件、`restore_turn` 整组撤销最近一轮。 |
 | `AGENT_CONTEXT_TOKENS` | 模型上下文窗口（估算值）。设置后：单条工具结果上限取窗口 10%，中段压缩在窗口 60% 触发。 |
 | `AGENT_MIDLOOP_COMPACT_TOKENS` | 显式覆盖中段压缩阈值（估算 token）；不配时用窗口 60% 或默认 24000。 |
+| `QQ_ONEBOT_ENABLED` 等 `QQ_*` | 接入 QQ（OneBot v11 反向 WebSocket），配置与安全说明见 [`docs/agent/17-qq-onebot.md`](docs/agent/17-qq-onebot.md)。 |
 | `AGENT_TOOL_OUTPUT_CAP` | 显式覆盖单条工具结果字符上限；不配时用窗口 10% 或默认 16000。 |
 | `AGENT_EVOLVE` | 自我进化档位：`off`/`record`/`suggest`/`auto`（默认 `off`）。 |
 | `AGENT_EVOLVE_DIR` | 进化数据目录（轨迹、账本、候选）；默认用户配置目录。 |
