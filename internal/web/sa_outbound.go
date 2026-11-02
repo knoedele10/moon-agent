@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strings"
 	"sync"
 	"time"
 
@@ -110,17 +109,6 @@ func saWakeOutbound() {
 	case saOutboundWake <- struct{}{}:
 	default:
 	}
-}
-
-func saIsDuplicateKey(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return true
-	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "unique constraint") || strings.Contains(msg, "duplicate entry")
 }
 
 func saOutboundLoop(ctx context.Context) {
