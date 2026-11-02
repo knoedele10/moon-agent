@@ -59,14 +59,9 @@ func Run(ctx context.Context) error {
 	// 长任务：启动对账（中断轮次 → 先核对现场再续跑），然后自动推进到验收或明确停止。
 	web.StartTaskScheduler(ctx)
 	defer web.StopTaskScheduler()
-<<<<<<< Updated upstream
-=======
-	// Superagent 前台判断：重新安排重启前遗留的消息，并每分钟巡检（docs/agent/18-superagent.md §3.4）。
-	web.StartSARouter(ctx)
-	defer web.StopSARouter()
+	// 发件箱：启动后继续发 pending/failed，已有 sent_ref 的不重发（docs/agent/18-superagent.md §3.6、§3.8）。
 	web.StartSAOutboundSender(ctx)
 	defer web.StopSAOutboundSender()
->>>>>>> Stashed changes
 	log.Printf("READY http://%s", ln.Addr().String())
 	return serve(ctx, ln, r)
 }
