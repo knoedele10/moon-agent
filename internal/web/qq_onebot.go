@@ -3,13 +3,15 @@ package web
 // QQ 接入：OneBot v11 反向 WebSocket（docs/agent/17-qq-onebot.md）。
 //
 // NapCat / LLOneBot / Lagrange 这类 OneBot 实现登录一个 QQ 号，再主动连到
-// /onebot/v11/ws。我们只做三件事：
-//   - 收消息：私聊直接回；群里只回 @机器人 的消息；
-//   - 映射会话：每个 QQ 聊天（私聊某人 / 某个群）绑一个本地会话，上下文跨消息延续；
-//   - 跑一轮：与网页同一条 agent 路径（工具集、记忆、压缩、落库都一样），把最终回复发回 QQ。
+// /onebot/v11/ws。适配器只做三件事：
+//   - 收消息：转成 saTriggerIn 交给 saIngest。私聊 Addressed=direct，群里 @ 了是 mention，
+//     其余（含群里没 @）是 none。群里没 @ 的也入库，回不回话由 gate 决定。
+//   - 本地命令：保留 /new、/help。/new 只换这个聊天的前台会话，Thread 不变。
+//   - 连接：校验 access token，并把 OneBot 的 echo 回执交给渠道发送（sa_channel_qq.go）。
 //
-// 安全边界：QQ 里的人不是本机主人。默认只放行白名单里的 QQ 号 / 群，会话模式默认 chat
-// （不给文件、命令类工具），风险操作仍走 confirm 档的「回复确认」流程。
+// 适配器不判断谁有权，也不再直接跑一轮。QQ_ALLOW_USERS / QQ_ALLOW_GROUPS 只作为
+// 策略首次建行的默认值（契约 §3.1、§3.2）；名单、@ 和模式都交给 gate。
+// 业务回复只经发件箱。连接必须带 token。
 
 import (
 	"context"
@@ -46,7 +48,8 @@ type qqConfig struct {
 	UserID string
 	Model  string
 	Kind   string
-	// 白名单：含 "*" 表示全部放行；为空表示全部拒绝。
+	// AllowUsers / AllowGroups 只保留 QQ_ALLOW_* 的解析结果，供策略默认值对照。
+	// 适配器不再用它们决定收不收、回不回（契约 §3.1）。
 	AllowUsers  map[string]bool
 	AllowGroups map[string]bool
 	Timeout     time.Duration
@@ -91,6 +94,8 @@ func qqIDSet(raw string) map[string]bool {
 	return out
 }
 
+// allowed 描述 QQ_ALLOW_USERS / QQ_ALLOW_GROUPS 的集合语义（空 = 都不包含，* = 全放行）。
+// qqHandleMessage 不调用它。消息是否进入判断由 gate 根据策略决定。
 func (c qqConfig) allowed(ev qqEvent) bool {
 	if ev.MessageType == "group" {
 		return c.AllowGroups["*"] || c.AllowGroups[ev.GroupID.String()]
@@ -476,18 +481,21 @@ func qqOneBotWS(c *gin.Context) {
 
 const qqHelpText = "我是接在 QQ 上的助手。\n直接发消息和我聊（群里请 @我）。\n/new 开始新对话（清空上下文）\n/help 显示这条说明"
 
-// qqRunTurn 跑一轮并返回要发回 QQ 的文本。测试里替换成桩。
+// qqRunTurn 是旧的「适配器里直接跑一轮」。普通消息不再调用它：回复只经发件箱。
+// 变量留下来，是为了既有测试还能把旧轮次换成桩，而不会在入口被重新接上。
 var qqRunTurn = qqRunAgentTurn
 
-// qqDispatch 是 qqHandleMessage 实际发回复的出口。测试里替换成桩。
+// qqDispatch 只服务适配器本地命令（/new、/help）和「还没有本地账号」的提示。
+// 普通消息的业务回复不得走这里。测试可以把它换成记录桩。
 var qqDispatch = qqSend
 
 func qqHandleMessage(cfg qqConfig, ev qqEvent) {
 	if ev.MessageType != "private" && ev.MessageType != "group" {
 		return
 	}
+	// 机器人自己发的消息在适配器里丢掉，不入库（契约 §3.1）。
 	if ev.UserID != "" && ev.UserID == ev.SelfID {
-		return // 自己发的消息（部分实现会上报）
+		return
 	}
 	text, atSelf := qqExtractText(ev)
 	if text == "" {
@@ -502,14 +510,8 @@ func qqHandleMessage(cfg qqConfig, ev qqEvent) {
 		return
 	}
 
-	// Pre-migration compatibility: retain the former allowlist and group
-	// mention behavior until the Superagent schema is available.
-	if model.DB == nil || !model.DB.Migrator().HasTable(&model.SAThread{}) {
-		if !cfg.allowed(ev) || (ev.MessageType == "group" && !atSelf) {
-			return
-		}
-	}
-
+	// /new 与 /help 是适配器本地命令，不进入判断。除此之外不看白名单、不看 @、
+	// 也不直接跑轮次：群里没 @ 的同样入库，交给 gate。
 	switch strings.ToLower(strings.Fields(text)[0]) {
 	case "/help", "/帮助":
 		qqDispatch(ev, qqHelpText)
@@ -529,27 +531,32 @@ func qqHandleMessage(cfg qqConfig, ev qqEvent) {
 	} else if atSelf {
 		addressed = model.SAAddressedMention
 	}
-	raw, _ := json.Marshal(ev)
+	raw, err := json.Marshal(ev)
+	if err != nil {
+		log.Printf("qq: 入站序列化失败 %s: %v", ev.chatKey(), err)
+		return
+	}
 	msgID := ev.MessageID.String()
 	if msgID == "" {
 		msgID = fmt.Sprintf("raw:%x", raw)
 	}
-	_, err := saIngest(context.Background(), saTriggerIn{UserID: userID, Source: model.SASourceQQ, SourceMsgID: msgID, ReplyToMsgID: qqReplyToID(ev), ThreadKey: "qq:" + ev.chatKey(), ThreadLabel: qqConversationTitle(ev), ActorID: ev.UserID.String(), ActorName: ev.senderName(), ActorKind: model.SAActorHuman, Addressed: addressed, Text: text, Raw: string(raw), Inline: false})
+	// 看不到可靠的「对方是机器人」标记时按 human 填。自己的消息已在上面丢弃。
+	_, err = saIngest(context.Background(), saTriggerIn{
+		UserID:       userID,
+		Source:       model.SASourceQQ,
+		SourceMsgID:  msgID,
+		ReplyToMsgID: qqReplyToID(ev),
+		ThreadKey:    "qq:" + ev.chatKey(),
+		ThreadLabel:  qqConversationTitle(ev),
+		ActorID:      ev.UserID.String(),
+		ActorName:    ev.senderName(),
+		ActorKind:    model.SAActorHuman,
+		Addressed:    addressed,
+		Text:         text,
+		Raw:          string(raw),
+		Inline:       false,
+	})
 	if err != nil {
-		// Keep the legacy turn available while an older database is being
-		// migrated. With Superagent tables present, this branch is never used.
-		if strings.Contains(strings.ToLower(err.Error()), "no such table") {
-			if conv, convErr := qqConversationFor(cfg, userID, ev); convErr == nil {
-				legacyText := text
-				if ev.MessageType == "group" && atSelf {
-					legacyText = fmt.Sprintf("[%s(%s)]: %s", ev.senderName(), ev.UserID.String(), text)
-				}
-				if reply, runErr := qqRunTurn(context.Background(), conv, userID, legacyText); runErr == nil {
-					qqDispatch(ev, reply)
-					return
-				}
-			}
-		}
 		log.Printf("qq: 入站失败 %s: %v", ev.chatKey(), err)
 	}
 }
@@ -588,9 +595,20 @@ func qqNewConversation(cfg qqConfig, userID string, ev qqEvent) (*model.Conversa
 			return res.Error
 		}
 		if res.RowsAffected == 0 {
-			return tx.Create(&model.QQChatBinding{ChatKey: ev.chatKey(), UserID: userID, ConversationID: conv.Id}).Error
+			if err := tx.Create(&model.QQChatBinding{ChatKey: ev.chatKey(), UserID: userID, ConversationID: conv.Id}).Error; err != nil {
+				return err
+			}
+		} else if err := tx.Model(&b).Updates(map[string]any{"conversation_id": conv.Id, "user_id": userID}).Error; err != nil {
+			return err
 		}
-		return tx.Model(&b).Updates(map[string]any{"conversation_id": conv.Id, "user_id": userID}).Error
+		// 入口只在 Thread 还不存在时采纳旧 binding。Thread 一旦建好，前台会话以
+		// sa_thread.conversation_id 为准，/new 必须改这一列，Thread 本身不变。
+		if !tx.Migrator().HasTable(&model.SAThread{}) {
+			return nil
+		}
+		return tx.Model(&model.SAThread{}).
+			Where("thread_key = ? AND user_id = ?", "qq:"+ev.chatKey(), userID).
+			Update("conversation_id", conv.Id).Error
 	})
 	if err != nil {
 		return nil, err
@@ -599,6 +617,7 @@ func qqNewConversation(cfg qqConfig, userID string, ev qqEvent) (*model.Conversa
 }
 
 // qqConversationFor 取这个 QQ 聊天绑定的会话；没有、或会话已被删掉/换了账号，就新建一个。
+// 普通消息不再走这里：Thread 和前台会话由 saIngest 找/建，/new 走 qqNewConversation。
 func qqConversationFor(cfg qqConfig, userID string, ev qqEvent) (*model.Conversation, error) {
 	if model.DB == nil {
 		return nil, errors.New("数据库未初始化")
