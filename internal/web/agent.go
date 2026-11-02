@@ -548,7 +548,8 @@ func runAgentChat(in turnInput) {
 	}
 	systemPrompt += modePrompt(mode, root)
 	if depth == 0 && normalizeMode(mode) != ModePlan && (profileFor(kind).Tools == nil || profileFor(kind).Tools["orchestrator_route"]) {
-		systemPrompt += sessionRouterPrompt
+		// 前台路由段（docs/agent/18-superagent.md §3.4）：没接入消息入口也没有工单时为空。
+		systemPrompt += saFrontPrompt(conv)
 	}
 	if depth == 0 && normalizeMode(mode) != ModePlan && normalizeKind(kind) != KindChat {
 		systemPrompt += taskManagePrompt
@@ -816,6 +817,10 @@ func runAgentChat(in turnInput) {
 		}
 	}
 	saveChatMessage(conv.Id, "assistant", strings.TrimSpace(acc.String()))
+	if depth == 0 {
+		// 网页前台轮次（Inline）结束：路由工具没处理的消息补记成 reply。
+		saFinishInlineTurn(conv.Id, strings.TrimSpace(acc.String()))
+	}
 
 	if runErr != nil {
 		var reported *agent.LimitReportError

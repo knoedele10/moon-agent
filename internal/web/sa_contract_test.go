@@ -18,7 +18,7 @@ func setupSATestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tables := []any{&model.User{}, &model.Conversation{}, &model.Message{}, &model.AgentSetting{}, &model.QQChatBinding{}}
+	tables := []any{&model.User{}, &model.Conversation{}, &model.Message{}, &model.AgentSetting{}, &model.AgentSubagentRun{}, &model.QQChatBinding{}}
 	tables = append(tables, model.TaskModels()...)
 	tables = append(tables, model.SAModels()...)
 	if err := db.AutoMigrate(tables...); err != nil {

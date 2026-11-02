@@ -66,6 +66,8 @@ var kindProfiles = map[string]kindProfile{
 			"datetime": true, "calculator": true, "ask_user": true,
 			// 「明早提醒我」在陪伴场景里最常见，所以聊天模式也给唤醒三件套。
 			"schedule_wakeup": true, "list_wakeups": true, "cancel_wakeup": true,
+			// 前台路由只做分流：真正干活的是工单，工单的权限另由授权上限决定（docs/agent/18）。
+			"orchestrator_route": true,
 		},
 		Prompt: "\n【当前模式：日常聊天】这是一次陪伴性质的对话，不是工作任务。" +
 			"不要主动把话题引向工作，也不要提议去改文件或跑命令；语气自然、简短、像熟人聊天。" +

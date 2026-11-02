@@ -115,7 +115,14 @@ QQ 名单的默认值取自 `QQ_ALLOW_USERS` / `QQ_ALLOW_GROUPS`，第一次建 
 - 没有调用路由工具、只是回答：记一条 `reply` Decision。非 Inline 时把回答经 `saEnqueueOutbound`
   发回（`purpose=reply`，`dedupe=reply:<本批最后一个trigger_id>`）。
 - 前台**不等待**：不得 sleep、不轮询任务；工单的结果由宿主直接发到原对话。
-- 判断超时或出错：重新排队，连续三次后记 `unavailable`。
+- 非网页来源的入站文本由 B 在跑前台轮次时写进前台会话（一批合成一条 user 消息，群里带「[昵称(QQ号)]:」）；
+  A 只入库 Trigger，不写会话消息。网页来源由 `postChat` 自己写。
+- 推断候选不进前台轮次：没有启用规则时直接 ignore；有规则时由一次无工具的模型调用逐条评估，
+  observe 记 `would_accept`，auto 直接接单（`strength=inferred`，带命中规则）。
+- 判断超时或出错：重新排队（5s 起翻倍），连续三次后记 `unavailable`。失败计数在进程内，重启清零。
+- `StartSARouter` 随服务启动：重新安排遗留的 queued 消息，之后每分钟巡检一次。
+- 交回的消息：`sa_decision` 记一条 `by=handback`，消息回到 queued；前台提示里会附上交回原因，
+  同一工单不能再接收它。
 - `spawn_teammate` 等轮内委派工具保留，仍属于「前台在一轮内自己干完」的范畴。
 
 ### 3.5 工单（C）
