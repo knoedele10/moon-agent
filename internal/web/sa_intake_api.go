@@ -13,7 +13,7 @@ import (
 // Superagent panel and keep the panel from reaching into the sa_* tables.
 func listSAThreadsAPI(c *gin.Context) {
 	limit := saAPILimit(c)
-	var rows []model.SAThread
+	rows := []model.SAThread{}
 	q := model.DB.WithContext(c.Request.Context()).Where("user_id = ?", currentUserID(c)).Order("id desc").Limit(limit)
 	if source := c.Query("source"); source != "" {
 		q = q.Where("source = ?", source)
@@ -21,6 +21,9 @@ func listSAThreadsAPI(c *gin.Context) {
 	if err := q.Find(&rows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if rows == nil {
+		rows = []model.SAThread{}
 	}
 	c.JSON(http.StatusOK, rows)
 }
@@ -36,16 +39,19 @@ func listSAThreadTriggersAPI(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "thread not found"})
 		return
 	}
-	var rows []model.SATrigger
+	rows := []model.SATrigger{}
 	if err := model.DB.WithContext(c.Request.Context()).Where("thread_id = ?", thread.Id).Order("id asc").Limit(saAPILimit(c)).Find(&rows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if rows == nil {
+		rows = []model.SATrigger{}
 	}
 	c.JSON(http.StatusOK, rows)
 }
 
 func listSAOutboundAPI(c *gin.Context) {
-	var rows []model.SAOutbound
+	rows := []model.SAOutbound{}
 	q := model.DB.WithContext(c.Request.Context()).Where("user_id = ?", currentUserID(c)).Order("id desc").Limit(saAPILimit(c))
 	if status := c.Query("status"); status != "" {
 		q = q.Where("status = ?", status)
@@ -53,6 +59,9 @@ func listSAOutboundAPI(c *gin.Context) {
 	if err := q.Find(&rows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if rows == nil {
+		rows = []model.SAOutbound{}
 	}
 	c.JSON(http.StatusOK, rows)
 }
