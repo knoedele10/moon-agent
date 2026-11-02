@@ -325,7 +325,11 @@ func saFrontPrompt(conv *model.Conversation) string {
 			if name == "" {
 				name = t.ActorID
 			}
-			fmt.Fprintf(&b, "- trigger_id=%d %s(%s) [%s]: %s\n", t.Id, name, t.ActorID, saStrengthLabel(strength), clipRunes(strings.TrimSpace(t.Text), 300))
+			label := saStrengthLabel(strength)
+			if saIsOwner(p, t.Source, t.ActorID) {
+				label += "·主人"
+			}
+			fmt.Fprintf(&b, "- trigger_id=%d %s(%s) [%s]: %s\n", t.Id, name, t.ActorID, label, clipRunes(strings.TrimSpace(t.Text), 300))
 			for _, r := range reasons[t.Id] {
 				fmt.Fprintf(&b, "  （已被交回：%s）\n", r)
 			}

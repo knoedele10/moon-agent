@@ -215,14 +215,17 @@ func saLowerMode(a, b string) string {
 	return a
 }
 
-// saActorIsOwner 判断发起人是不是本机主人：ActorID 必须就是执行用户本人。
-// QQ 来源的 ActorID 是 QQ 号，永远不等于网页账号 → 按访客处理。
+// saActorIsOwner 判断发起人是不是本机主人：网页上 ActorID 就是执行用户本人；
+// 其它来源（QQ）看策略里登记的主人账号（saIsOwner，B 线提供）。其余一律按访客处理。
 func saActorIsOwner(req saAcceptReq) bool {
 	actor := strings.TrimSpace(req.Origin.ActorID)
 	if actor == "" {
 		return isOwnerUser(req.UserID)
 	}
-	return actor == req.UserID && isOwnerUser(req.UserID)
+	if !isOwnerUser(req.UserID) {
+		return false
+	}
+	return actor == req.UserID || saIsOwner(req.Policy, req.Origin.Source, actor)
 }
 
 // saTicketAuthority 计算这份工单允许的 Kind/Mode 上限。

@@ -132,6 +132,12 @@ var saGate = func(p model.SAPolicy, t model.SATrigger, threadHasLiveTicket bool)
 	return model.SAStrengthNone, errSANotReady.Error()
 }
 
+// saIsOwner：这个来源身份是不是本机主人（网页上是账号本人；QQ 上是策略里登记的主人 QQ 号）。
+// 主人的请求按 explicit 处理，工单用主人自己的设置而不是访客上限。
+var saIsOwner = func(p model.SAPolicy, source, actorID string) bool {
+	return source == model.SASourceWeb && actorID != "" && actorID == p.UserID
+}
+
 // saEvaluate：异步安排该 Thread 的一次前台判断（合并期间到达的 queued Trigger）。不得阻塞调用方。
 var saEvaluate = func(ctx context.Context, threadID uint) {
 	log.Printf("superagent: saEvaluate 未实现，thread=%d 的消息停在 queued", threadID)

@@ -56,6 +56,7 @@ QQ 上的人不是本机主人，所以默认收得很紧：
 | --- | --- | --- |
 | `QQ_ONEBOT_ENABLED` | 关 | 总开关；关闭时 `/onebot/v11/ws` 返回 404。 |
 | `QQ_ONEBOT_TOKEN` | — | 必填，与 OneBot 端一致。 |
+| `QQ_OWNER` | 空 | 主人的 QQ 号：请求按本机主人处理，能派活、用你自己的档位。见 18 的「主人」。 |
 | `QQ_ALLOW_USERS` | 空 | 私聊白名单（QQ 号，逗号分隔，`*` = 全部）。 |
 | `QQ_ALLOW_GROUPS` | 空 | 群白名单（群号）。 |
 | `QQ_BOT_USER_ID` | 本机主账号 | QQ 消息记在哪个本地账号下（用它的 key、设置、记忆）。 |

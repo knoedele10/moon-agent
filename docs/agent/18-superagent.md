@@ -68,7 +68,7 @@
 
 | 情况 | 强度 |
 | --- | --- |
-| 本机主人（网页登录用户本人） | explicit |
+| 本机主人（网页登录用户本人；其它来源上登记在 `owners` 里的账号，如 QQ_OWNER） | explicit（私聊或 @；群仍须在接收名单里） |
 | 名单内的人，私聊或 @ | explicit |
 | 名单内的人，群里没 @ | inferred（`admission` 可设为 ignore） |
 | 不在名单的人，@ 或私聊 | 按 `admission`，默认 ignore |
@@ -129,7 +129,7 @@ QQ 名单的默认值取自 `QQ_ALLOW_USERS` / `QQ_ALLOW_GROUPS`，第一次建 
 
 - 工单 = `agent_task`；`saAcceptTicket` 在一个事务里建任务、`sa_mandate`（`origin_trigger_id` 唯一 → 幂等）、
   origin 订阅，然后入队受理确认（`purpose=ack`，`dedupe=task:<id>:ack`）。
-- 任务的 `Kind/Mode` 取「策略允许的上限」与「发起人的设置」中较小的一个：本机主人用自己的设置，
+- 任务的 `Kind/Mode` 取「策略允许的上限」与「发起人的设置」中较小的一个：本机主人（含 `saIsOwner` 认出的 QQ 主人号）用自己的设置，
   其他人用 `sa_policy.guest_kind/guest_mode`（默认 chat / confirm）。
 - 阶段（`saTicketCard.Stage`）：
 
@@ -178,6 +178,7 @@ inferred 的还要求模式 `auto` 且命中的规则仍启用。复核失败 �
 | A | `saEnqueueOutbound(saOutboundReq) (SAOutbound, error)` | B（前台回答）、C（受理/提问/结局） |
 | A | `saChannels[source]`（实现 `saChannel`） | 发件箱 |
 | B | `saPolicyFor(userID)`、`saGate(policy, trigger, hasTicket)` | A 不调；C 复核时调 |
+| B | `saIsOwner(policy, source, actorID)` | C（工单授权上限） |
 | B | `saEvaluate(ctx, threadID)` | A（入口）、B 自己（重排） |
 | B | `saHandBack(ctx, taskID, trigger, reason)` | C（执行端工具） |
 | C | `saFanOut(ctx, trigger) ([]taskID, error)` | A（入口） |

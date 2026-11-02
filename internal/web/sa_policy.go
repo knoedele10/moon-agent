@@ -39,6 +39,8 @@ type saAdmission struct {
 
 // saSourcePolicy 是一个来源在策略里的部分，身份一律用该来源自己的 id。
 type saSourcePolicy struct {
+	// Owners 是本机主人在这个来源上的身份（QQ 号）。只认精确匹配，不支持 "*"。
+	Owners      []string `json:"owners"`
 	AllowUsers  []string `json:"allow_users"`
 	AllowGroups []string `json:"allow_groups"`
 	Bots        []string `json:"bots"`
@@ -122,6 +124,7 @@ func saSplitIDs(raw string) []string {
 // 所以群范围的「名单外 @」默认设为 explicit（受访客上限约束），其余单元格按 dsh 默认。
 func saDefaultPolicy(userID string) model.SAPolicy {
 	qq := saSourcePolicy{
+		Owners:      saSplitIDs(os.Getenv("QQ_OWNER")),
 		AllowUsers:  saSplitIDs(os.Getenv("QQ_ALLOW_USERS")),
 		AllowGroups: saSplitIDs(os.Getenv("QQ_ALLOW_GROUPS")),
 		Bots:        []string{},
@@ -218,6 +221,11 @@ func saSavePolicy(userID string, expectVersion int, in saPolicyView) (model.SAPo
 		return cur, errors.New("accept_mode 只能是 off / observe / auto")
 	}
 	for name, s := range in.Sources {
+		for _, o := range s.Owners {
+			if strings.TrimSpace(o) == "" || strings.Contains(o, "*") {
+				return cur, errors.New("主人只能填具体的账号，不能用 *：" + name)
+			}
+		}
 		for scope, a := range s.Admission {
 			if !validCell(a.ListedUnaddressed, false) || !validCell(a.UnlistedAddressed, true) || !validCell(a.UnlistedUnaddressed, false) {
 				return cur, errors.New("准入单元格取值不合法：" + name + "/" + scope)
@@ -283,8 +291,26 @@ func putSAPolicyAPI(c *gin.Context) {
 	c.JSON(http.StatusOK, saPolicyToView(p))
 }
 
+// saIsOwnerActor：网页上是账号本人；其它来源看策略里登记的主人。
+func saIsOwnerActor(p model.SAPolicy, source, actorID string) bool {
+	actorID = strings.TrimSpace(actorID)
+	if actorID == "" {
+		return false
+	}
+	if source == model.SASourceWeb {
+		return actorID == p.UserID
+	}
+	for _, o := range saSources(p)[source].Owners {
+		if o == actorID {
+			return true
+		}
+	}
+	return false
+}
+
 func init() {
 	saPolicyFor = saPolicyForDB
+	saIsOwner = saIsOwnerActor
 	saRouteRegistrars = append(saRouteRegistrars, func(api *gin.RouterGroup) {
 		api.GET("/sa/policy", getSAPolicyAPI)
 		api.PUT("/sa/policy", putSAPolicyAPI)

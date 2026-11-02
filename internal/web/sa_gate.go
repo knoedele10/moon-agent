@@ -76,6 +76,10 @@ func saGateRaw(p model.SAPolicy, t model.SATrigger, threadKey string, hasTicket 
 
 	switch t.ActorKind {
 	case model.SAActorHuman:
+		// 主人：私聊或 @ 一律是明确请求（群仍须在接收名单里，上面已检查）。
+		if addressed && saIsOwnerActor(p, t.Source, t.ActorID) {
+			return model.SAStrengthExplicit, "主人的请求"
+		}
 	case model.SAActorBot:
 		// 名单内的机器人只能产生推断候选，而且必须对 agent 说话。
 		if saListed(src.Bots, t.ActorID) && addressed {
