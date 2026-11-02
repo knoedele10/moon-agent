@@ -16,6 +16,21 @@ CREATE TABLE IF NOT EXISTS `user` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='站点用户';
 
 -- 用户密钥表：用户为某个端点填的 API Key，存 AES-GCM 密文。
+-- Auth sessions are recorded for online-user visibility and revocation.
+CREATE TABLE IF NOT EXISTS `user_session` (
+  `id`           VARCHAR(36)  NOT NULL,
+  `user_id`      VARCHAR(36)  NOT NULL,
+  `ip`           VARCHAR(128) NULL,
+  `user_agent`   TEXT         NULL,
+  `created_at`   DATETIME(3)  NULL,
+  `last_seen_at` DATETIME(3) NULL,
+  `revoked_at`   DATETIME(3)  NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_session_user_id` (`user_id`),
+  KEY `idx_user_session_last_seen_at` (`last_seen_at`),
+  KEY `idx_user_session_revoked_at` (`revoked_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='user authentication sessions';
+
 CREATE TABLE IF NOT EXISTS `user_key` (
   `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键：自增，密钥是附属数据、量级大用数字 id 更省空间',
   `user_id`    VARCHAR(36)  NOT NULL COMMENT '外键：关联 user.id，表示这个 key 属于谁',

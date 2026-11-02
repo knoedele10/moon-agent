@@ -380,13 +380,24 @@ func (r *subagentRunner) executeChild(ctx context.Context, req agent.SubagentReq
 	history = append(history, parentHistory...)
 	history = append(history, llm.Message{Role: llm.RoleUser, Content: req.Prompt})
 
+	// Continuations use the same rolling summary as the main conversation.
+	// Fork history belongs to the parent and must not advance the child's cursor.
+	compactSummary := ""
+	if len(req.History) > 0 && normalizeSubagentContext(req.Context) != "fork" && model.DB != nil {
+		var conv model.Conversation
+		if err := model.DB.Where("id = ? AND user_id = ?", childID, userID).First(&conv).Error; err == nil {
+			cr := maybeCompactHistory(ctx, &conv, history, req.Model, subagentAPIKey(userID, req.Model))
+			history, compactSummary = cr.History, cr.Summary
+		}
+	}
+
 	tools, source := assembleRuntimeTools(subagentToolsFor(userID, req, depth), agentToolPolicy{
 		UserID: userID, Kind: req.Kind, Mode: req.Mode, Child: true,
 	}, evo)
 	cfg := agent.Config{
 		Model:               req.Model,
 		APIKey:              subagentAPIKey(userID, req.Model),
-		SystemPrompt:        subagentSystemPrompt(req) + evo.PromptBlock(),
+		SystemPrompt:        subagentSystemPrompt(req) + evo.PromptBlock() + compactSummaryBlock(compactSummary),
 		MaxIterations:       subagentMaxIterations(),
 		MaxToolCalls:        subagentMaxToolCalls(),
 		LimitRecoveryRounds: agentLimitRecoveryRounds(req.Mode),
@@ -427,15 +438,15 @@ func (r *subagentRunner) executeChild(ctx context.Context, req agent.SubagentReq
 	reply = strings.TrimSpace(acc.String())
 	if runErr != nil {
 		status, stopReason = classifySubagentOutcome(runErr)
-		return status, stopReason, clipRunes(reply, subagentReplyMaxRunes), runErr.Error()
+		return status, stopReason, reply, runErr.Error()
 	}
 	if needInput != "" {
 		if reply == "" {
 			reply = needInput
 		}
-		return model.SubagentDone, subagentStopNeedInput, clipRunes(reply, subagentReplyMaxRunes), ""
+		return model.SubagentDone, subagentStopNeedInput, reply, ""
 	}
-	return model.SubagentDone, subagentStopDone, clipRunes(reply, subagentReplyMaxRunes), ""
+	return model.SubagentDone, subagentStopDone, reply, ""
 }
 
 // settle 是收尾顺序（契约 §3.3 第 5 条，顺序冻结）：
@@ -455,7 +466,7 @@ func (r *subagentRunner) settle(run model.AgentSubagentRun, parentID, childID ui
 	if err := model.DB.Model(&model.AgentSubagentRun{}).Where("id = ?", run.Id).Updates(map[string]any{
 		"status":      status,
 		"stop_reason": stopReason,
-		"reply":       reply,
+		"reply":       clipRunes(reply, subagentReplyMaxRunes),
 		"progress":    "",
 		"activity":    activity,
 		"err_text":    errText,
@@ -478,7 +489,7 @@ func (r *subagentRunner) settle(run model.AgentSubagentRun, parentID, childID ui
 		Label:      run.Label,
 		Status:     status,
 		StopReason: stopReason,
-		Reply:      reply,
+		Reply:      clipRunes(reply, subagentReplyMaxRunes),
 		Error:      errText,
 		DurationMS: finished.Sub(started).Milliseconds(),
 	}

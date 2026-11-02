@@ -538,6 +538,7 @@ func runAgentChat(in turnInput) {
 
 	// 灵魂放在系统提示词**最前面**：它是用户亲手设的，优先级高于一切默认风格与行为准则。
 	// 灵魂同样可能来自助手覆盖，所以用 actx 里的值，而不是再查一遍全局设置。
+	depth, rootSessionID := conversationDelegation(conv)
 	systemPrompt := soulBlockFrom(actx.SoulPersonality, actx.SoulVoice, actx.SoulWork) + soulGrowthBlock(actx.SoulGrowth) + agentSystemPrompt(root, memoryBlock)
 	if len(roots) > 1 {
 		systemPrompt += "\n【多个活动工作区】普通相对路径默认在 workspace1（主工作区）；访问其他目录时使用 @workspace2/相对路径、@workspace3/相对路径，以此类推。路径编号顺序如下：\n"
@@ -546,6 +547,10 @@ func runAgentChat(in turnInput) {
 		}
 	}
 	systemPrompt += modePrompt(mode, root)
+	if depth == 0 && normalizeMode(mode) != ModePlan && (profileFor(kind).Tools == nil || profileFor(kind).Tools["orchestrator_route"]) {
+		systemPrompt += sessionRouterPrompt
+	}
+
 	systemPrompt += skillPromptBlock(userID)
 	// 画像每轮都带上（短且稳定）；零散记忆再按相关度补充。
 	systemPrompt += kbProfileBlock(userID)
@@ -585,7 +590,6 @@ func runAgentChat(in turnInput) {
 
 	// 委派深度与整棵树的根会话：用户可能点进某个子会话直接说话，那时它已经不是根了。
 	// 这两个值决定「还能不能再派活」与「容量按谁统计」，必须按会话真实身份算，不能写死 0。
-	depth, rootSessionID := conversationDelegation(conv)
 
 	// 工具集：先按会话模式/执行档位构建全量工具，再按 AGENT_TOOLSETS 选择。
 	// 没配置 AGENT_TOOLSETS 时 keep 为空，filterToolsByToolsets 原样返回——行为不变。
@@ -941,7 +945,7 @@ func wakeAllowed(id uint, now time.Time) bool {
 // wakePrompt 是唤醒轮次的触发文本。它**不会**被落库成用户消息（用户消息由 handler 写），
 // 只用于这一轮的记忆检索；模型真正读到的上下文是历史里那几条完成通知。
 const wakePrompt = "（系统）你派出去的子任务都结束了，完成通知已经在对话历史里。" +
-	"请读这些结论，把结果汇总给用户；如果还有没做完的，说明下一步。"
+	"请读取完成报告并核对原始目标与验收条件；已完成则汇总真实结果，尚未完成且授权范围内可推进时，继续执行或交回原执行对话。需要用户输入时说明具体阻碍，不要把受理或计划当作完成。"
 
 // wakeParentAfterSubagents 在父会话的子任务全部结束后，替它自动跑一轮汇总。
 
@@ -1097,7 +1101,7 @@ func wakeParentAfterSubagents(convID uint) {
 		return
 	}
 	if conversationBusy(convID) {
-		log.Printf("[subagent] 会话 %d 正在跑，跳过唤醒（通知已落库，下次对话可见）", convID)
+		scheduleTeamWake(convID)
 		return
 	}
 	if !wakeAllowed(convID, time.Now()) {

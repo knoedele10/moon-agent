@@ -194,14 +194,15 @@ var byName = map[string]Meta{
 	"list_subagents": known(RiskRead, true, false, SideEffectReadOnly, false, false),
 
 	// 团队。列表/详情可并发；发消息、改任务板、等人都不能并发，但旧确认名单不问。
-	"spawn_teammate":   known(RiskExec, false, false, SideEffectNonIdempotent, false, false),
-	"send_message":     known(RiskSelf, false, false, SideEffectNonIdempotent, false, false),
-	"list_agents":      known(RiskRead, true, false, SideEffectReadOnly, false, false),
-	"wait_agent":       known(RiskSelf, false, false, SideEffectNonIdempotent, false, false),
-	"team_task_create": known(RiskSelf, false, false, SideEffectNonIdempotent, false, false),
-	"team_task_list":   known(RiskRead, true, false, SideEffectReadOnly, false, false),
-	"team_task_get":    known(RiskRead, true, false, SideEffectReadOnly, false, false),
-	"team_task_update": known(RiskSelf, false, false, SideEffectNonIdempotent, false, false),
+	"orchestrator_route": known(RiskExec, false, false, SideEffectNonIdempotent, false, false),
+	"spawn_teammate":     known(RiskExec, false, false, SideEffectNonIdempotent, false, false),
+	"send_message":       known(RiskSelf, false, false, SideEffectNonIdempotent, false, false),
+	"list_agents":        known(RiskRead, true, false, SideEffectReadOnly, false, false),
+	"wait_agent":         known(RiskSelf, false, false, SideEffectNonIdempotent, false, false),
+	"team_task_create":   known(RiskSelf, false, false, SideEffectNonIdempotent, false, false),
+	"team_task_list":     known(RiskRead, true, false, SideEffectReadOnly, false, false),
+	"team_task_get":      known(RiskRead, true, false, SideEffectReadOnly, false, false),
+	"team_task_update":   known(RiskSelf, false, false, SideEffectNonIdempotent, false, false),
 
 	// 目录与落盘结果。tool_search 会激活工具，不能并发。
 	"tool_search":      known(RiskSelf, false, false, SideEffectNonIdempotent, false, false),

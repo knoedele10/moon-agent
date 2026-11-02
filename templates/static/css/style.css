@@ -59,60 +59,63 @@
   --radius-sm: 8px;
   --radius: 12px;
   --radius-lg: 18px;
-  --shadow-sm: 0 4px 18px rgb(51 68 58 / 0.05);
-  --shadow-md: 0 18px 48px rgb(51 68 58 / 0.10);
-  --shadow-lg: 0 24px 72px rgb(51 68 58 / 0.18);
+  /* 阴影色跟着雾蓝走：旧值是灰绿（上一套鼠尾草主题的遗留），压在蓝底上会发脏。 */
+  --shadow-sm: 0 1px 2px rgb(36 64 110 / 0.04), 0 4px 16px rgb(36 64 110 / 0.06);
+  --shadow-md: 0 2px 6px rgb(36 64 110 / 0.05), 0 18px 44px rgb(36 64 110 / 0.11);
+  --shadow-lg: 0 24px 72px rgb(36 64 110 / 0.18);
   --ease-out: cubic-bezier(0.2, 0.75, 0.25, 1);
 }
 
 :root[data-theme="graphite"] {
+  /* 夜间深蓝：与日间雾蓝同一条色相线，只把明度压下去；重音用提亮的长春花蓝，
+     深底上对比度 > 7，--accent-ink 压在它上面同样 ≥ 4.5。 */
   color-scheme: dark;
-  --bg: #1b2228;
-  --sidebar: rgb(29 37 43 / 0.82);
-  --surface: #242e34;
-  --surface-raised: #2a353b;
-  --surface-hover: #303f44;
-  --border: #354148;
-  --border-strong: #45555b;
-  --text: #d5ddd9;
-  --text-muted: #a5b3ad;
-  --text-faint: #8c9f98;
-  --accent: #a4c2b8;
-  --accent-strong: #b5cfc6;
-  --accent-ink: #20332e;
-  --accent-ink-rgb: 32 51 46;
-  --accent-rgb: 164 194 184;
-  --accent-2-rgb: 132 151 181;
-  --dot-rgb: 140 168 161;
+  --bg: #0e1524;
+  --sidebar: rgb(16 24 40 / 0.84);
+  --surface: #142036;
+  --surface-raised: #19263f;
+  --surface-hover: #21304e;
+  --border: #233250;
+  --border-strong: #324568;
+  --text: #dce5f4;
+  --text-muted: #a6b4cd;
+  --text-faint: #8a99b5;
+  --accent: #8db4ff;
+  --accent-strong: #aac7ff;
+  --accent-ink: #0b1630;
+  --accent-ink-rgb: 11 22 48;
+  --accent-rgb: 141 180 255;
+  --accent-2-rgb: 168 148 240;
+  --dot-rgb: 132 162 222;
   --accent-soft: rgb(var(--accent-rgb) / 0.12);
-  --danger: #e28b81;
-  --danger-strong: #c94646;
-  --danger-rgb: 226 139 129;
+  --danger: #f2919c;
+  --danger-strong: #d9505f;
+  --danger-rgb: 242 145 156;
   --danger-soft: rgb(var(--danger-rgb) / 0.12);
-  --warn: #d9b478;
-  --warn-strong: #e0a75a;
-  --warn-rgb: 217 180 120;
-  --info: #a9c6e6;
-  --info-rgb: 146 178 216;
-  --hover-faint: rgba(255, 255, 255, 0.02);
-  --hover-weak: rgba(255, 255, 255, 0.035);
-  --hover: rgba(255, 255, 255, 0.045);
-  --hover-strong: rgba(255, 255, 255, 0.08);
-  --line: rgba(255, 255, 255, 0.18);
-  --line-strong: rgba(255, 255, 255, 0.3);
-  --overlay: rgba(4, 6, 4, 0.62);
-  --topbar-bg: rgb(29 38 44 / 0.78);
-  --topbar-bg-strong: rgb(29 38 44 / 0.96);
-  --bubble-user-bg: #30443f;
-  --bubble-error-text: #f0a59d;
-  --code-bg: rgba(0, 0, 0, 0.28);
+  --warn: #e7b872;
+  --warn-strong: #eda650;
+  --warn-rgb: 231 184 114;
+  --info: #7fd4e6;
+  --info-rgb: 127 212 230;
+  --hover-faint: rgb(170 196 255 / 0.025);
+  --hover-weak: rgb(170 196 255 / 0.04);
+  --hover: rgb(170 196 255 / 0.06);
+  --hover-strong: rgb(170 196 255 / 0.1);
+  --line: rgb(170 196 255 / 0.16);
+  --line-strong: rgb(170 196 255 / 0.28);
+  --overlay: rgb(3 7 16 / 0.64);
+  --topbar-bg: rgb(15 23 39 / 0.78);
+  --topbar-bg-strong: rgb(15 23 39 / 0.96);
+  --bubble-user-bg: #1e335a;
+  --bubble-error-text: #f6a7b0;
+  --code-bg: rgb(3 8 20 / 0.42);
   --code-text: var(--text);
-  --scrollbar: #45555b;
-  --glass: rgb(36 46 52 / 0.86);
-  --glass-line: rgb(181 205 196 / 0.08);
-  --shadow-sm: 0 3px 12px rgba(0, 0, 0, 0.16);
-  --shadow-md: 0 18px 48px rgba(0, 0, 0, 0.24);
-  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --scrollbar: #2e3f60;
+  --glass: rgb(20 31 53 / 0.86);
+  --glass-line: rgb(170 196 255 / 0.08);
+  --shadow-sm: 0 3px 12px rgb(0 4 14 / 0.22);
+  --shadow-md: 0 18px 48px rgb(0 4 14 / 0.32);
+  --shadow-lg: 0 24px 60px rgb(0 4 14 / 0.6);
 }
 
 *,
@@ -7390,6 +7393,613 @@ details[open]::details-content {
     padding: 0 12px 4px;
   }
   .review-summary {
+    display: none;
+  }
+}
+
+/* ============================================================================
+   2026-10-31 视觉精修层
+   原则：只在这里覆盖，不回头改前面的历史规则，方便整段回滚。
+   覆盖面：侧栏会话列表（分组 / 时间 / SVG 操作键）、消息与 Markdown、
+   代码块头部、空状态、任务看板网格、列表视图、表单焦点、登录页、移动端输入栏。
+   ============================================================================ */
+
+/* ---- 0. 统一的焦点与控件手感 ---- */
+.input:focus-visible,
+.select:focus-visible,
+.composer textarea:focus-visible {
+  /* 已经有 border + 3px 光环表达焦点，再叠一圈 outline 就成了双框。 */
+  outline: none;
+}
+
+.input,
+.select {
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 160ms ease;
+}
+
+.input:hover:not(:focus),
+.select:hover:not(:focus) {
+  border-color: var(--border-strong);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* ---- 1. 侧栏会话列表 ---- */
+.conv-list {
+  gap: 1px;
+  padding-top: 2px;
+}
+
+.conv-group-label {
+  margin: 12px 0 2px;
+  padding: 6px 12px 4px;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.conv-group-label:first-child {
+  margin-top: 0;
+}
+
+/* 不再为操作键预留 92px：没悬停时标题能用满整行，时间戳贴右。 */
+.conv-item {
+  min-height: 36px;
+  padding: 7px 10px 7px 12px;
+  border-radius: 9px;
+}
+
+.conv-item::before {
+  width: 3px;
+  height: 14px;
+  border-radius: 3px;
+  background: transparent;
+  opacity: 1;
+  transition: background 160ms ease, height 160ms var(--ease-out);
+}
+
+.conv-item:hover,
+.conv-item:focus-visible {
+  transform: none;
+}
+
+.conv-item.active::before {
+  height: 16px;
+  background: var(--accent);
+}
+
+.conv-row.is-pinned .conv-item::before {
+  background: var(--warn);
+}
+
+.conv-time {
+  flex: none;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+  transition: opacity 120ms ease;
+}
+
+/* 悬停 / 选中时操作键浮出：标题让位，时间戳隐去，三者不再叠字。 */
+.conv-row:hover .conv-item,
+.conv-row:focus-within .conv-item,
+.conv-item.active {
+  padding-right: 112px;
+}
+
+.conv-row:hover .conv-time,
+.conv-row:focus-within .conv-time,
+.conv-item.active .conv-time {
+  opacity: 0;
+}
+
+.conv-actions {
+  right: 6px;
+  gap: 0;
+}
+
+.conv-action {
+  display: inline-grid;
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  min-height: 26px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+}
+
+.conv-action svg {
+  width: 14px;
+  height: 14px;
+}
+
+.conv-action:hover {
+  background: var(--hover-strong);
+  color: var(--text);
+}
+
+.conv-action.is-pinned {
+  color: var(--warn);
+}
+
+.conv-action.is-pinned svg {
+  fill: currentColor;
+  fill-opacity: 0.18;
+}
+
+/* 子会话行不显示时间，保持原来的缩进节奏 */
+.conv-item.is-child {
+  padding-right: 10px;
+}
+
+/* ---- 2. 消息流 ---- */
+@media (min-width: 1181px) {
+  .main {
+    --reading: 760px;
+  }
+}
+
+/* 回答占满阅读列：以前被 min(84%, 720px) 再砍一刀，代码块只剩 500px 出头。 */
+.msg.assistant .bubble,
+.msg.assistant .bubble.is-error {
+  min-width: 0;
+  max-width: none;
+  flex: 1;
+}
+
+.msg.assistant .bubble.is-error {
+  flex: 0 1 auto;
+}
+
+/* 用户消息不再挂「我」字头像：右对齐的气泡已经足够区分说话人。 */
+.msg.user .avatar {
+  display: none;
+}
+
+.msg.user .msg-actions {
+  right: 0;
+}
+
+.msg.user .bubble {
+  max-width: min(80%, 620px);
+  padding: 10px 15px;
+  border-color: transparent;
+  box-shadow: 0 1px 2px rgb(var(--accent-rgb) / 0.08);
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.msg.assistant .avatar {
+  border: 0;
+  background: linear-gradient(140deg, rgb(var(--accent-rgb)) 0%, rgb(var(--accent-2-rgb)) 100%);
+  color: var(--accent-ink);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  box-shadow: 0 2px 8px rgb(var(--accent-rgb) / 0.25);
+}
+
+.msg-actions {
+  left: 39px;
+}
+
+/* ---- 3. Markdown ---- */
+.md code {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--hover-weak);
+  color: var(--accent-strong);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+}
+
+.md strong {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.md del {
+  color: var(--text-faint);
+}
+
+.md a {
+  text-decoration: underline;
+  text-decoration-color: rgb(var(--accent-rgb) / 0.35);
+  text-underline-offset: 3px;
+}
+
+.md a:hover {
+  text-decoration-color: currentColor;
+}
+
+.md blockquote {
+  padding: 8px 14px;
+  border-left: 3px solid rgb(var(--accent-rgb) / 0.55);
+  border-radius: 4px 10px 10px 4px;
+  background: var(--accent-soft);
+  color: var(--text-muted);
+}
+
+.md li::marker {
+  color: var(--text-faint);
+}
+
+.md li.md-task {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-left: -18px;
+  list-style: none;
+}
+
+.md-check {
+  position: relative;
+  top: 2px;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 4px;
+}
+
+.md-task.is-done {
+  color: var(--text-faint);
+}
+
+.md-task.is-done .md-check {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.md-task.is-done .md-check::after {
+  position: absolute;
+  top: 1px;
+  left: 4px;
+  width: 4px;
+  height: 7px;
+  border: solid var(--accent-ink);
+  border-width: 0 1.5px 1.5px 0;
+  content: "";
+  transform: rotate(45deg);
+}
+
+/* 代码块：顶部一条 32px 的标题栏放语言名和复制键，正文行距收紧到正常代码编辑器的密度。
+   标题栏用背景渐变画，不额外包 DOM——md.js 产出的结构和复制逻辑保持不变。 */
+.md .md-code {
+  margin: 12px 0 14px;
+  padding: 44px 16px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background-color: var(--code-bg);
+  background-image: linear-gradient(to bottom,
+    var(--hover-weak) 0, var(--hover-weak) 34px,
+    var(--line) 34px, var(--line) 35px,
+    transparent 35px);
+  color: var(--code-text);
+  line-height: 1.6;
+  tab-size: 4;
+}
+
+.md .md-code code {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 12.5px;
+  line-height: inherit;
+}
+
+.md-code-lang {
+  position: absolute;
+  top: 9px;
+  left: 14px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  user-select: none;
+}
+
+.md-code-copy {
+  top: 5px;
+  right: 7px;
+  min-height: 24px;
+  padding: 2px 9px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.md-code-copy:hover,
+.md-code-copy:focus-visible {
+  background: var(--surface);
+}
+
+.md-table {
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.md-table tbody tr:hover td {
+  background: var(--hover-faint);
+}
+
+/* ---- 4. 首屏空状态 ---- */
+/* 还没开始任何对话时，右上角那张「暂无任务」卡片只是噪音。 */
+.app.is-empty .task-card {
+  display: none;
+}
+
+@media (min-width: 1181px) {
+  .app.is-empty .main {
+    --rail: 0px;
+  }
+}
+
+.empty-example {
+  padding: 8px 14px;
+  font-size: 12px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease, transform 160ms var(--ease-out);
+}
+
+.empty-example:hover {
+  border-color: rgb(var(--accent-rgb) / 0.35);
+  color: var(--accent-strong);
+  transform: translateY(-1px);
+}
+
+/* ---- 5. 顶栏 ---- */
+#keys-open {
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 999px;
+}
+
+#keys-open svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ---- 6. 列表视图（模型 / 技能 / 助手 / 提示词） ---- */
+.list-panel {
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.item-row:hover {
+  background: var(--hover-weak);
+  transform: none;
+}
+
+.item-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.item-badge::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.item-badge-warn::before {
+  background: var(--text-faint);
+  opacity: 0.6;
+}
+
+/* ---- 7. 任务看板：内容区与右侧两块等高，活动轨迹横跨整行，不再留大块空洞 ---- */
+.taskboard-grid {
+  align-items: stretch;
+}
+
+.taskboard-activity-panel {
+  grid-column: 1 / -1;
+}
+
+.taskboard-content-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.taskboard-content-panel > .taskboard-content {
+  flex: 1;
+}
+
+/* ---- 8. 登录 / 注册 ---- */
+.auth-shell {
+  display: grid;
+  width: min(100%, 920px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  animation: surface-enter 560ms var(--ease-out) both;
+}
+
+.auth-shell .auth-card {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  animation: none;
+  padding: 44px 40px;
+}
+
+.auth-aside {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 40px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgb(var(--accent-rgb) / 0.22), transparent 60%),
+    radial-gradient(90% 70% at 100% 100%, rgb(var(--accent-2-rgb) / 0.22), transparent 60%),
+    var(--surface-raised);
+  border-right: 1px solid var(--border);
+}
+
+.auth-aside::after {
+  position: absolute;
+  right: -90px;
+  bottom: -90px;
+  width: 300px;
+  height: 300px;
+  border: 1px solid rgb(var(--accent-rgb) / 0.18);
+  border-radius: 50%;
+  box-shadow: 0 0 0 40px rgb(var(--accent-rgb) / 0.04), 0 0 0 80px rgb(var(--accent-rgb) / 0.03);
+  content: "";
+  pointer-events: none;
+}
+
+.auth-aside h2 {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+
+.auth-aside h2 em {
+  color: var(--accent);
+  font-style: normal;
+}
+
+.auth-aside > div > p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.auth-points {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.auth-points li {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.auth-points b {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.auth-points svg {
+  width: 34px;
+  height: 34px;
+  padding: 8px;
+  border: 1px solid rgb(var(--accent-rgb) / 0.2);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--accent);
+}
+
+@media (max-width: 760px) {
+  .auth-shell {
+    width: min(100%, 440px);
+    grid-template-columns: 1fr;
+  }
+  .auth-aside {
+    display: none;
+  }
+  .auth-shell .auth-card {
+    padding: 32px 26px;
+  }
+}
+
+/* ---- 9. 移动端输入栏：发送键永远在最右，设置项折到下一行 ---- */
+@media (max-width: 600px) {
+  .composer-toolbar {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .composer-settings-toggle { order: 0; }
+  .composer .chat-params-btn { order: 1; }
+  .composer-toolbar .send-btn { order: 2; margin-left: auto; }
+  .composer-settings { order: 3; }
+  .topbar-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* ---- 10. 深色主题细节 ---- */
+:root[data-theme="graphite"] .md :not(pre) > code {
+  color: var(--accent-strong);
+  background: rgb(var(--accent-rgb) / 0.08);
+}
+
+:root[data-theme="graphite"] .msg.user .bubble {
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-shell { animation: none; }
+  .empty-example:hover { transform: none; }
+}
+
+/* 输入框下方的小字行与输入框同宽对齐（以前固定 800px，比阅读列宽，左右各探出一截）。 */
+.composer-meta {
+  max-width: var(--reading, 800px);
+  padding: 0 14px;
+}
+
+.auth-aside > * {
+  position: relative;
+  z-index: 1;
+}
+
+.auth-aside::after {
+  right: -120px;
+  bottom: -140px;
+  opacity: 0.7;
+}
+
+@media (min-width: 761px) {
+  /* 左侧品牌面板已经放了 logo，右侧表单里那份就收起来。 */
+  .auth-shell .auth-card > .auth-brand {
     display: none;
   }
 }

@@ -122,6 +122,9 @@ func buildAgentTools(p agentToolPolicy) []agent.Tool {
 	// 子 agent 委派：还没到深度上限时才给这两个工具。
 	// 放在 confirm 包裹**之后**：委派本身不动用户文件，不该让用户再确认一次；
 	// 真正的风险操作发生在子 agent 内部，那里有更严的策略（见 web/subagent.go）。
+	if depth == 0 {
+		tools = append(tools, sessionRouterTool{policy: p})
+	}
 	runner := newSubagentRunner()
 	if depth < subagentMaxDepth() {
 		tools = append(tools,

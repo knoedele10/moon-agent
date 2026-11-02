@@ -138,7 +138,9 @@ func maybeCompactHistory(ctx context.Context, conv *model.Conversation, history 
 	// 距离上次摘要没攒够新消息就先用旧摘要顶着，避免每轮都重算。
 	// 距上次摘要没攒够新消息就先用旧摘要顶着，避免每轮都重算。
 	if !summarizeIsStale(rows[:cut], conv.SummaryUpto, compactMinNewMessages, strings.TrimSpace(conv.Summary) != "") {
-		out.History = toLLMMessages(rows[cut:])
+		// Only discard messages actually covered by the stored summary.
+		// New messages outside keepN have not been summarized yet.
+		out.History = toLLMMessages(uncoveredCompactRows(rows, conv.SummaryUpto))
 		out.Summary = strings.TrimSpace(conv.Summary)
 		out.Compacted = true
 		return out
@@ -238,4 +240,14 @@ func generateCompactSummary(ctx context.Context, modelID, key, previous string, 
 		return "", err
 	}
 	return clipRunes(strings.TrimSpace(out), compactMaxRunes), nil
+}
+
+// uncoveredCompactRows keeps the unsummarized gap as well as the recent tail.
+func uncoveredCompactRows(rows []model.Message, upto uint) []model.Message {
+	for i, row := range rows {
+		if row.Id > upto {
+			return rows[i:]
+		}
+	}
+	return nil
 }

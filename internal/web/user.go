@@ -22,6 +22,7 @@ func pageIndex(c *gin.Context) {
 	c.HTML(http.StatusOK, "chat/index.html", gin.H{
 		"Title":    "聊天",
 		"Username": u.Username,
+		"IsAdmin":  u.Role == "admin" || os.Getenv("ADMIN_USER_ID") == u.Id,
 	})
 }
 
@@ -35,12 +36,15 @@ func postLogin(c *gin.Context) {
 
 	var u model.User
 	err := model.DB.Where("username = ?", username).First(&u).Error
-	if err != nil || bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password)) != nil {
+	if err != nil || u.Status == "disabled" || bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password)) != nil {
 		c.HTML(http.StatusOK, "user/login.html", gin.H{"Title": "登录", "Error": "用户名或密码错误"})
 		return
 	}
 
-	setSession(c, u.Id)
+	if err := setSession(c, u.Id); err != nil {
+		c.HTML(http.StatusOK, "user/login.html", gin.H{"Title": "登录", "Error": "登录失败，请稍后重试"})
+		return
+	}
 	c.Redirect(http.StatusFound, "/")
 }
 
@@ -106,7 +110,12 @@ func postRegister(c *gin.Context) {
 		return
 	}
 
-	u := model.User{Username: username, Password: string(hash)}
+	role := "user"
+	var total int64
+	if model.DB.Model(&model.User{}).Count(&total).Error == nil && total == 0 {
+		role = "admin"
+	}
+	u := model.User{Username: username, Password: string(hash), Role: role, Status: "active"}
 	if err := model.DB.Create(&u).Error; err != nil {
 		msg := "注册失败，请稍后重试"
 		if strings.Contains(strings.ToLower(err.Error()), "duplicate") {
@@ -116,7 +125,10 @@ func postRegister(c *gin.Context) {
 		return
 	}
 
-	setSession(c, u.Id)
+	if err := setSession(c, u.Id); err != nil {
+		c.HTML(http.StatusOK, "user/login.html", gin.H{"Title": "登录", "Error": "注册成功，但自动登录失败，请手动登录"})
+		return
+	}
 	c.Redirect(http.StatusFound, "/")
 }
 

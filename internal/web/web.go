@@ -42,6 +42,7 @@ func Setup(r *gin.Engine, reg *llm.Registry) {
 	r.POST("/register", postRegister)
 	r.GET("/logout", logout)
 	r.GET("/settings", authRequired, pageSettings)
+	r.GET("/admin", authRequired, adminRequired, pageAdmin)
 
 	// 探活不鉴权：健康检查要在未登录时也能被探到（与 docs/api-contract.md 一致）。
 	r.GET("/api/health", health)
@@ -51,6 +52,11 @@ func Setup(r *gin.Engine, reg *llm.Registry) {
 
 	api := r.Group("/api", authRequired)
 	{
+		admin := api.Group("/admin", adminRequired)
+		admin.GET("/sessions", adminListSessions)
+		admin.POST("/sessions/:id/revoke", adminRevokeSession)
+		admin.POST("/users/:id/disable", adminDisableUser)
+		admin.POST("/users/:id/enable", adminEnableUser)
 		api.GET("/models", listModels)
 
 		api.GET("/conversations", listConversations)
