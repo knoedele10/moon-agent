@@ -85,7 +85,7 @@ func initSQLite() error {
 func autoMigrate() error {
 	if err := DB.AutoMigrate(&User{}, &UserSession{}, &UserKey{}, &Conversation{}, &Message{}, &KBDocument{}, &KBChunk{}, &AgentSetting{}, &KBMemoryEvent{}, &AgentSkill{}, &AgentPendingTool{}, &AgentAssistant{}, &AgentPrompt{}, &AgentProactiveState{}, &AgentProactiveMessage{}, &AgentSubagentRun{}, &AgentTeamTask{},
 		&ContentAsset{}, &ContentDraft{}, &ContentDraftVersion{}, &ContentDraftAsset{}, &ContentPublication{},
-		&AgentWakeup{}, &AgentUsage{}); err != nil {
+		&AgentWakeup{}, &AgentUsage{}, &QQChatBinding{}); err != nil {
 		return fmt.Errorf("migrate database: %w", err)
 	}
 	reclaimRunningSubagents()

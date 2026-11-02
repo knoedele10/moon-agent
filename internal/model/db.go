@@ -68,7 +68,9 @@ func initMySQL() error {
 		// 定时唤醒（到点让 agent 在该会话里跑一轮）：同样只增表。
 		&AgentWakeup{},
 		// token 账：按轮写入，会话接口再汇总。
-		&AgentUsage{}); err != nil {
+		&AgentUsage{},
+		// QQ 聊天 → 本地会话的绑定（OneBot 接入，见 docs/agent/17-qq-onebot.md）。
+		&QQChatBinding{}); err != nil {
 		if sqlDB, closeErr := DB.DB(); closeErr == nil {
 			_ = sqlDB.Close()
 		}

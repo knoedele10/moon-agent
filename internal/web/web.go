@@ -50,6 +50,10 @@ func Setup(r *gin.Engine, reg *llm.Registry) {
 	// CUA 的模型代理：子进程没有 session cookie，改用它自己的每 run Bearer token（契约 3）。
 	r.POST("/internal/cua/llm/v1/chat/completions", cuaLLMProxy)
 
+	// QQ 接入（OneBot v11 反向 WebSocket）：NapCat 等客户端没有 session cookie，
+	// 改用 QQ_ONEBOT_TOKEN 鉴权；未启用时返回 404（docs/agent/17-qq-onebot.md）。
+	r.GET("/onebot/v11/ws", qqOneBotWS)
+
 	api := r.Group("/api", authRequired)
 	{
 		admin := api.Group("/admin", adminRequired)
