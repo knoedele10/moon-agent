@@ -83,6 +83,12 @@ func saAcceptTicketImpl(ctx context.Context, req saAcceptReq) (model.AgentTask, 
 		conv.Model = saFrontModel(&conv)
 	}
 	kind, mode := saTicketAuthority(req, conv)
+	// 聊天档没有执行工具，而长任务至少按辅助工作执行（task_store 的既有规则）。
+	// 上限是聊天档时，任何任务的实际配置都会超过这份授权，所以只能拒单；
+	// 想给访客派活，由主人把 sa_policy.guest_kind 调高（契约 §3.5 的 Kind 上限）。
+	if !saActorIsOwner(req) && normalizeKind(kind) == KindChat {
+		return model.AgentTask{}, errors.New("发起人的接单上限是聊天档（guest_kind=chat），不能建工单；请主人调整接单策略")
+	}
 	roots := kindWorkspaceRootsFor(req.UserID, kind, agentFSRootsFor(req.UserID))
 	spec := saTicketSpec(req)
 	opt := taskCreateOptions{

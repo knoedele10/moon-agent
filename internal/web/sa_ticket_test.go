@@ -245,6 +245,20 @@ func TestSATicketGuestAuthorityLimit(t *testing.T) {
 	if err == nil {
 		t.Fatal("访客档位不应允许命令验收")
 	}
+
+	// 默认聊天档没有执行工具：任何任务都会超过这份授权，因此直接拒单。
+	h3 := newSATicketHarness(t, KindWork)
+	h3.makeOwner()
+	h3.policy = model.SAPolicy{UserID: h3.owner, Version: 1, AcceptMode: model.SAAcceptAuto,
+		GuestKind: KindChat, GuestMode: ModeConfirm, Rules: "[]"}
+	if _, err := h3.accept(h3.newTrigger("帮我整理数据并写报告", asGuest)); err == nil {
+		t.Fatal("guest_kind=chat 时不应建出工单（任务至少是 work 档）")
+	}
+	var n int64
+	h3.db.Model(&model.AgentTask{}).Count(&n)
+	if n != 0 {
+		t.Fatalf("拒单不应留下任务：%d", n)
+	}
 }
 
 // 2b. 本机主人用自己的设置（会话用途 + 自主档位），命令验收在自主档允许。
