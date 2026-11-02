@@ -210,18 +210,30 @@ func runTaskVerification(parent context.Context, task model.AgentTask) {
 	recordTaskEvent(task.Id, "verified", "验收结果："+result.Overall, result)
 	switch result.Overall {
 	case verdictPass:
+		// 验收期间又来了后续消息（前台可能已经认领并写进 outbox）：不能就这么结束，
+		// 否则那条消息会永远停在待投递里。回到执行轮先把它处理掉，再重新验收。
+		if pendingTaskOutbox(task.Id) > 0 {
+			if ok, _ := transitionTask(task.Id, []string{model.TaskVerifying}, map[string]any{
+				"status": model.TaskRunning, "stop_reason": "new_input", "verification": string(raw),
+				"next_run_at": time.Now(), "consecutive_failures": 0,
+			}); ok {
+				recordTaskEvent(task.Id, "new_input", "验收期间收到后续消息，先处理再重新验收", nil)
+				kickTaskScheduler()
+			}
+			return
+		}
 		if ok, _ := transitionTask(task.Id, []string{model.TaskVerifying}, map[string]any{
 			"status": model.TaskDone, "stop_reason": "verified", "verification": string(raw), "blocker": "",
 			"consecutive_failures": 0,
 		}); ok {
-			notifyTaskMain(task, "已通过全部验收条件，任务完成。\n交付概述："+clipRunes(sub.Summary, 1200)+"\n"+verificationText(result))
+			notifyTask(task, model.SAPurposeResult, "已通过全部验收条件，任务完成。\n交付概述："+clipRunes(sub.Summary, 1200)+"\n"+verificationText(result))
 		}
 	case verdictReview:
 		if ok, _ := transitionTask(task.Id, []string{model.TaskVerifying}, map[string]any{
 			"status": model.TaskReview, "stop_reason": "needs_review", "verification": string(raw),
 			"blocker": "有验收条件需要人工判断", "consecutive_failures": 0,
 		}); ok {
-			notifyTaskMain(task, "自动核对已通过，剩余条件需要人工审核：\n"+verificationText(result))
+			notifyTask(task, model.SAPurposeQuestion, "自动核对已通过，剩余条件需要人工审核：\n"+verificationText(result))
 		}
 	default:
 		attempts := task.VerifyAttempts + 1
@@ -231,7 +243,7 @@ func runTaskVerification(parent context.Context, task model.AgentTask) {
 				"blocker": fmt.Sprintf("验收连续 %d 次未通过，停止", attempts),
 			}); ok {
 				recordTaskEvent(task.Id, "failed", fmt.Sprintf("验收 %d 次未通过，停止", attempts), nil)
-				notifyTaskMain(task, fmt.Sprintf("验收连续 %d 次未通过，任务失败：\n%s", attempts, verificationText(result)))
+				notifyTask(task, model.SAPurposeQuestion, fmt.Sprintf("验收连续 %d 次未通过，任务失败：\n%s", attempts, verificationText(result)))
 			}
 			return
 		}

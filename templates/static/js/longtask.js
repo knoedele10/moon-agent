@@ -188,6 +188,16 @@
     detailEl.appendChild(nav);
     detailEl.appendChild(el('h3', 'lt-title', '#' + t.id + ' ' + t.title));
 
+    // 工单信息：来源与发起人（docs/agent/18-superagent.md §3.5）。普通长任务没有 mandate。
+    if (t.mandate) {
+      var m = t.mandate;
+      var meta = '来源：' + (m.source_label || m.source || '未知') + ' · 发起人 ' + (m.actor_id || '—') +
+        ' · 授权 ' + (m.strength || '—') + (m.policy_version ? '（策略 v' + m.policy_version + '）' : '');
+      if (m.withdrawn_at) meta += ' · 已被发起人叫停';
+      else if (m.revoked_at) meta += ' · 授权复核未通过';
+      detailEl.appendChild(el('div', 'lt-sub', meta));
+    }
+
     // 为什么停下 / 正在做什么
     var why = t.blocker || STOP_EXPLAIN[t.stop_reason] || t.stop_reason || '';
     if (t.status === 'running' && !t.blocker) why = (STOP_EXPLAIN[t.stop_reason] || '执行中') + (t.next_run_at ? '（下一轮：' + fmtTime(t.next_run_at) + '）' : '');

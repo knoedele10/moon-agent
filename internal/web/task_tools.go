@@ -17,7 +17,7 @@ import (
 // 它们只写任务行，不改变「是否完成」——完成与否由 task_verify.go 的宿主验收决定。
 
 func taskExecutorTools(st *taskRoundState) []agent.Tool {
-	return []agent.Tool{taskProgressTool{st: st}, taskSubmitTool{st: st}, taskBlockTool{st: st}}
+	return []agent.Tool{taskProgressTool{st: st}, taskSubmitTool{st: st}, taskBlockTool{st: st}, taskHandBackTool{st: st}}
 }
 
 func taskToolFail(msg string) (agent.Result, error) {
@@ -150,6 +150,54 @@ func (t taskBlockTool) Execute(ctx context.Context, raw json.RawMessage, _ *agen
 	t.st.blocked = clipRunes(why, 2000)
 	t.st.mu.Unlock()
 	return agent.Result{Content: "已标记为等待人工。", AwaitUser: why}, nil
+}
+
+// taskHandBackTool 把明显超出本任务范围的后续消息交回前台判断
+// （docs/agent/18-superagent.md §3.3）。它只对「已经扇出给本任务」的消息生效，
+// 不扩大授权，也不改变任务的验收。
+type taskHandBackTool struct{ st *taskRoundState }
+
+func (taskHandBackTool) Name() string { return "orchestrator_handback" }
+func (taskHandBackTool) Description() string {
+	return "把一条明显超出本任务范围的后续消息交回前台判断（例如用户在原对话里改成了另一件事）。" +
+		"只对经扇出交给本任务的后续消息使用；不要用它拒绝任务范围内的难活。"
+}
+func (taskHandBackTool) Parameters() map[string]any {
+	return map[string]any{"type": "object", "properties": map[string]any{
+		"trigger_id": map[string]any{"type": "integer", "description": "后续消息的 trigger id（消息里标注了 #id）"},
+		"reason":     map[string]any{"type": "string", "description": "为什么超出本任务范围，一句话"},
+	}, "required": []string{"trigger_id", "reason"}, "additionalProperties": false}
+}
+func (t taskHandBackTool) Execute(ctx context.Context, raw json.RawMessage, _ *agent.Exec) (agent.Result, error) {
+	var args struct {
+		TriggerID uint   `json:"trigger_id"`
+		Reason    string `json:"reason"`
+	}
+	if err := json.Unmarshal(raw, &args); err != nil || args.TriggerID == 0 || strings.TrimSpace(args.Reason) == "" {
+		return taskToolFail("需要 trigger_id 与 reason")
+	}
+	if model.DB == nil {
+		return taskToolFail("数据库未就绪")
+	}
+	var trig model.SATrigger
+	if err := model.DB.First(&trig, args.TriggerID).Error; err != nil {
+		return taskToolFail("找不到这条消息")
+	}
+	if trig.Disposition != model.SADispFannedOut {
+		return taskToolFail("这条消息不在任何工单名下")
+	}
+	if !saTaskSubscribesThread(t.st.task.Id, trig.ThreadID) {
+		return taskToolFail("这条消息不属于本任务")
+	}
+	if m, ok := saTaskMandate(t.st.task.Id); ok && m.OriginTriggerID == trig.Id {
+		return taskToolFail("不能把任务的原始消息交回")
+	}
+	if err := saHandBack(ctx, t.st.task.Id, trig, strings.TrimSpace(args.Reason)); err != nil {
+		return taskToolFail("交回失败：" + err.Error())
+	}
+	recordTaskEvent(t.st.task.Id, "handback", "执行端把消息交回前台判断："+clipRunes(args.Reason, 300),
+		map[string]any{"trigger_id": trig.Id})
+	return agent.Result{Content: fmt.Sprintf("已把消息 #%d 交回前台判断。", trig.Id)}, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -294,8 +342,10 @@ func applyTaskAction(task model.AgentTask, action string, in taskActionInput) (m
 			map[string]any{"status": model.TaskCanceled, "stop_reason": "canceled_by_user", "blocker": "用户已取消"})
 		if ok {
 			cancelTaskRun(task.Id)
+			// 取消一份工单 = 收回授权：之后的消息不再认领给它（契约 §3.5）。
+			_ = saWithdrawMandate(task.Id, "用户在任务面板取消了工单")
 			recordTaskEvent(task.Id, "canceled", "用户取消了任务；不会再启动新步骤", nil)
-			notifyTaskMain(task, "已被用户取消（未完成）。")
+			notifyTask(task, model.SAPurposeNotice, "已被用户取消（未完成）。")
 		}
 	case "retry":
 		updates := map[string]any{"status": model.TaskRunning, "stop_reason": "retry", "next_run_at": now,
@@ -350,7 +400,7 @@ func applyTaskAction(task model.AgentTask, action string, in taskActionInput) (m
 			ok, err = transitionTask(task.Id, []string{model.TaskReview}, map[string]any{"status": model.TaskDone, "stop_reason": "approved", "verification": string(raw), "blocker": ""})
 			if ok {
 				recordTaskEvent(task.Id, "approved", "用户审核通过，任务完成", nil)
-				notifyTaskMain(task, "人工审核通过，任务已完成。")
+				notifyTask(task, model.SAPurposeResult, "人工审核通过，任务已完成。")
 			}
 		} else {
 			reason := strings.TrimSpace(in.Message)

@@ -177,10 +177,31 @@ func agentIntEnvOr(name string, fallback int) int {
 }
 
 // createTask 建执行对话 + 任务行 + 首条任务说明（outbox），然后提醒调度器。
+// 工单线要在同一个事务里追加 Mandate 与订阅，所以真正的建任务逻辑在 createTaskTx。
 func createTask(spec taskSpec, opt taskCreateOptions) (model.AgentTask, error) {
 	if model.DB == nil {
 		return model.AgentTask{}, errors.New("数据库未初始化")
 	}
+	var task model.AgentTask
+	err := model.DB.Transaction(func(tx *gorm.DB) error {
+		t, err := createTaskTx(tx, spec, opt)
+		if err != nil {
+			return err
+		}
+		task = t
+		return nil
+	})
+	if err != nil {
+		return model.AgentTask{}, err
+	}
+	recordTaskEvent(task.Id, "created", "任务已创建，执行对话 #"+strconv.FormatUint(uint64(task.ExecConversationID), 10), nil)
+	kickTaskScheduler()
+	return task, nil
+}
+
+// createTaskTx 在调用方的事务里建执行对话、任务行与首条任务说明。
+// 不写事件、不唤醒调度器：调用方提交后再做，避免事务回滚却留下通知。
+func createTaskTx(tx *gorm.DB, spec taskSpec, opt taskCreateOptions) (model.AgentTask, error) {
 	if strings.TrimSpace(opt.UserID) == "" {
 		return model.AgentTask{}, errors.New("缺少用户")
 	}
@@ -190,7 +211,7 @@ func createTask(spec taskSpec, opt taskCreateOptions) (model.AgentTask, error) {
 	}
 	if opt.MainConversationID != 0 {
 		var main model.Conversation
-		if err := model.DB.Where("id = ? AND user_id = ?", opt.MainConversationID, opt.UserID).First(&main).Error; err != nil {
+		if err := tx.Where("id = ? AND user_id = ?", opt.MainConversationID, opt.UserID).First(&main).Error; err != nil {
 			return model.AgentTask{}, errors.New("主对话不存在")
 		}
 		if strings.TrimSpace(opt.Model) == "" {
@@ -225,22 +246,17 @@ func createTask(spec taskSpec, opt taskCreateOptions) (model.AgentTask, error) {
 		d := now.Add(time.Duration(spec.DeadlineMinutes) * time.Minute)
 		task.Deadline = &d
 	}
-	err = model.DB.Transaction(func(tx *gorm.DB) error {
-		exec := model.Conversation{UserID: opt.UserID, Title: "任务：" + spec.Title, Model: opt.Model, Kind: opt.Kind}
-		if err := tx.Create(&exec).Error; err != nil {
-			return fmt.Errorf("创建执行对话失败：%w", err)
-		}
-		task.ExecConversationID = exec.Id
-		if err := tx.Create(&task).Error; err != nil {
-			return fmt.Errorf("创建任务失败：%w", err)
-		}
-		return enqueueTaskMessageTx(tx, task.Id, "goal", taskBriefMessage(task, spec.Criteria), fmt.Sprintf("t%d:goal", task.Id))
-	})
-	if err != nil {
+	exec := model.Conversation{UserID: opt.UserID, Title: "任务：" + spec.Title, Model: opt.Model, Kind: opt.Kind}
+	if err := tx.Create(&exec).Error; err != nil {
+		return model.AgentTask{}, fmt.Errorf("创建执行对话失败：%w", err)
+	}
+	task.ExecConversationID = exec.Id
+	if err := tx.Create(&task).Error; err != nil {
+		return model.AgentTask{}, fmt.Errorf("创建任务失败：%w", err)
+	}
+	if err := enqueueTaskMessageTx(tx, task.Id, "goal", taskBriefMessage(task, spec.Criteria), fmt.Sprintf("t%d:goal", task.Id)); err != nil {
 		return model.AgentTask{}, err
 	}
-	recordTaskEvent(task.Id, "created", "任务已创建，执行对话 #"+strconv.FormatUint(uint64(task.ExecConversationID), 10), nil)
-	kickTaskScheduler()
 	return task, nil
 }
 
@@ -452,10 +468,56 @@ func recordTaskEvent(taskID uint, kind, message string, data any) {
 	}
 }
 
-// notifyTaskMain 把任务的阶段性结局写进主对话（role=subagent，下一轮会作为上下文读到）。
+// notifyTaskMain 把任务的阶段性结局告诉用户。有 Mandate 的（工单）经发件箱发回原对话；
+// 其余（界面/主对话建的长任务）仍写主对话的 role=subagent 消息，保持原行为。
 // 只写不唤醒：任务的推进由任务调度器负责，主对话不必为每个状态变化跑一轮模型。
 func notifyTaskMain(t model.AgentTask, text string) {
-	if t.MainConversationID == 0 || strings.TrimSpace(text) == "" {
+	notifyTask(t, saPurposeForStatus(t.Status), text)
+}
+
+// saPurposeForStatus 给通知挑一个发件箱用途。调用点知道更准确的语义时可以显式传。
+func saPurposeForStatus(status string) string {
+	switch status {
+	case model.TaskDone:
+		return model.SAPurposeResult
+	case model.TaskWaitingHuman, model.TaskReview, model.TaskFailed, model.TaskBudgetExhausted:
+		return model.SAPurposeQuestion
+	}
+	return model.SAPurposeNotice
+}
+
+// notifyTask 是通知的唯一出口。工单通知带 dedupe=task:<id>:<状态>:<revision>：
+// 同一次状态变化重复通知只发一次，重试后又失败（revision 变了）才再发。
+func notifyTask(t model.AgentTask, purpose, text string) {
+	if strings.TrimSpace(text) == "" {
+		return
+	}
+	if threadID, active, hasMandate := taskOriginThread(t.Id); hasMandate {
+		if !active {
+			log.Printf("[sa] 工单任务 %d 的授权已失效，丢弃通知：%s", t.Id, clipRunes(text, 120))
+			return
+		}
+		cur, err := loadTask(t.Id)
+		if err != nil {
+			cur = t
+		}
+		replyTo := uint(0)
+		if m, ok := saTaskMandate(t.Id); ok {
+			replyTo = m.OriginTriggerID
+		}
+		_, err = saEnqueueOutbound(saOutboundReq{
+			UserID: t.UserID, ThreadID: threadID, TaskID: t.Id,
+			Purpose: purpose, Text: fmt.Sprintf("【任务 #%d %s】%s", t.Id, t.Title, text),
+			ReplyToTriggerID: replyTo,
+			DedupeKey:        fmt.Sprintf("task:%d:%s:%d", t.Id, cur.Status, cur.Revision),
+		})
+		if err != nil {
+			log.Printf("[sa] 工单任务 %d 的通知入队失败：%v", t.Id, err)
+			recordTaskEvent(t.Id, "outbound_error", "通知入队失败："+err.Error(), nil)
+		}
+		return
+	}
+	if t.MainConversationID == 0 {
 		return
 	}
 	saveChatMessage(t.MainConversationID, subagentMessageRole, fmt.Sprintf("【任务 #%d %s】%s", t.Id, t.Title, text))

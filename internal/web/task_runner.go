@@ -183,6 +183,21 @@ func runTaskStep(parent context.Context, id uint) {
 	if err != nil {
 		return
 	}
+	// 工单的授权是执行的前提：被发起人叫停（withdrawn）或复核失败（revoked）后，
+	// 不再启动任何新步骤。这是宿主检查，模型和提示词都改不了。
+	if status, reason, blocked := taskMandateStopped(task.Id); blocked {
+		blocker := "发起人已叫停这份工单"
+		if status == model.TaskFailed {
+			blocker = "工单授权复核未通过"
+		}
+		if ok, _ := transitionTask(task.Id, []string{model.TaskRunning, model.TaskVerifying}, map[string]any{
+			"status": status, "stop_reason": reason, "blocker": blocker,
+		}); ok {
+			cancelTaskRun(task.Id)
+			recordTaskEvent(task.Id, reason, blocker, nil)
+		}
+		return
+	}
 	switch task.Status {
 	case model.TaskRunning:
 		runTaskRound(parent, task)
@@ -217,8 +232,24 @@ func markBudgetExhausted(t model.AgentTask, code, why string) {
 	})
 	if ok {
 		recordTaskEvent(t.Id, "budget_exhausted", why, nil)
-		notifyTaskMain(t, "预算耗尽，任务**未完成**："+why+"。最近进度："+clipRunes(t.Progress, 400)+"。可在任务面板追加预算后重试。")
+		notifyTask(t, model.SAPurposeQuestion, "预算耗尽，任务**未完成**："+why+"。最近进度："+clipRunes(t.Progress, 400)+"。可在任务面板追加预算后重试。")
 	}
+}
+
+// taskMandateStopped 检查工单授权是否已被收回（人叫停）或吊销（复核失败）。
+// 没有 Mandate 的长任务（界面/主对话直接建）不受影响。
+func taskMandateStopped(taskID uint) (status, reason string, stopped bool) {
+	m, ok := saTaskMandate(taskID)
+	if !ok {
+		return "", "", false
+	}
+	if m.WithdrawnAt != nil {
+		return model.TaskCanceled, "mandate_withdrawn", true
+	}
+	if m.RevokedAt != nil {
+		return model.TaskFailed, "mandate_revoked", true
+	}
+	return "", "", false
 }
 
 // ---------------------------------------------------------------------------
@@ -390,7 +421,8 @@ func taskCard(t model.AgentTask, reconcile string) string {
 		"- 你的「完成了」不算完成：只有 task_submit 后宿主逐项验收通过，任务才结束。\n" +
 		"- 每完成一个阶段调用 task_update_progress（progress + done_steps）；这是重启和压缩后恢复的依据。\n" +
 		"- 不要只写计划然后停下；能执行就直接执行。\n" +
-		"- 缺少登录、权限、密钥或只有用户能做的决定时，调用 task_block 说明需要人做什么，然后结束本轮。\n")
+		"- 缺少登录、权限、密钥或只有用户能做的决定时，调用 task_block 说明需要人做什么，然后结束本轮。\n" +
+		"- 后续消息（【来自原对话的后续消息】）如果明显换成了另一件事、超出本任务范围，用 orchestrator_handback 交回前台判断，不要硬做。\n")
 	return b.String()
 }
 
@@ -552,7 +584,7 @@ func runTaskRound(parent context.Context, task model.AgentTask) {
 			"status": model.TaskWaitingHuman, "stop_reason": "need_human", "blocker": clipRunes(why, 2000), "next_run_at": nil,
 		}); ok {
 			recordTaskEvent(task.Id, "need_human", why, nil)
-			notifyTaskMain(task, "需要人工处理后才能继续："+clipRunes(why, 600)+"。在任务面板补充信息后会自动继续。")
+			notifyTask(task, model.SAPurposeQuestion, "需要人工处理后才能继续："+clipRunes(why, 600)+"。在任务面板补充信息后会自动继续。")
 		}
 	default:
 		// 模型自然收尾却没提交：宿主判定未完成，自动投递续跑消息。
@@ -730,7 +762,7 @@ func failTaskStep(id uint, cause error, transient bool) {
 			"last_error": msg, "blocker": fmt.Sprintf("连续失败 %d 次后停止：%s", n, msg),
 		}); ok {
 			recordTaskEvent(id, "failed", fmt.Sprintf("连续失败 %d 次，停止：%s", n, msg), nil)
-			notifyTaskMain(t, fmt.Sprintf("连续失败 %d 次已停止（任务未完成）：%s", n, clipRunes(msg, 300)))
+			notifyTask(t, model.SAPurposeQuestion, fmt.Sprintf("连续失败 %d 次已停止（任务未完成）：%s", n, clipRunes(msg, 300)))
 		}
 		return
 	}

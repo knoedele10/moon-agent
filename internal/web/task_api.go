@@ -37,6 +37,27 @@ func taskView(t model.AgentTask, full bool) gin.H {
 		"actions": taskAllowedActions(t.Status),
 	}
 	if full {
+		// 工单信息：来源、发起人、授权强度与订阅（docs/agent/18-superagent.md §3.5）。
+		// 只读展示，不能通过这里改授权。
+		if m, ok := saTaskMandate(t.Id); ok {
+			h["mandate"] = gin.H{
+				"source": m.Source, "source_label": taskSourceLabel(m.Source),
+				"actor_id": m.ActorID, "thread_id": m.ThreadID,
+				"strength": m.Strength, "kind": m.Kind, "mode": m.Mode,
+				"scope": m.Scope, "policy_version": m.PolicyVersion,
+				"origin_trigger_id": m.OriginTriggerID,
+				"matched_rules":     saJSONStrings(m.MatchedRules),
+				"withdrawn_at":      m.WithdrawnAt, "revoked_at": m.RevokedAt,
+				"end_reason": m.EndReason, "created_at": m.CreatedAt,
+			}
+			var subs []model.SASubscription
+			model.DB.Where("task_id = ? AND dropped_at IS NULL", t.Id).Order("id asc").Find(&subs)
+			sv := make([]gin.H, 0, len(subs))
+			for _, s := range subs {
+				sv = append(sv, gin.H{"thread_id": s.ThreadID, "role": s.Role, "created_at": s.CreatedAt})
+			}
+			h["subscriptions"] = sv
+		}
 		var rounds []model.AgentTaskRound
 		model.DB.Where("task_id = ?", t.Id).Order("id desc").Limit(30).Find(&rounds)
 		rv := make([]gin.H, 0, len(rounds))
