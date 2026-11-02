@@ -550,6 +550,9 @@ func runAgentChat(in turnInput) {
 	if depth == 0 && normalizeMode(mode) != ModePlan && (profileFor(kind).Tools == nil || profileFor(kind).Tools["orchestrator_route"]) {
 		systemPrompt += sessionRouterPrompt
 	}
+	if depth == 0 && normalizeMode(mode) != ModePlan && normalizeKind(kind) != KindChat {
+		systemPrompt += taskManagePrompt
+	}
 
 	systemPrompt += skillPromptBlock(userID)
 	// 画像每轮都带上（短且稳定）；零散记忆再按相关度补充。
@@ -900,6 +903,21 @@ func unmarkConversationBusy(id uint) {
 		convBusy[id]--
 	}
 	convBusyMu.Unlock()
+}
+
+// tryMarkConversationBusy 是「检查 + 登记」的原子版本：会话空闲才登记并返回 true。
+// 后台任务轮次用它，保证不会和用户手动发起的一轮、或另一个后台轮次在同一会话里并发。
+func tryMarkConversationBusy(id uint) bool {
+	if id == 0 {
+		return false
+	}
+	convBusyMu.Lock()
+	defer convBusyMu.Unlock()
+	if convBusy[id] > 0 {
+		return false
+	}
+	convBusy[id] = 1
+	return true
 }
 
 func conversationBusy(id uint) bool {

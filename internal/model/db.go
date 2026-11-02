@@ -77,6 +77,20 @@ func initMySQL() error {
 		DB = nil
 		return fmt.Errorf("migrate database: %w", err)
 	}
+	if err := DB.AutoMigrate(TaskModels()...); err != nil {
+		if sqlDB, closeErr := DB.DB(); closeErr == nil {
+			_ = sqlDB.Close()
+		}
+		DB = nil
+		return fmt.Errorf("migrate task tables: %w", err)
+	}
+	if err := DB.AutoMigrate(SAModels()...); err != nil {
+		if sqlDB, closeErr := DB.DB(); closeErr == nil {
+			_ = sqlDB.Close()
+		}
+		DB = nil
+		return fmt.Errorf("migrate superagent tables: %w", err)
+	}
 	reclaimRunningSubagents()
 	dropLegacySHAIndex()
 	// v2 的索引对账：把老库上 child_conversation_id 的唯一索引降级（续跑要同一子会话多行 run）。

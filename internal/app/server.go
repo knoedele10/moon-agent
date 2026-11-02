@@ -56,6 +56,9 @@ func Run(ctx context.Context) error {
 	// 定时唤醒：到点让 agent 在目标会话里自己跑一轮（见 docs/agent/12-wakeup.md）。
 	web.StartWakeupScheduler(ctx)
 	defer web.StopWakeupScheduler()
+	// 长任务：启动对账（中断轮次 → 先核对现场再续跑），然后自动推进到验收或明确停止。
+	web.StartTaskScheduler(ctx)
+	defer web.StopTaskScheduler()
 	log.Printf("READY http://%s", ln.Addr().String())
 	return serve(ctx, ln, r)
 }

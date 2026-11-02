@@ -131,6 +131,22 @@ func midLoopCompactTokens() int {
 	return midLoopCompactTokensDefault
 }
 
+// midLoopThreshold 选本次运行的循环内压缩阈值：显式环境变量优先，
+// 其次按调用方给的模型窗口（Config.ContextTokens）的 60%，最后回落全局默认。
+// 这样长任务换到小窗口模型时会更早压缩，而不是等上游拒绝请求。
+func midLoopThreshold(cfg Config) int {
+	if n, err := strconv.Atoi(strings.TrimSpace(os.Getenv("AGENT_MIDLOOP_COMPACT_TOKENS"))); err == nil && n > 0 {
+		return n
+	}
+	if cfg.ContextTokens > 0 {
+		return cfg.ContextTokens * 3 / 5
+	}
+	return midLoopCompactTokens()
+}
+
+// EstimateMessagesTokens 对外暴露同一套粗估口径，供 web 层按模型窗口决定入口压缩。
+func EstimateMessagesTokens(msgs []llm.Message) int { return estimateMessagesTokens(msgs) }
+
 // ---------------------------------------------------------------------------
 // 工作集（压缩时保留的确定性事实）
 // ---------------------------------------------------------------------------

@@ -1686,6 +1686,9 @@
   window.CHAT.openConversation = function (id, parentId, title) {
     return openConversation(Number(id), true, parentId, title);
   };
+  // 长任务面板（longtask.js）按当前会话过滤任务。
+  window.CHAT.currentConversationId = function () { return state.currentId; };
+  window.CHAT.currentModel = function () { return els.modelSelect ? els.modelSelect.value : ''; };
   // 任务看板只读当前会话快照，不直接依赖 chat.js 的内部变量。
   // historyCache 中保留最近一次服务端校对后的消息，DOM 则补上当前尚未落库的流式内容。
   window.CHAT.getTaskSnapshot = function () {

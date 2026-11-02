@@ -88,6 +88,12 @@ func autoMigrate() error {
 		&AgentWakeup{}, &AgentUsage{}, &QQChatBinding{}); err != nil {
 		return fmt.Errorf("migrate database: %w", err)
 	}
+	if err := DB.AutoMigrate(TaskModels()...); err != nil {
+		return fmt.Errorf("migrate task tables: %w", err)
+	}
+	if err := DB.AutoMigrate(SAModels()...); err != nil {
+		return fmt.Errorf("migrate superagent tables: %w", err)
+	}
 	reclaimRunningSubagents()
 	return nil
 }
