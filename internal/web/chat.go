@@ -302,12 +302,44 @@ func postChat(c *gin.Context) {
 
 	// 模式取自**会话本身**（不是请求），这样客户端不传时行为也不会漂移。
 	setConversationKind(c, conv.Kind)
-	if err := model.DB.Create(&model.Message{
+	userMessage := model.Message{
 		ConversationID: conv.Id,
 		Role:           "user",
 		Content:        body.Content,
-	}).Error; err != nil {
+	}
+	if err := model.DB.Create(&userMessage).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存消息失败"})
+		return
+	}
+
+	// Persist the browser event before routing it through Superagent. Inline
+	// ingestion lets an active ticket claim the message without starting a
+	// second foreground run; ordinary chat continues through streamReply.
+	ingest, ingestErr := saIngest(c.Request.Context(), saTriggerIn{
+		UserID:         userID,
+		Source:         model.SASourceWeb,
+		SourceMsgID:    strconv.FormatUint(uint64(userMessage.Id), 10),
+		ThreadKey:      "web:conv:" + strconv.FormatUint(uint64(conv.Id), 10),
+		ThreadLabel:    conv.Title,
+		ConversationID: conv.Id,
+		ActorID:        userID,
+		ActorKind:      model.SAActorHuman,
+		Addressed:      model.SAAddressedDirect,
+		Text:           body.Content,
+		Raw:            body.Content,
+		Inline:         true,
+	})
+	if ingestErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": ingestErr.Error()})
+		return
+	}
+	if len(ingest.FannedOut) > 0 {
+		sse := startSSE(c)
+		if sse == nil {
+			return
+		}
+		sse.send("delta", gin.H{"content": fmt.Sprintf("已转交任务 #%d", ingest.FannedOut[0])})
+		sse.send("done", gin.H{})
 		return
 	}
 	// The browser creates a conversation before opening the stream so it can
