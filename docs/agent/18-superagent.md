@@ -56,6 +56,8 @@
 
 - `ThreadKey`：`web:conv:<会话id>`、`qq:private:<QQ号>`、`qq:group:<群号>`。一个 Thread 一个前台会话
   （`sa_thread.conversation_id`）；QQ 的 `/new` 只换前台会话，Thread 不变。旧 `qq_chat_binding` 迁移进来后不再写。
+- 适配器本地命令（`/new`、`/help`）不进入判断，但同样要过 gate：只有 explicit 的发送者能用；群里的 `/new`
+  还要求是主人或名单内的人。被拒的命令不回话，按普通消息入库。服务端没有任何账号时只写日志，不回话。
 - Trigger 以 `(source, source_msg_id)` 去重：重复事件返回 `Duplicate=true`，不再扇出、不再判断。
 - 机器人自己发的消息在适配器里丢掉，不入库。
 - 网页来源 `Inline=true`：`postChat` 存完 user 消息后调 `saIngest`（`source_msg_id` = message.id）；

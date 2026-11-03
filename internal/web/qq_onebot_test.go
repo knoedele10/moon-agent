@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -109,26 +110,29 @@ func stubQQ(t *testing.T) (*qqSent, *[]string) {
 	t.Helper()
 	sent := &qqSent{}
 	var inputs []string
-	oldRun, oldDispatch := qqRunTurn, qqDispatch
-	qqRunTurn = func(_ context.Context, conv *model.Conversation, _ string, content string) (string, error) {
+	// inputs 记录前台轮次：适配器自己不跑轮次，普通消息只入库，轮次由判断环节决定。
+	saSwap(t, &saRunFrontTurn, func(_ context.Context, _ model.SAThread, content string) (string, error) {
+		sent.mu.Lock()
 		inputs = append(inputs, content)
-		saveChatMessage(conv.Id, "user", content)
+		sent.mu.Unlock()
 		return "回复:" + content, nil
-	}
-	qqDispatch = func(_ qqEvent, text string) {
+	})
+	saSwap(t, &qqDispatch, func(_ qqEvent, text string) {
 		sent.mu.Lock()
 		sent.msgs = append(sent.msgs, text)
 		sent.mu.Unlock()
-	}
-	t.Cleanup(func() { qqRunTurn, qqDispatch = oldRun, oldDispatch })
+	})
 	return sent, &inputs
 }
 
 func TestQQHandleMessageBindsConversation(t *testing.T) {
-	// /new 仍然只换这个聊天的前台会话。普通消息即使 SA 表还没迁上，也不再回退到
-	// 旧白名单和直接跑轮次。
-	setupQQTestDB(t)
+	// /new 仍然只换这个聊天的前台会话，但只对过了准入的人生效；
+	// 普通消息不再回退到旧白名单和直接跑轮次。
+	setupSATestDB(t)
+	t.Setenv("QQ_ALLOW_USERS", "200")
+	t.Setenv("QQ_ALLOW_GROUPS", "300")
 	sent, inputs := stubQQ(t)
+	stubSAIngressSideEffects(t)
 	cfg := qqConfig{UserID: "u1", Model: "m1", Kind: KindChat, AllowUsers: qqIDSet("200"), AllowGroups: qqIDSet("300"), Timeout: time.Minute}
 
 	renew := qqEvent{PostType: "message", MessageType: "private", SelfID: "100", UserID: "200", Message: json.RawMessage(`"/new"`)}
@@ -166,10 +170,60 @@ func TestQQHandleMessageBindsConversation(t *testing.T) {
 	}
 }
 
+// 本地命令也要过准入：陌生人的 /help、/new 不回话、不重置会话，只按普通消息入库；
+// 群里能 @ 的名单外成员可以 /help，但不能 /new 重置大家共用的前台会话。
+func TestQQCommandsRequireAdmission(t *testing.T) {
+	setupSATestDB(t)
+	model.DB.Create(&model.User{Id: "u1", Username: "owner"})
+	t.Setenv("QQ_OWNER", "42")
+	t.Setenv("QQ_ALLOW_USERS", "200")
+	t.Setenv("QQ_ALLOW_GROUPS", "300") // 默认策略：群里名单外 @ 为 explicit
+	sent, _ := stubQQ(t)
+	stubSAIngressSideEffects(t)
+	cfg := qqConfig{UserID: "u1", Model: "m1", Kind: KindChat, Timeout: time.Minute}
+	priv := func(user, text string, id int) qqEvent {
+		return qqTestEvent(t, fmt.Sprintf(`{"post_type":"message","message_type":"private","self_id":100,"user_id":%s,"message_id":%d,"message":[{"type":"text","data":{"text":%q}}]}`, user, id, text))
+	}
+	group := func(user, text string, id int) qqEvent {
+		return qqTestEvent(t, fmt.Sprintf(`{"post_type":"message","message_type":"group","self_id":100,"user_id":%s,"group_id":300,"message_id":%d,"message":[{"type":"at","data":{"qq":"100"}},{"type":"text","data":{"text":%q}}]}`, user, id, text))
+	}
+
+	qqHandleMessage(cfg, priv("999", "/help", 1))
+	qqHandleMessage(cfg, priv("999", "/new", 2))
+	if got := sent.all(); len(got) != 0 {
+		t.Fatalf("陌生人的命令不应回话: %q", got)
+	}
+	var n int64
+	model.DB.Model(&model.SATrigger{}).Where("actor_id = ?", "999").Count(&n)
+	if n != 2 {
+		t.Fatalf("被拒的命令应按普通消息入库交给 gate: %d", n)
+	}
+	model.DB.Model(&model.QQChatBinding{}).Count(&n)
+	if n != 0 {
+		t.Fatal("陌生人的 /new 不应建会话")
+	}
+
+	qqHandleMessage(cfg, group("777", "/help", 3)) // 名单外，但群里 @ 是 explicit
+	qqHandleMessage(cfg, group("777", "/new", 4))  // 不能重置群会话
+	qqHandleMessage(cfg, group("200", "/new", 5))  // 名单内可以
+	qqHandleMessage(cfg, priv("42", "/new", 6))    // 主人私聊可以（不在名单里也行）
+	got := sent.all()
+	if len(got) != 3 || got[0] != qqHelpText || got[1] != "好的，已开始新的对话。" || got[2] != "好的，已开始新的对话。" {
+		t.Fatalf("sent = %q", got)
+	}
+	model.DB.Model(&model.SATrigger{}).Where("actor_id = ? AND text = ?", "777", "/new").Count(&n)
+	if n != 1 {
+		t.Fatal("群里名单外成员的 /new 应按普通消息入库")
+	}
+}
+
 func TestQQOneBotWSRoundTrip(t *testing.T) {
-	setupQQTestDB(t)
+	setupSATestDB(t)
 	_, _ = stubQQ(t)
+	stubSAIngressSideEffects(t)
 	qqDispatch = qqSend // 走真实发送，验证动作帧
+	// 最后注册、最先执行：先等处理中的入站消息结束，再还原假实现、拆库。
+	t.Cleanup(qqHandlers.Wait)
 	gin.SetMode(gin.TestMode)
 	t.Setenv("QQ_ONEBOT_ENABLED", "1")
 	t.Setenv("QQ_ONEBOT_TOKEN", "secret")
@@ -194,8 +248,11 @@ func TestQQOneBotWSRoundTrip(t *testing.T) {
 	if err := ws.WriteMessage(websocket.TextMessage, []byte(`{"post_type":"meta_event","meta_event_type":"heartbeat","self_id":100}`)); err != nil {
 		t.Fatal(err)
 	}
-	// /help 仍走适配器本地回复，且不看白名单（999 不在 QQ_ALLOW_USERS 里）。
-	if err := ws.WriteMessage(websocket.TextMessage, []byte(`{"post_type":"message","message_type":"private","self_id":100,"user_id":999,"message_id":7,"message":[{"type":"text","data":{"text":"/help"}}]}`)); err != nil {
+	// 陌生人（999 不在名单里）的 /help 不回帧；名单内（200）的 /help 走适配器本地回复。
+	if err := ws.WriteMessage(websocket.TextMessage, []byte(`{"post_type":"message","message_type":"private","self_id":100,"user_id":999,"message_id":6,"message":[{"type":"text","data":{"text":"/help"}}]}`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := ws.WriteMessage(websocket.TextMessage, []byte(`{"post_type":"message","message_type":"private","self_id":100,"user_id":200,"message_id":7,"message":[{"type":"text","data":{"text":"/help"}}]}`)); err != nil {
 		t.Fatal(err)
 	}
 	_ = ws.SetReadDeadline(time.Now().Add(5 * time.Second))
@@ -212,7 +269,7 @@ func TestQQOneBotWSRoundTrip(t *testing.T) {
 	if err := ws.ReadJSON(&frame); err != nil {
 		t.Fatal(err)
 	}
-	if frame.Action != "send_private_msg" || frame.Params.UserID != 999 || len(frame.Params.Message) != 1 || frame.Params.Message[0].Data["text"] != qqHelpText {
+	if frame.Action != "send_private_msg" || frame.Params.UserID != 200 || len(frame.Params.Message) != 1 || frame.Params.Message[0].Data["text"] != qqHelpText {
 		t.Fatalf("frame = %+v", frame)
 	}
 	// 普通消息不直接回帧：没有 SA 表时也不再跑一轮。
@@ -325,14 +382,14 @@ func TestQQAddressedSkipsAllowlistAndDoesNotDispatch(t *testing.T) {
 	if len(*inputs) != 0 {
 		t.Fatalf("不应直接跑轮次: %q", *inputs)
 	}
-	got := sent.all()
-	if len(got) != 1 || got[0] != qqHelpText {
-		t.Fatalf("只有 /help 可以本地回复: %q", got)
+	// 名单外的人连 /help 也不回话：本地命令同样要过准入，被拒就按普通消息入库。
+	if got := sent.all(); len(got) != 0 {
+		t.Fatalf("名单外的人不应收到任何本地回复: %q", got)
 	}
 	var n int64
-	model.DB.Model(&model.SATrigger{}).Where("source_msg_id IN ?", []string{"3", "4"}).Count(&n)
-	if n != 2 {
-		t.Fatalf("名单外的消息也应入库, count=%d", n)
+	model.DB.Model(&model.SATrigger{}).Where("source_msg_id IN ?", []string{"3", "4", "5"}).Count(&n)
+	if n != 3 {
+		t.Fatalf("名单外的消息（含被拒的 /help）也应入库, count=%d", n)
 	}
 	var priv model.SATrigger
 	if err := model.DB.Where("source_msg_id = ?", "3").First(&priv).Error; err != nil {
@@ -380,6 +437,7 @@ func TestQQReplyToMsgIDArrayAndCQ(t *testing.T) {
 
 func TestQQNewSwitchesForegroundSession(t *testing.T) {
 	setupSATestDB(t)
+	t.Setenv("QQ_ALLOW_USERS", "200") // /new 需要过准入
 	sent, inputs := stubQQ(t)
 	stubSAIngressSideEffects(t)
 	cfg := qqConfig{UserID: "u1", Model: "m1", Kind: KindChat}

@@ -29,7 +29,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"blog-my/internal/llm"
 	"blog-my/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -470,10 +469,17 @@ func qqOneBotWS(c *gin.Context) {
 			qqSetConn(selfID, conn)
 		}
 		if ev.PostType == "message" {
-			go qqHandleMessage(cfg, ev)
+			qqHandlers.Add(1)
+			go func() {
+				defer qqHandlers.Done()
+				qqHandleMessage(cfg, ev)
+			}()
 		}
 	}
 }
+
+// qqHandlers 记着在处理中的入站消息（每条一个 goroutine）；测试收尾时等它们结束再还原依赖。
+var qqHandlers sync.WaitGroup
 
 // ---------------------------------------------------------------------------
 // 消息处理
@@ -481,12 +487,8 @@ func qqOneBotWS(c *gin.Context) {
 
 const qqHelpText = "我是接在 QQ 上的助手。\n直接发消息和我聊（群里请 @我）。\n/new 开始新对话（清空上下文）\n/help 显示这条说明"
 
-// qqRunTurn 是旧的「适配器里直接跑一轮」。普通消息不再调用它：回复只经发件箱。
-// 变量留下来，是为了既有测试还能把旧轮次换成桩，而不会在入口被重新接上。
-var qqRunTurn = qqRunAgentTurn
-
-// qqDispatch 只服务适配器本地命令（/new、/help）和「还没有本地账号」的提示。
-// 普通消息的业务回复不得走这里。测试可以把它换成记录桩。
+// qqDispatch 只服务适配器本地命令（/new、/help）。普通消息的业务回复不得走这里。
+// 测试可以把它换成记录桩。
 var qqDispatch = qqSend
 
 func qqHandleMessage(cfg qqConfig, ev qqEvent) {
@@ -506,22 +508,8 @@ func qqHandleMessage(cfg qqConfig, ev qqEvent) {
 		userID = ownerUserID()
 	}
 	if userID == "" {
-		qqDispatch(ev, "服务端还没有任何账号，请先在网页上注册。")
-		return
-	}
-
-	// /new 与 /help 是适配器本地命令，不进入判断。除此之外不看白名单、不看 @、
-	// 也不直接跑轮次：群里没 @ 的同样入库，交给 gate。
-	switch strings.ToLower(strings.Fields(text)[0]) {
-	case "/help", "/帮助":
-		qqDispatch(ev, qqHelpText)
-		return
-	case "/new", "/reset", "/新对话":
-		if _, err := qqNewConversation(cfg, userID, ev); err != nil {
-			qqDispatch(ev, "新建对话失败："+err.Error())
-			return
-		}
-		qqDispatch(ev, "好的，已开始新的对话。")
+		// 不回话：对方可能是任何人，提示只写日志。
+		log.Printf("qq: 服务端还没有任何账号，丢弃消息 %s", ev.chatKey())
 		return
 	}
 
@@ -530,6 +518,24 @@ func qqHandleMessage(cfg qqConfig, ev qqEvent) {
 		addressed = model.SAAddressedDirect
 	} else if atSelf {
 		addressed = model.SAAddressedMention
+	}
+
+	// /new 与 /help 是适配器本地命令，不进入判断，但同样要过准入（qqCommandAllowed）。
+	// 不被允许的命令不回话，按普通消息入库，交给 gate 记录与过滤。
+	switch cmd := strings.ToLower(strings.Fields(text)[0]); cmd {
+	case "/help", "/帮助", "/new", "/reset", "/新对话":
+		if qqCommandAllowed(userID, ev, addressed, cmd != "/help" && cmd != "/帮助") {
+			if cmd == "/help" || cmd == "/帮助" {
+				qqDispatch(ev, qqHelpText)
+				return
+			}
+			if _, err := qqNewConversation(cfg, userID, ev); err != nil {
+				qqDispatch(ev, "新建对话失败："+err.Error())
+				return
+			}
+			qqDispatch(ev, "好的，已开始新的对话。")
+			return
+		}
 	}
 	raw, err := json.Marshal(ev)
 	if err != nil {
@@ -559,6 +565,25 @@ func qqHandleMessage(cfg qqConfig, ev qqEvent) {
 	if err != nil {
 		log.Printf("qq: 入站失败 %s: %v", ev.chatKey(), err)
 	}
+}
+
+// qqCommandAllowed 决定本地命令能不能执行：发送者必须是 gate 认定的明确请求。
+// resets=true（/new）时还要求：群里只有主人或接收名单里的人能重置大家共用的前台会话。
+func qqCommandAllowed(userID string, ev qqEvent, addressed string, resets bool) bool {
+	p, err := saPolicyFor(userID)
+	if err != nil {
+		log.Printf("qq: 取接单策略失败，拒绝命令 %s: %v", ev.chatKey(), err)
+		return false
+	}
+	actor := ev.UserID.String()
+	trig := model.SATrigger{Source: model.SASourceQQ, ActorID: actor, ActorKind: model.SAActorHuman, Addressed: addressed}
+	if strength, _ := saGateDecide(p, trig, "qq:"+ev.chatKey(), false); strength != model.SAStrengthExplicit {
+		return false
+	}
+	if resets && ev.MessageType == "group" {
+		return saIsOwner(p, model.SASourceQQ, actor) || saListed(saSources(p)[model.SASourceQQ].AllowUsers, actor)
+	}
+	return true
 }
 
 // qqModelFor 定本轮用哪个模型：QQ_BOT_MODEL > 会话已选的 > 该用户最近用过的。
@@ -614,105 +639,4 @@ func qqNewConversation(cfg qqConfig, userID string, ev qqEvent) (*model.Conversa
 		return nil, err
 	}
 	return &conv, nil
-}
-
-// qqConversationFor 取这个 QQ 聊天绑定的会话；没有、或会话已被删掉/换了账号，就新建一个。
-// 普通消息不再走这里：Thread 和前台会话由 saIngest 找/建，/new 走 qqNewConversation。
-func qqConversationFor(cfg qqConfig, userID string, ev qqEvent) (*model.Conversation, error) {
-	if model.DB == nil {
-		return nil, errors.New("数据库未初始化")
-	}
-	var b model.QQChatBinding
-	if res := model.DB.Where("chat_key = ?", ev.chatKey()).Limit(1).Find(&b); res.Error == nil && res.RowsAffected > 0 && b.UserID == userID {
-		var conv model.Conversation
-		if err := model.DB.Where("id = ? AND user_id = ?", b.ConversationID, userID).First(&conv).Error; err == nil {
-			if strings.TrimSpace(conv.Model) == "" {
-				if m := qqModelFor(cfg, userID); m != "" {
-					conv.Model = m
-					model.DB.Model(&conv).Update("model", m)
-				}
-			}
-			return &conv, nil
-		}
-	}
-	return qqNewConversation(cfg, userID, ev)
-}
-
-// qqRunAgentTurn 与网页 /api/chat 走同一条路：先落 user 消息，再按 AGENT_TOOLS 决定
-// 走 agent 循环还是直连模型；把增量文本攒起来当回复。
-func qqRunAgentTurn(ctx context.Context, conv *model.Conversation, userID, content string) (string, error) {
-	if registry == nil {
-		return "", errors.New("模型注册表未就绪")
-	}
-	modelID := strings.TrimSpace(conv.Model)
-	if modelID == "" {
-		return "", errors.New("没有可用的模型：请设置 QQ_BOT_MODEL，或先在网页上用某个模型聊一次")
-	}
-	ep, ok := registry.FindByModel(modelID)
-	if !ok {
-		return "", fmt.Errorf("找不到模型 %s 的端点", modelID)
-	}
-	key := resolveKey(userID, ep)
-	saveChatMessage(conv.Id, "user", content)
-	var rows []model.Message
-	if err := model.DB.Where("conversation_id = ?", conv.Id).Order("id asc").Find(&rows).Error; err != nil {
-		return "", err
-	}
-	history := rebuildLLMHistory(rows)
-
-	if !shouldUseAgent(true) {
-		stream, err := registry.Stream(ctx, modelID, key, directChatRequest(history, chatParams{}))
-		if err != nil {
-			return "", err
-		}
-		var acc strings.Builder
-		for ev := range stream {
-			switch ev.Type {
-			case llm.EventDelta:
-				acc.WriteString(ev.Content)
-			case llm.EventError:
-				saveChatMessage(conv.Id, "assistant", acc.String())
-				return acc.String(), ev.Err
-			}
-		}
-		saveChatMessage(conv.Id, "assistant", acc.String())
-		touchConversation(conv.Id)
-		return acc.String(), nil
-	}
-
-	var (
-		acc       strings.Builder
-		question  string
-		runErrMsg string
-	)
-	runAgentChat(turnInput{
-		ctx:     ctx,
-		conv:    conv,
-		userID:  userID,
-		modelID: modelID,
-		key:     key,
-		content: content,
-		history: history,
-		kind:    normalizeKind(conv.Kind),
-		sendEvent: func(name string, v any) {
-			m, _ := v.(gin.H)
-			switch name {
-			case "delta":
-				s, _ := m["content"].(string)
-				acc.WriteString(s)
-			case "need_input":
-				question, _ = m["question"].(string)
-			case "error":
-				runErrMsg, _ = m["error"].(string)
-			}
-		},
-	})
-	reply := strings.TrimSpace(acc.String())
-	if q := strings.TrimSpace(question); q != "" && !strings.Contains(reply, q) {
-		reply = strings.TrimSpace(reply + "\n\n" + q)
-	}
-	if runErrMsg != "" {
-		return reply, errors.New(runErrMsg)
-	}
-	return reply, nil
 }
